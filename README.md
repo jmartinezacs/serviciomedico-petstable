@@ -2,95 +2,43 @@
 
 **Salud laboral** — sistema web para solicitar y controlar citas médicas y mantener actualizado el inventario de medicamentos.
 
-- **Frontend:** HTML + CSS + JavaScript (módulos ES), sin compilación. Librerías por CDN con versión fija: supabase-js 2.45.4, Lucide 0.453.0, Chart.js 4.4.4.
-- **Backend:** Supabase (PostgreSQL, Auth, RLS, funciones `security definer`).
-- **Hosting:** Vercel, con despliegue automático desde GitHub.
+- **Frontend:** HTML + CSS + JavaScript (módulos ES) empaquetados en un solo `index.html`. Librerías por CDN con versión fija: supabase-js 2.45.4, Lucide 0.453.0, Chart.js 4.4.4.
+- **Backend:** Supabase (PostgreSQL, Auth, RLS, Storage, Edge Functions, pg_cron, pg_net).
+- **Repositorio:** GitHub (privado) → **Vercel** despliega automáticamente cada `push` a `main`.
 - **Zona horaria de operación:** `America/Mexico_City`.
 
 ---
 
-## 0. Publicación (4 archivos)
-
-La carpeta **`entrega/`** contiene todo lo que hay que subir:
-
-| Archivo | Contenido |
-|---|---|
-| `index.html` | El sitio completo: estilos, código, logotipo, ícono del login, favicon, configuración pública de Supabase y una Content-Security-Policy con hashes |
-| `apple-touch-icon.png` | Ícono de 180×180 para iPhone/iPad y para las notificaciones |
-| `sw.js` | *Service worker*: muestra las notificaciones push. El navegador exige que sea un archivo aparte |
-| `manifest.webmanifest` | Manifiesto de la app instalada. iPhone lo exige para permitir notificaciones |
-
-1. Crea un repositorio en GitHub y sube **los cuatro archivos a la raíz** (no dentro de una carpeta).
-2. En Vercel, *Add New → Project →* elige el repositorio *→ Deploy*. No necesita variables de entorno, comando de compilación ni configuración.
-3. Abre `https://TU-DOMINIO/apple-touch-icon.png` para confirmar que el ícono responde.
-
-### Horario y citas de urgencia (v1.4)
-- **Bloques:** de 20 minutos, de lunes a viernes, de 09:00 a 17:20; el último bloque empieza a las 17:00.
-- **Cita de urgencia / extraordinaria:**
-  - No usa bloques y puede pedirse cualquier día. El motivo de la urgencia es obligatorio.
-  - Servicio Médico recibe el aviso y **asigna un horario especial** al confirmarla, o la **rechaza** con un motivo; quien la pidió recibe el aviso.
-  - Si se atiende sin horario asignado, se registra la hora en que se atendió.
-- **Recordatorio cada hora al médico:**
-  - `pg_cron` ejecuta `recordatorios_med` cada hora en punto. La función envía un push a los administradores con "Recibe avisos" mientras haya citas pendientes por validar.
-  - Solo envía **de lunes a viernes**, entre las 07:00 y las 19:00, hora de Ciudad de México.
-  - **Inventario:** una vez al día, a las 09:00, avisa qué medicamentos están bajo su stock mínimo o agotados y qué lotes caducados aún tienen existencia.
-  - El llamado está protegido con un secreto guardado en `med_private.cron`.
-  - Para pausarlo, ejecuta `select cron.unschedule('med_recordatorio_pendientes');`.
-
-### Avisos de citas (notificaciones y correo)
-- **Push:** cada persona los activa en *Mi perfil* o desde el aviso del Panel. En iPhone primero debe instalar la app ("Agregar a pantalla de inicio") y abrirla desde ese ícono.
-- **Quién recibe qué:**
-  - Los administradores con la opción **"Recibe avisos de nuevas citas"** reciben las solicitudes nuevas y las cancelaciones o reprogramaciones que hace un usuario.
-  - Quien solicitó una cita recibe el aviso cuando Servicio Médico la **confirma, cancela o reprograma**.
-- La Edge Function `notificar_med` verifica que cada aviso corresponda a un cambio real y no lo envía dos veces. Las claves de notificación se generan y guardan dentro de Supabase.
-- **Correo (opcional):**
-  1. Crea una cuenta en [resend.com](https://resend.com). El plan gratuito incluye 3,000 correos al mes.
-  2. Verifica el dominio `petstable.mx`.
-  3. En *Supabase → Edge Functions → Secrets* agrega:
-     - `RESEND_API_KEY`: la clave de Resend.
-     - `MED_EMAIL_FROM`: por ejemplo `Servicio Médico <avisos@petstable.mx>`.
-     - `MED_SITE_URL`: la URL de Vercel.
-
-  Sin esa clave solo se envían los avisos push.
-
-**Para modificar el sitio:** edita las fuentes en `public/` y regenera con el comando de abajo. Luego sube el nuevo `entrega/index.html`.
-
-```bash
-powershell -ExecutionPolicy Bypass -File tools\build-single.ps1
-```
-
-**Alta de usuarios desde el sitio (Usuarios → Nuevo usuario):** se capturan nombre, correo, puesto, área, rol y foto.
-- Si el correo **ya tiene** cuenta Pet's Table, la persona entra con su contraseña de siempre. Esa cuenta **no se modifica**.
-- Si **no tiene** cuenta, se crea con una contraseña temporal (hay un botón para generarla) a través de la Edge Function `gestionar_usuarios_med`. Esa función vive en Supabase y es la única que usa la llave secreta. La persona puede cambiar la contraseña en *Mi perfil*.
-- Las fotos nuevas se recortan a 320×320 y se guardan en el bucket propio `avatares_med`. Las fotos existentes del bucket `avatares` solo se enlazan; esta app no puede escribir en él.
-
----
-
-## 1. Estructura
+## 1. Estructura y publicación
 
 ```
-servicio-medico/
-├── public/                     ← raíz publicada por Vercel
-│   ├── index.html
-│   ├── manifest.webmanifest
-│   ├── apple-touch-icon.png    (180×180, ícono oficial)
-│   ├── favicon.ico             (16/32/48)
-│   ├── icons/ icon-192.png · icon-512.png · icon-maskable-512.png · favicon-32.png
-│   ├── img/logo-petstable.webp (logotipo oficial, sin modificar)
-│   ├── css/app.css
-│   └── js/
-│       ├── config.js           (URL + llave pública; se regenera en Vercel)
-│       ├── theme-init.js
-│       ├── core.js             (cliente, utilidades, modales, tablas, validación)
-│       ├── app.js              (sesión, header, menú, rutas)
-│       └── modules/ dashboard · citas · colaboradores · inventario · usuarios · bitacora · perfil
-├── supabase/migrations/        ← migraciones SQL reproducibles (ya aplicadas)
-├── tests/sql/pruebas_reglas_negocio.sql
-├── scripts/generate-config.mjs ← genera config.js con variables de entorno
-├── tools/make-icons.ps1        ← regenera íconos desde el original
-├── tools/serve.ps1             ← servidor local para pruebas (Windows)
-├── vercel.json · package.json · .env.example · .gitignore
+(raíz del repositorio = lo que publica Vercel)
+├── index.html              ← GENERADO por tools/build-single.ps1 (no editar a mano)
+├── sw.js                   ← service worker: notificaciones push
+├── manifest.webmanifest    ← app instalable (iPhone lo exige para push)
+├── apple-touch-icon.png    ← ícono 512×512
+├── version.json            ← versión publicada (aviso "Hay una nueva versión")
+├── vercel.json             ← sin compilación; encabezados de seguridad y caché
+├── .vercelignore           ← deja fuera de la publicación todo lo siguiente:
+├── public/                 ← FUENTES del sitio (index.html, css/, js/, img/)
+├── supabase/migrations/    ← migraciones SQL (todas aplicadas)
+├── supabase/functions/     ← Edge Functions (desplegadas)
+├── tests/sql/              ← pruebas de reglas de negocio
+├── tools/                  ← build-single.ps1, serve.ps1, make-icons.ps1
+└── fuentes/                ← ícono original en alta resolución
 ```
+
+**Para publicar un cambio:**
+1. Editar las fuentes en `public/` y subir `APP_VERSION` en `public/js/config.js`.
+2. Generar el sitio:
+   ```bash
+   powershell -ExecutionPolicy Bypass -File tools\build-single.ps1
+   ```
+3. `git commit` y `git push` a `main`. Vercel publica en 1–2 minutos y quienes tengan la app abierta verán el aviso **"Hay una nueva versión disponible · Actualizar"**.
+
+**Revertir:** *Vercel → Deployments →* último despliegue estable *→ ⋯ → Promote to Production*, o `git revert <commit>` y `push`. Las migraciones son aditivas; para revertir objetos `_med` se requiere una migración nueva y explícita.
+
+**Pruebas locales:** `powershell -ExecutionPolicy Bypass -File tools\serve.ps1 -Port 5173` sirve `public/` en `http://localhost:5173` (usa la base de datos real). Las reglas del servidor se prueban ejecutando los bloques de `tests/sql/pruebas_reglas_negocio.sql` en el *SQL Editor*; cada bloque revierte sus cambios y muestra los resultados como mensaje de error (intencional).
 
 ---
 
@@ -98,20 +46,20 @@ servicio-medico/
 
 | Acción | Administrador | Usuario |
 |---|:-:|:-:|
-| Ver panel con KPI y gráficas | ✔ (todo) | ✔ (solo sus citas) |
-| Solicitar cita para un colaborador | ✔ | ✔ |
-| Ver citas | Todas | Solo las que solicitó |
-| Modificar cita pendiente propia | ✔ | ✔ |
-| Confirmar · reprogramar confirmada · marcar inasistencia | ✔ | — |
-| Cancelar cita (con motivo obligatorio) | ✔ | Solo las propias |
+| Panel con KPI y gráficas | ✔ (todo) | ✔ (solo sus citas) |
+| Solicitar cita (normal o de urgencia) para un colaborador | ✔ | ✔ |
+| Ver citas, agenda del día y agenda semanal | Todas | Las que solicitó (los demás horarios aparecen "Ocupado") |
+| Modificar / cancelar cita pendiente propia | ✔ | ✔ |
+| Confirmar, reprogramar, asignar horario de urgencia, marcar o reabrir inasistencia | ✔ | — |
 | Registrar atención y dispensar medicamentos | ✔ | — |
-| Ver sintomatología y notas de atención | ✔ | — |
-| Consultar y registrar colaboradores | ✔ | ✔ |
-| Editar, desactivar o eliminar colaboradores · gestionar áreas | ✔ | — |
-| Inventario (catálogo, entradas, salidas, ajustes, movimientos) | ✔ | — |
-| Usuarios, configuración y bitácora | ✔ | — |
+| Constancia de atención (imprimible, sin datos clínicos) | ✔ | De sus citas atendidas |
+| Días sin servicio (festivos, ausencias) | ✔ | Solo los ve |
+| Historial de atención por colaborador | ✔ | — |
+| Colaboradores: consultar y registrar | ✔ | ✔ |
+| Colaboradores: editar, desactivar, eliminar · áreas | ✔ | — |
+| Inventario, reabasto, reportes, respaldo, usuarios, configuración y bitácora | ✔ | — |
 
-**Usuarios iniciales:** javier.martinez, kevin.hernandez, nelisa.ramirez, julian.pacheco y servicio.medico (Administrador); abigail.ordaz (Usuario). Todos con dominio `@petstable.mx`.
+**Usuarios iniciales:** javier.martinez, kevin.hernandez, nelisa.ramirez, julian.pacheco y servicio.medico (Administrador); abigail.ordaz (Usuario). Dominio `@petstable.mx`.
 
 Todas las reglas se aplican **en la base de datos** (RLS, triggers y funciones). Ocultar botones en la interfaz es solo una ayuda visual.
 
@@ -120,10 +68,12 @@ Todas las reglas se aplican **en la base de datos** (RLS, triggers y funciones).
 ## 3. Reglas de negocio
 
 **Proporcionadas por el usuario**
-1. Los usuarios solicitan citas para colaboradores de un catálogo. Los colaboradores no necesitan cuenta.
-2. Horario: lunes a viernes de 9:00 a 17:30, en bloques de 30 minutos (el último inicia a las 17:00). Un bloque admite una sola cita activa.
-3. Los medicamentos se descuentan al registrar la atención. Además hay entradas, salidas y ajustes manuales.
-4. Datos clínicos mínimos: motivo, sintomatología y una nota breve. Solo los consultan los administradores.
+1. Los usuarios solicitan citas para colaboradores de un catálogo; los colaboradores no necesitan cuenta.
+2. Horario de lunes a viernes de 9:00 a 17:30, en bloques de **20 minutos** (el último inicia a las 17:00). Un bloque admite una sola cita activa.
+3. **Cita de urgencia / extraordinaria:** sin bloques y cualquier día; el motivo es obligatorio. Servicio Médico asigna un horario especial al confirmarla o la rechaza.
+4. Los medicamentos se descuentan al registrar la atención; además hay entradas, salidas y ajustes manuales.
+5. Datos clínicos mínimos: motivo, padecimiento, sintomatología y nota breve. Solo los consultan los administradores.
+6. Recordatorios al médico solo de lunes a viernes; aviso de bajo stock al médico.
 
 **Supuestos documentados (ajustables)**
 
@@ -131,161 +81,86 @@ Todas las reglas se aplican **en la base de datos** (RLS, triggers y funciones).
 |---|---|---|
 | Ventana de alerta de caducidad | 60 días | Usuarios → Configuración |
 | Stock mínimo | Por medicamento (0 = sin alerta) | Inventario → Editar |
-| Días festivos | **No** se bloquean automáticamente | Requiere migración si se desea |
-| Estados de cita | pendiente → confirmada → atendida; cancelada; no asistió | — |
-| Un usuario no administrador agenda solo horarios futuros | Sí | Trigger `med_validar_cita` |
-| Un administrador puede registrar citas del día en un bloque ya transcurrido (atención inmediata) | Sí | Trigger `med_validar_cita` |
+| Días festivos | Días de descanso obligatorio de la LFT (art. 74) 2026–2027 precargados; los demás los registra el médico | Citas → Días sin servicio |
+| Un día u horario sin servicio bloquea citas **normales**; las urgencias se permiten | Sí | Trigger `med_validar_cita` |
+| Citas ya agendadas cuando se registra un bloqueo | No se cancelan solas; se muestran para reprogramarlas | — |
+| Inasistencia automática | 19:05 de L-V: citas confirmadas cuyo horario ya pasó y no se atendieron | `cron` `med_inasistencias` |
+| Una inasistencia puede reabrirse (admin) para registrar la atención | Sí | Trigger `med_validar_cita` |
+| Recordatorio pendientes al médico | Cada hora en punto, L-V 07:00–19:00 | `recordatorios_med` |
+| Aviso de inventario al médico | 09:00 L-V (bajo mínimo, agotados, lotes caducados con existencia) | `recordatorios_med` |
+| Recordatorio a quien solicitó la cita | 18:00 del día hábil anterior y ~1 hora antes | `recordatorios_med` |
+| Consumo para reabasto | Piezas entregadas en consultas, últimos 90 días | `med_reabasto` |
+| Cobertura objetivo del pedido sugerido | 60 días (nunca menos que el stock mínimo) | Usuarios → Configuración |
+| Un usuario agenda solo horarios futuros; un admin puede registrar citas del día en un bloque ya transcurrido | Sí | Trigger `med_validar_cita` |
 | Solo se atienden citas de hoy o de fechas pasadas | Sí | `med_atender_cita` |
-| Lotes caducados no se pueden dispensar; sí pueden darse de baja | Sí | RPC |
-| Las entradas exigen caducidad posterior a hoy; un lote existente debe conservar su caducidad | Sí | `med_registrar_entrada` |
-| Las citas no se eliminan; se cancelan (trazabilidad) | Sí | Sin política DELETE |
+| Lotes caducados no se dispensan; sí pueden darse de baja. Se propone primero el lote que caduca antes | Sí | RPC / interfaz |
+| Las citas no se eliminan; se cancelan | Sí | Sin política DELETE |
 | Colaboradores, medicamentos y áreas con historial no se eliminan; se desactivan | Sí | Llaves foráneas `RESTRICT` |
-| Siempre debe existir al menos un administrador activo; nadie cambia su propio rol ni estado | Sí | Trigger `med_validar_usuario` |
+| Siempre hay al menos un administrador activo; nadie cambia su propio rol ni estado | Sí | Trigger `med_validar_usuario` |
 | La bitácora no replica el contenido clínico | Sí | `med_auditar` |
 
 ---
 
 ## 4. Modelo de datos (sufijo `_med`)
 
-| Tabla | Propósito | Claves y restricciones principales |
-|---|---|---|
-| `areas_med` | Catálogo de áreas | nombre único (sin distinguir mayúsculas) |
-| `usuarios_med` | Usuarios autorizados y su rol | email único `@petstable.mx`; rol `admin`/`usuario`; FK área |
-| `colaboradores_med` | Pacientes | No. de empleado único (opcional); FK área (RESTRICT) |
-| `citas_med` | Citas | folio consecutivo; día hábil; hora en bloque válido; **índice único parcial `(fecha, hora)` para citas activas**; motivo obligatorio al cancelar |
-| `atenciones_med` | Atención 1:1 con la cita | sintomatología ≤500, nota ≤1000; solo administradores |
-| `medicamentos_med` | Catálogo | clave única; stock mínimo ≥ 0 |
-| `lotes_med` | Existencia por lote | (medicamento, lote) único; existencia ≥ 0; **sin escritura directa** |
-| `movimientos_med` | Kardex (solo inserción) | tipo entrada/salida/ajuste/dispensación; signo validado; existencia resultante |
-| `bitacora_med` | Auditoría automática | escritura solo por triggers |
-| `config_med` | Configuración (fila única) | días de alerta 1–365 |
+| Tabla | Propósito |
+|---|---|
+| `areas_med` | Catálogo de áreas |
+| `usuarios_med` | Usuarios autorizados, rol, foto y "Recibe avisos" |
+| `colaboradores_med` | Pacientes |
+| `citas_med` | Citas (`tipo` normal/urgente; índice único parcial `(fecha, hora)` para citas normales activas) |
+| `atenciones_med` | Atención 1:1 con la cita (padecimiento, sintomatología, nota) |
+| `padecimientos_med` | Catálogo de padecimientos |
+| `dias_sin_servicio_med` | Festivos y ausencias (día completo o rango de horas) |
+| `medicamentos_med` · `lotes_med` · `movimientos_med` | Inventario en doble unidad (pieza y empaque) y kardex |
+| `push_subs_med` · `avisos_med` | Suscripciones push y registro de avisos enviados (evita duplicados) |
+| `bitacora_med` | Auditoría automática |
+| `config_med` | Configuración (alerta de caducidad, cobertura, aviso de privacidad) |
 
-**Vistas** (`security_invoker`, respetan RLS): `v_citas_med`, `v_stock_med`, `v_lotes_med`, `v_movimientos_med`.
+**Vistas** (`security_invoker`): `v_citas_med`, `v_stock_med`, `v_lotes_med`, `v_movimientos_med`.
 
-**Funciones RPC:** `med_mi_perfil`, `med_horarios_ocupados`, `med_atender_cita` (transaccional: cierra la cita, guarda la atención y descuenta los lotes en una sola operación), `med_registrar_entrada`, `med_registrar_salida`, `med_ajustar_lote`, `med_dashboard`, `med_estado_cuentas`.
+**RPC principales:** `med_mi_perfil`, `med_horarios_ocupados`, `med_atender_cita`, `med_registrar_entrada`, `med_registrar_salida`, `med_ajustar_lote`, `med_dashboard`, `med_estadisticas_padecimientos`, `med_constancia`, `med_reabasto`, `med_aviso_privacidad` (la única accesible sin sesión: solo devuelve el enlace del aviso).
 
-**Aislamiento:** la instancia `domumnsezocubigfqwry` la comparten otras aplicaciones (EPP, `brom_*`, `*_pruind`, `*_calbas`). Este proyecto **no modificó** ninguna tabla, función, política ni trigger ajeno. Todos sus objetos llevan el sufijo `_med` o el prefijo `med_`.
-
----
-
-## 5. Autenticación
-
-- Se usa la cuenta de **Supabase Auth compartida**: la contraseña es la misma de las demás apps de Pet's Table.
-- El acceso a *esta* app lo define la tabla `usuarios_med`, que se vincula por correo. Una cuenta sin registro activo ahí recibe el mensaje "sin acceso" y su sesión se cierra.
-- Al cerrar sesión se usa `scope: 'local'`, para no cerrar las sesiones de las otras apps.
-- "Mantener sesión" desactivado guarda la sesión en `sessionStorage`, que se borra al cerrar el navegador.
-
-### ⚠ Pendiente: cuenta de `servicio.medico@petstable.mx`
-Ese correo **todavía no existe en Supabase Auth**. Para crearlo: *Supabase → Authentication → Users → Invite user*.
-Ten en cuenta que, al crear cualquier usuario en esta instancia, se ejecutan triggers de otras apps (`trg_asignar_perfil` crea un perfil "Usuario" en la app de EPP y `brom_on_auth_user_created` no hace nada para este correo). Es el comportamiento existente de la instancia y no lo modifiqué.
-
-### Configuración de Auth recomendada (panel de Supabase)
-1. **Authentication → URL Configuration → Redirect URLs:** agrega `https://TU-DOMINIO.vercel.app/**` para que funcione el enlace de "Olvidé mi contraseña".
-2. **Authentication → Providers → Email → Leaked password protection:** activarla (aviso del asesor de seguridad).
+**Aislamiento:** la instancia `domumnsezocubigfqwry` la comparten otras aplicaciones (EPP, `brom_*`, `*_pruind`, `*_calbas`). Este proyecto no modifica objetos ajenos; todos los suyos llevan el sufijo `_med` o el prefijo `med_`.
 
 ---
 
-## 6. Despliegue: GitHub + Vercel
+## 5. Avisos y tareas programadas
 
-### 6.1 Subir a GitHub
-Este equipo no tiene `git` instalado. Hay dos opciones:
-- **Web:** crea un repositorio privado en GitHub → *Add file → Upload files* → arrastra el **contenido** de la carpeta `servicio-medico/` (incluidos `.gitignore` y `.env.example`).
-- **Con Git:** desde la carpeta `servicio-medico`:
+- **Push:** cada persona los activa en *Mi perfil* o desde el aviso del Panel. En iPhone primero debe instalar la app ("Agregar a pantalla de inicio") y abrirla desde ese ícono.
+- **`notificar_med`** (al momento): nuevas solicitudes y cancelaciones/reprogramaciones de usuarios → administradores con "Recibe avisos"; confirmación, rechazo, cancelación o reprogramación → quien solicitó la cita. Correo opcional con Resend (secretos `RESEND_API_KEY`, `MED_EMAIL_FROM`, `MED_SITE_URL` en *Edge Functions → Secrets*).
+- **`recordatorios_med`** (pg_cron `med_recordatorio_pendientes`, cada 20 min; solo actúa L-V 07:00–19:00): pendientes al médico cada hora en punto, inventario a las 09:00, recordatorio de cita a quien la solicitó (18:00 del día hábil anterior y ~1 h antes). Protegida con el secreto `med_private.cron`.
+- **`med_inasistencias`** (pg_cron, 19:05 L-V): marca inasistencias automáticas.
+- Para pausar un trabajo: `select cron.unschedule('<nombre>');`.
 
-```bash
-git init -b main
-```
-```bash
-git add . && git commit -m "Servicio Médico v1.0.0"
-```
-```bash
-git remote add origin https://github.com/ORG/servicio-medico.git && git push -u origin main
-```
+---
 
-### 6.2 Conectar Vercel
-1. *Vercel → Add New → Project →* importa el repositorio.
-2. **Framework Preset:** *Other*. `vercel.json` ya define `buildCommand` (`node scripts/generate-config.mjs`) y `outputDirectory` (`public`).
-3. **Environment Variables** (Production y Preview), con los valores de `.env.example`:
-   - `SUPABASE_URL` = `https://domumnsezocubigfqwry.supabase.co`
-   - `SUPABASE_ANON_KEY` = la llave **publishable** (`sb_publishable_…`). El script **rechaza** las llaves `service_role` y `sb_secret_`.
-4. *Deploy.* Cada `push` a `main` despliega a producción, y cada rama o PR genera una *Preview*.
+## 6. Autenticación
 
-> Si cambias de proyecto de Supabase, actualiza también el dominio en `connect-src` de la *Content-Security-Policy* en `vercel.json`.
+- Se usa la cuenta de **Supabase Auth compartida** (misma contraseña de las demás apps de Pet's Table). El acceso a esta app lo define `usuarios_med`, vinculado por correo.
+- Al cerrar sesión se usa `scope: 'local'` para no cerrar las sesiones de las otras apps.
+- **Alta de usuarios** (Usuarios → Nuevo usuario): si el correo ya tiene cuenta, no se modifica; si no, la Edge Function `gestionar_usuarios_med` la crea con contraseña temporal. Fotos nuevas en el bucket `avatares_med`; las del bucket `avatares` solo se enlazan.
 
-### 6.3 Comprobar que el despliegue terminó bien
-1. *Vercel → Deployments:* el último debe aparecer como **Ready** y asociado al commit correcto.
-2. En *Build Logs* debe aparecer `[config] public/js/config.js generado para https://…`.
-3. Abre estas URLs y confirma que responden `200` con el tipo correcto:
-   - `https://TU-DOMINIO/apple-touch-icon.png` → `image/png`
-   - `https://TU-DOMINIO/manifest.webmanifest` → `application/manifest+json`
-   - `https://TU-DOMINIO/icons/icon-192.png`, `/icons/icon-512.png`, `/icons/icon-maskable-512.png`, `/favicon.ico`
-4. En Chrome de escritorio: *DevTools → Application → Manifest*. No debe haber errores y deben verse los 3 íconos.
-5. *DevTools → Console:* sin errores. Si aparece "Refused to connect", revisa la CSP.
-
-### 6.4 Revertir a una versión estable
-- **Inmediato:** *Vercel → Deployments →* elige el último despliegue estable → **⋯ → Promote to Production** (Instant Rollback). No requiere tocar el código.
-- **Definitivo:** revierte el commit en GitHub (`git revert <sha>` y luego `push`). Vercel desplegará la versión corregida.
-- **Base de datos:** las migraciones son aditivas. Para revertir objetos `_med` se necesita una migración nueva y explícita. **Nunca** ejecutes `drop` sobre objetos sin el sufijo `_med`.
+### Pendiente en el panel de Supabase (lo hace un administrador del proyecto)
+1. **Authentication → URL Configuration → Redirect URLs:** agregar `https://TU-DOMINIO.vercel.app/**` (para "¿Olvidaste tu contraseña?").
+2. **Authentication → Providers → Email → Leaked password protection:** activarla.
 
 ---
 
 ## 7. Instalación en la pantalla de inicio
 
-- **iPhone/iPad (Safari):** *Compartir → Agregar a pantalla de inicio*. Nombre: "Servicio médico". Ícono: `apple-touch-icon.png` (180×180).
-- **Android (Chrome):** *menú ⋮ → Instalar aplicación*. Usa `manifest.webmanifest` (192, 512 y *maskable*).
-
-**Si iOS sigue mostrando un ícono anterior:** borra el acceso directo, cierra Safari por completo, ve a *Ajustes → Safari → Avanzado → Datos de sitios web* y elimina el dominio, vuelve a abrir el sitio y agrégalo de nuevo. Si cambias el ícono en el futuro, sube el número en `?v=1` de los `<link>` de `index.html`.
-
-**Nota sobre los íconos:** el ícono oficial que se recibió mide **180×180 px**. `apple-touch-icon.png` sale de él, aplanado sobre el naranja de su propio borde, porque iOS rellena de negro las esquinas transparentes. Las versiones de 192 y 512 px se generaron **ampliando** ese original, así que en Android pueden verse algo suaves. Para máxima nitidez, entrega el original en 1024×1024 y ejecuta:
-
-```bash
-powershell -ExecutionPolicy Bypass -File tools\make-icons.ps1 -Src C:\ruta\icono-1024.png -Logo public\img\logo-petstable.webp -Out public
-```
-
-El sitio **no** incluye *service worker* ni modo sin conexión, porque no se solicitó. Necesita conexión para funcionar.
+- **iPhone/iPad (Safari):** *Compartir → Agregar a pantalla de inicio*.
+- **Android (Chrome):** *menú ⋮ → Instalar aplicación*.
+- Si iOS muestra un ícono anterior: borrar el acceso directo, eliminar los datos del sitio en *Ajustes → Safari → Avanzado → Datos de sitios web* y volver a agregarlo.
 
 ---
 
-## 8. Pruebas locales
+## 8. Registro de pruebas
 
-```bash
-powershell -ExecutionPolicy Bypass -File tools\serve.ps1 -Port 5173
-```
-Abre `http://localhost:5173`. Usa la base de datos real, así que lo que registres queda guardado.
+**Ejecutadas (base de datos, sesiones simuladas, todo revertido):** reglas de citas, inventario, permisos y bitácora (27 verificaciones, v1.0); urgencias y bloques de 20 min (v1.4); v1.6 — horario bloqueado y festivo rechazados para citas normales y permitidos para urgencias, usuario sin permiso para crear bloqueos ni ver reabasto, reapertura de inasistencia, constancia solo para el solicitante o admin, URL de aviso sin https rechazada, inasistencia automática.
 
-Para validar las reglas del servidor, ejecuta `tests/sql/pruebas_reglas_negocio.sql` en el *SQL Editor* de Supabase. Ese script revierte todos sus cambios al terminar y muestra los resultados como mensaje de error (eso es intencional).
+**Ejecutadas (navegador con datos simulados):** agenda semanal (escritorio y 375 px), días sin servicio (alta de varios días, lista), horarios bloqueados en el formulario, disponibilidad del Panel saltando festivos, reabasto y su exportación, reportes CSV y respaldo JSON, historial por colaborador, constancia (contenido de impresión), aviso de nueva versión y enlace de privacidad en el login.
 
----
+**Ejecutadas (Edge Function):** `recordatorios_med` v3 responde 200 con el secreto correcto.
 
-## 9. Registro de pruebas (12/10/2026)
-
-### Ejecutadas ✔
-**Base de datos (sesiones simuladas de admin, usuario, cuenta sin acceso y anónimo; todo revertido):** 27 de 27 verificaciones correctas.
-- Cita creada por un usuario queda forzada a `pendiente`; se rechazan sábado, 17:30, 09:15, fecha pasada y traslape del mismo bloque.
-- Un usuario no puede confirmar, no puede reprogramar una cita confirmada, no ve medicamentos ni atenciones y no puede registrar entradas.
-- Cancelar exige motivo y libera el bloque.
-- Entradas: un lote existente suma existencia, se rechaza una caducidad distinta y se rechaza una caducidad vencida.
-- La atención no procede en fecha futura; al faltar existencia se revierte **toda** la operación; la atención correcta descuenta el lote.
-- Una cita solo pasa a "atendida" vía la RPC; salida sin motivo rechazada; el ajuste por conteo físico funciona.
-- No se puede borrar un medicamento con lotes; un admin no puede desactivarse a sí mismo; correo fuera de `@petstable.mx` rechazado.
-- La bitácora no contiene datos clínicos.
-- Una cuenta Auth no autorizada no ve ni crea nada, y el rol anónimo no tiene acceso.
-- Asesor de seguridad de Supabase: sin hallazgos para los objetos `_med`, salvo el aviso esperado de funciones `security definer` ejecutables por usuarios autenticados (validan rol internamente).
-
-**Navegador (servidor local, panel integrado de Claude, motor Chromium):**
-- Carga sin errores de consola; supabase-js, Lucide y Chart.js cargan desde el CDN.
-- La llave *publishable* funciona con supabase-js 2.45.4; el rol anónimo recibe `permission denied` en tablas y RPC; Auth responde a credenciales inválidas.
-- Pantalla de acceso a 375 px sin desbordamiento horizontal; tema claro y oscuro.
-- Los 7 módulos se renderizan sin errores con respuestas **simuladas**. Gráficas (5 en el panel), tablas tipo tarjeta en móvil, modal tipo hoja inferior en móvil.
-- Formulario de cita: validaciones, buscador de colaborador, bloqueo de fin de semana, horarios ocupados deshabilitados, confirmación de "descartar cambios".
-- Atención: tope por existencia del lote, confirmación previa y payload correcto hacia `med_atender_cita`. Cancelación con motivo obligatorio. Entrada con lote existente.
-- Recursos: `apple-touch-icon.png` (PNG 180×180), íconos 192/512/maskable (PNG), `favicon.ico`, manifiesto válido y metadatos en `<head>`. Comprobado por HTTP local, **no** por HTTPS.
-
-### Pendientes ⏳ (requieren despliegue o credenciales reales)
-- Inicio de sesión real con cada rol. No se ingresaron contraseñas reales.
-- Flujo completo contra la base de datos desde la interfaz: crear, confirmar, atender y cancelar con datos reales.
-- Restablecimiento de contraseña por correo (requiere configurar Redirect URLs).
-- Accesibilidad de los recursos por **HTTPS** en Vercel y encabezados CSP en producción.
-- **iPhone real con Safari** y "Agregar a pantalla de inicio" (no se ha probado en un dispositivo iOS).
-- Android real (instalación y apariencia del ícono *maskable*).
-- Tableta física y tablas con muchos registros reales.
+**Pendientes (requieren uso real):** inicio de sesión real con cada rol; recepción de push en un dispositivo (incluidos los recordatorios de 18:00, 1 h antes y 09:00); impresión real de la constancia; descarga de archivos en iPhone; iPhone/Android físicos.

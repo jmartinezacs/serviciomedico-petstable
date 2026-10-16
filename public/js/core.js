@@ -31,6 +31,8 @@ export const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_AN
 });
 
 export const state = { session: null, profile: null, isAdmin: false };
+// Funciones que un módulo publica para otro sin importarlo (evita dependencias circulares)
+export const ganchos = {};
 
 // ---------- Formato y fechas ----------
 export const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -125,6 +127,10 @@ const CONSTRAINT_MSG = {
   areas_med_nombre_uk: 'Ya existe un área con ese nombre.',
   usuarios_med_email_uk: 'Ese correo ya está registrado.',
   usuarios_med_email_check: 'El correo debe ser del dominio @petstable.mx.',
+  dias_sin_servicio_med_dia_uk: 'Ese día ya está marcado como sin servicio.',
+  dias_sin_servicio_med_horas_ck: 'La hora final debe ser posterior a la inicial.',
+  config_med_aviso_url_check: 'La dirección del aviso de privacidad debe empezar con https://',
+  config_med_dias_cobertura_check: 'La cobertura objetivo debe estar entre 7 y 365 días.',
 };
 export function errMsg(err) {
   if (!err) return 'Ocurrió un error inesperado.';
@@ -469,6 +475,50 @@ export async function getAreas({ force = false, soloActivas = false } = {}) {
   return soloActivas ? areasCache.filter((a) => a.activo) : areasCache;
 }
 export function invalidateAreas() { areasCache = null; }
+
+// ---------- Días u horarios sin servicio (festivos, ausencias del médico) ----------
+export async function getBloqueos(desde, hasta = desde) {
+  const { data, error } = await sb.from('dias_sin_servicio_med').select('id, fecha, hora_inicio, hora_fin, tipo, motivo')
+    .gte('fecha', desde).lte('fecha', hasta).order('fecha').order('hora_inicio', { nullsFirst: true });
+  if (error) throw error;
+  return data;
+}
+// Bloqueo que afecta a un horario (o al día completo si hora es null)
+export function bloqueoDe(bloqueos, fecha, hora = null) {
+  return bloqueos.find((b) => b.fecha === fecha && (!b.hora_inicio
+    || (hora && hora >= fmtTime(b.hora_inicio) && hora < fmtTime(b.hora_fin)))) || null;
+}
+export const bloqueoTxt = (b) => (b.hora_inicio ? `${fmtTime(b.hora_inicio)} a ${fmtTime(b.hora_fin)} h` : 'Todo el día');
+
+// ---------- Exportación de archivos ----------
+// Lee todas las filas de una consulta en páginas de 1,000 (límite del servidor)
+export async function fetchAll(build, max = 50000) {
+  const out = [];
+  for (let from = 0; from < max; from += 1000) {
+    const { data, error } = await build().range(from, from + 999);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < 1000) break;
+  }
+  return out;
+}
+// CSV compatible con Excel (UTF-8 con BOM, separado por comas)
+export function toCSV(rows, cols) {
+  const cell = (v) => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'number') return String(v);
+    // Evita que Excel interprete texto como fórmula
+    const s = /^[=+\-@\t\r]/.test(String(v)) ? `'${v}` : String(v);
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return '﻿' + [cols.map((c) => cell(c.label)).join(','), ...rows.map((r) => cols.map((c) => cell(c.get(r))).join(','))].join('\r\n');
+}
+export function descargar(nombre, contenido, tipo = 'text/csv;charset=utf-8') {
+  const url = URL.createObjectURL(new Blob([contenido], { type: tipo }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: nombre });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
 
 // ---------- Fotos de usuario ----------
 // Avatar con foto (si existe) y respaldo de iniciales cuando la imagen no carga

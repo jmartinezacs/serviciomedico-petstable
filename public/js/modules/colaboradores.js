@@ -6,6 +6,7 @@
 import {
   sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, nullIfEmpty,
   DataTable, paged, sanitizeSearch, debounce, getAreas, invalidateAreas, pill, must, fmtNum,
+  fmtDate, fmtTime, estadoPill, MOTIVOS, cantUnidad, refreshIcons, ganchos,
 } from '../core.js';
 
 let root, table, areasTable;
@@ -45,6 +46,7 @@ export default {
         { label: 'Puesto', render: (c) => esc(c.puesto || '—') },
         { label: 'Estado', render: (c) => (c.activo ? pill('Activo', 'ok') : pill('Inactivo', 'gray')) },
         ...(admin ? [{ label: 'Acciones', cls: 'actions', render: (c) => `<div class="row-actions">
+          <button class="icon-btn ok" data-ka="historial" data-id="${esc(c.id)}" title="Historial de atención" aria-label="Historial de atención">${icon('clipboard-list')}</button>
           <button class="icon-btn" data-ka="editar" data-id="${esc(c.id)}" title="Editar" aria-label="Editar">${icon('pencil')}</button>
           <button class="icon-btn ${c.activo ? 'warn' : 'ok'}" data-ka="toggle" data-id="${esc(c.id)}" title="${c.activo ? 'Desactivar' : 'Activar'}" aria-label="${c.activo ? 'Desactivar' : 'Activar'}">${icon(c.activo ? 'user-minus' : 'user-check')}</button>
           <button class="icon-btn bad" data-ka="eliminar" data-id="${esc(c.id)}" title="Eliminar" aria-label="Eliminar">${icon('trash-2')}</button></div>` }] : []),
@@ -105,6 +107,7 @@ async function onClick(e) {
     const c = table.row(a.dataset.id);
     if (!c) return;
     try {
+      if (a.dataset.ka === 'historial') await openHistorial(c);
       if (a.dataset.ka === 'editar') { if (await openColaboradorForm({ colaborador: c })) table.load(); }
       if (a.dataset.ka === 'toggle') {
         const ok = await confirmDialog({
@@ -153,6 +156,57 @@ async function onClick(e) {
       }
     } catch (err) { toast(errMsg(err), 'error'); }
   }
+}
+
+// ---------- Historial de atención (solo administradores) ----------
+async function openHistorial(c) {
+  let citas, atenciones, meds;
+  try {
+    citas = must(await sb.from('v_citas_med').select('id, folio_txt, fecha, hora, motivo, descripcion, estado, tipo')
+      .eq('colaborador_id', c.id).order('fecha', { ascending: false }).order('hora', { ascending: false }).limit(200)).data;
+    const ids = citas.filter((x) => x.estado === 'atendida').map((x) => x.id);
+    [atenciones, meds] = ids.length ? await Promise.all([
+      sb.from('atenciones_med').select('cita_id, sintomatologia, nota, atendido_at, padecimiento:padecimientos_med(nombre)').in('cita_id', ids).then((r) => must(r).data),
+      sb.from('v_movimientos_med').select('cita_id, medicamento, unidad, cantidad').in('cita_id', ids).then((r) => must(r).data),
+    ]) : [[], []];
+  } catch (err) { toast(errMsg(err), 'error'); return; }
+  const at = new Map(atenciones.map((x) => [x.cita_id, x]));
+  const atendidas = citas.filter((x) => x.estado === 'atendida');
+  const inasist = citas.filter((x) => x.estado === 'no_asistio').length;
+  const pads = {};
+  atenciones.forEach((x) => { const n = x.padecimiento?.nombre || 'Sin clasificar'; pads[n] = (pads[n] || 0) + 1; });
+  const topPads = Object.entries(pads).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const items = citas.map((x) => {
+    const a = at.get(x.id);
+    const m = meds.filter((y) => y.cita_id === x.id);
+    return `<li class="hist-item st-${esc(x.estado)}">
+      <div class="hist-head"><button type="button" class="link-btn mono" data-hist="${esc(x.id)}">${esc(x.folio_txt)}</button>
+        <span>${esc(fmtDate(x.fecha))} · ${esc(x.hora ? `${fmtTime(x.hora)} h` : 'Sin horario')}</span>${estadoPill(x.estado)}${x.tipo === 'urgente' ? pill('Urgente', 'bad') : ''}</div>
+      <div class="hist-body"><b>${esc(MOTIVOS[x.motivo] || x.motivo)}</b>${a?.padecimiento?.nombre ? ` · ${esc(a.padecimiento.nombre)}` : ''}
+        ${a?.sintomatologia ? `<p><small>Sintomatología:</small> ${esc(a.sintomatologia)}</p>` : ''}
+        ${a?.nota ? `<p><small>Nota:</small> ${esc(a.nota)}</p>` : ''}
+        ${m.length ? `<p><small>Medicamentos:</small> ${m.map((y) => `${esc(y.medicamento)} (${esc(cantUnidad(-y.cantidad, y.unidad))})`).join(', ')}</p>` : ''}</div></li>`;
+  }).join('');
+  await openModal({
+    title: `Historial · ${c.nombre}`, size: 'lg',
+    subtitle: [c.num_empleado, c.area?.nombre, c.puesto].filter(Boolean).join(' · '),
+    body: `
+      <div class="notice">${icon('shield-check')}<span>Información confidencial: solo la ven los administradores. No la compartas fuera de Servicio Médico.</span></div>
+      <div class="detail-grid">
+        <div class="info-box"><small>Consultas atendidas</small><b>${fmtNum(atendidas.length)}</b></div>
+        <div class="info-box"><small>Inasistencias</small><b>${fmtNum(inasist)}</b></div>
+        <div class="info-box"><small>Última atención</small><b>${atendidas[0] ? esc(fmtDate(atendidas[0].fecha)) : '—'}</b></div>
+        <div class="info-box"><small>Padecimientos más frecuentes</small><b>${topPads.length ? topPads.map(([n, k]) => `${esc(n)} (${k})`).join(', ') : '—'}</b></div>
+      </div>
+      ${citas.length ? `<ul class="hist-list">${items}</ul>` : '<p class="hint">Este colaborador aún no tiene citas registradas.</p>'}`,
+    onOpen: ({ wrap, close }) => {
+      refreshIcons();
+      wrap.addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-hist]'); if (!b) return;
+        close(); await ganchos.openDetalle?.(b.dataset.hist);
+      });
+    },
+  });
 }
 
 function initAreas() {

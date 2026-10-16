@@ -7,6 +7,7 @@ import {
   sb, state, esc, icon, refreshIcons, todayISO, addDays, fmtDate, fmtTime, fmtDateTime, fmtNum,
   MOTIVOS, ESTADOS, estadoPill, pill, makeChart, destroyCharts, emptyState, errorState, navigate,
   monthShort, prefs, must, avatarHTML, cantUnidad, nowHHMM, isWeekday, fmtLongDate, SLOTS, push, toast, errMsg,
+  getBloqueos, bloqueoDe,
 } from '../core.js';
 import { openCitaForm, openDetalle } from './citas.js';
 import { openEntrada } from './inventario.js';
@@ -97,25 +98,31 @@ async function onClick(e) {
 }
 
 // ---------- Disponibilidad de citas (hoy o el siguiente día hábil) ----------
-async function libresDe(fecha, soloFuturos) {
+async function libresDe(fecha, soloFuturos, bloqueos) {
   const { data, error } = await sb.rpc('med_horarios_ocupados', { p_fecha: fecha });
   if (error) throw error;
   const oc = new Set((data || []).map(fmtTime));
   const now = nowHHMM();
-  return SLOTS.filter((s) => !oc.has(s) && (!soloFuturos || s > now));
+  return SLOTS.filter((s) => !oc.has(s) && (!soloFuturos || s > now) && !bloqueoDe(bloqueos, fecha, s));
 }
-function sigHabil(iso) { let d = addDays(iso, 1); while (!isWeekday(d)) d = addDays(d, 1); return d; }
+// Siguiente día hábil con servicio (salta fines de semana, festivos y ausencias de día completo)
+function sigHabil(iso, bloqueos) {
+  let d = addDays(iso, 1);
+  for (let i = 0; i < 60 && (!isWeekday(d) || bloqueoDe(bloqueos, d)); i++) d = addDays(d, 1);
+  return d;
+}
 async function disponibilidad() {
   const hoy = todayISO();
-  const restantes = SLOTS.filter((s) => s > nowHHMM()).length;
-  if (isWeekday(hoy) && restantes > 0) {
-    const libres = await libresDe(hoy, true);
+  const bloqueos = await getBloqueos(hoy, addDays(hoy, 75));
+  const restantes = SLOTS.filter((s) => s > nowHHMM() && !bloqueoDe(bloqueos, hoy, s)).length;
+  const sig = sigHabil(hoy, bloqueos);
+  const diaBloq = isWeekday(hoy) ? bloqueoDe(bloqueos, hoy) : null;
+  if (isWeekday(hoy) && !diaBloq && restantes > 0) {
+    const libres = await libresDe(hoy, true, bloqueos);
     if (libres.length) return { tipo: 'hoy', fecha: hoy, libres, base: restantes };
-    const sig = sigHabil(hoy);
-    return { tipo: 'lleno', fecha: sig, libres: await libresDe(sig, false), base: SLOTS.length, finde: false };
+    return { tipo: 'lleno', fecha: sig, libres: await libresDe(sig, false, bloqueos), base: SLOTS.length, finde: false };
   }
-  const sig = sigHabil(hoy);
-  return { tipo: 'cerrado', fecha: sig, libres: await libresDe(sig, false), base: SLOTS.length, finde: !isWeekday(hoy) };
+  return { tipo: 'cerrado', fecha: sig, libres: await libresDe(sig, false, bloqueos), base: SLOTS.length, finde: !isWeekday(hoy), motivo: diaBloq?.motivo };
 }
 function availHTML(d) {
   if (!d) return '';
@@ -127,7 +134,9 @@ function availHTML(d) {
   const t = {
     hoy: ['', 'Citas disponibles hoy', `${n} ${n === 1 ? 'horario libre' : 'horarios libres'} hoy`, `El próximo es a las ${d.libres[0]} h. Toca un horario para agendar.`],
     lleno: ['lleno', 'Agenda llena hoy', 'Ya no hay horarios disponibles hoy', `Próximo día hábil: ${dia} · ${n} ${n === 1 ? 'horario libre' : 'horarios libres'}.`],
-    cerrado: ['cerrado', d.finde ? 'Fin de semana' : 'Fuera de horario', d.finde ? 'Hoy no hay servicio médico' : 'El servicio de hoy ya concluyó', `Próximo día hábil: ${dia} · ${n} ${n === 1 ? 'horario libre' : 'horarios libres'}.`],
+    cerrado: ['cerrado', d.finde ? 'Fin de semana' : d.motivo ? 'Sin servicio' : 'Fuera de horario',
+      d.finde ? 'Hoy no hay servicio médico' : d.motivo ? `Hoy no hay servicio: ${d.motivo}` : 'El servicio de hoy ya concluyó',
+      `Próximo día con servicio: ${dia} · ${n} ${n === 1 ? 'horario libre' : 'horarios libres'}.`],
   }[d.tipo];
   return `<section class="avail ${t[0]}" aria-label="Disponibilidad de citas">
     <div class="avail-ring" style="--p:${pct}"><b>${n}<small>libres</small></b></div>

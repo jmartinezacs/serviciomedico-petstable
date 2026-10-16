@@ -9,6 +9,7 @@ import {
   nullIfEmpty, bindCounters, todayISO, nowHHMM, addDays, isWeekday, fmtDate, fmtTime, fmtDateTime,
   fmtLongDate, fmtNum, SLOTS, MOTIVOS, ESTADOS, estadoPill, pill, DataTable, paged, sanitizeSearch,
   debounce, emptyState, errorState, getAreas, must, fieldError, cantUnidad, plural, avisar,
+  getBloqueos, bloqueoDe, bloqueoTxt, isoDow, ganchos,
 } from '../core.js';
 import { openColaboradorForm } from './colaboradores.js';
 
@@ -18,19 +19,21 @@ export default {
   async render(el, params = {}) {
     root = el;
     const admin = state.isAdmin;
-    const vista = params.vista === 'agenda' ? 'agenda' : 'lista';
+    const vista = ['agenda', 'semana'].includes(params.vista) ? params.vista : 'lista';
     el.innerHTML = `
       <section class="page-intro">
         <div><span class="eyebrow">Citas médicas</span>
           <h1>${admin ? 'Citas' : 'Mis citas'}</h1>
           <p>${admin ? 'Solicitudes, confirmaciones y atención del servicio médico.' : 'Citas que has solicitado para ti o para colaboradores.'}</p></div>
         <div class="page-actions">
+          ${admin ? `<button class="btn secondary" data-c="bloqueos">${icon('calendar-off')} Días sin servicio</button>` : ''}
           <button class="btn primary" data-c="nueva">${icon('calendar-plus')} ${admin ? 'Nueva cita' : 'Solicitar cita'}</button>
         </div>
       </section>
       <div class="tabs" role="tablist">
         <button role="tab" data-tab="lista" class="${vista === 'lista' ? 'active' : ''}">${icon('list')} Lista</button>
         <button role="tab" data-tab="agenda" class="${vista === 'agenda' ? 'active' : ''}">${icon('calendar-range')} Agenda del día</button>
+        <button role="tab" data-tab="semana" class="${vista === 'semana' ? 'active' : ''}">${icon('calendar-days')} Semana</button>
       </div>
       <div id="tab-lista" class="${vista === 'lista' ? '' : 'hidden'}">
         <div class="card">
@@ -47,7 +50,8 @@ export default {
           <div id="citas-table"></div>
         </div>
       </div>
-      <div id="tab-agenda" class="${vista === 'agenda' ? '' : 'hidden'}"><div class="card" id="agenda-card"></div></div>`;
+      <div id="tab-agenda" class="${vista === 'agenda' ? '' : 'hidden'}"><div class="card" id="agenda-card"></div></div>
+      <div id="tab-semana" class="${vista === 'semana' ? '' : 'hidden'}"><div class="card" id="semana-card"></div></div>`;
 
     table = new DataTable(el.querySelector('#citas-table'), {
       columns: columns(),
@@ -73,9 +77,9 @@ export default {
 
     el.addEventListener('click', onClick);
     agendaDate = params.fecha && /^\d{4}-\d{2}-\d{2}$/.test(params.fecha) ? params.fecha : todayISO();
-    if (vista === 'agenda') await renderAgenda(); else await apply();
+    if (vista === 'agenda') await renderAgenda(); else if (vista === 'semana') await renderSemana(); else await apply();
   },
-  destroy() { agendaToken++; root = null; table = null; },
+  destroy() { agendaToken++; semanaToken++; root = null; table = null; },
 };
 
 function columns() {
@@ -123,10 +127,12 @@ function availableActions(c) {
     if (abierta) acts.push(urg ? ['asignar', 'calendar-clock', 'Cambiar horario', ''] : ['reprogramar', 'calendar-clock', 'Reprogramar', '']);
     if (abierta && pasada) acts.push(['no_asistio', 'user-x', 'Marcar inasistencia', 'warn']);
     if (abierta) acts.push(['cancelar', 'x-circle', c.estado === 'pendiente' ? 'Rechazar' : 'Cancelar', 'bad']);
+    if (c.estado === 'no_asistio') acts.push(['reabrir', 'rotate-ccw', 'Reabrir (sí asistió)', '']);
   } else if (own) {
     if (c.estado === 'pendiente' && !urg) acts.push(['reprogramar', 'calendar-clock', 'Modificar', '']);
     if (abierta) acts.push(['cancelar', 'x-circle', 'Cancelar', 'bad']);
   }
+  if (c.estado === 'atendida' && (state.isAdmin || own)) acts.push(['constancia', 'printer', 'Constancia de atención', '']);
   // Evita duplicar "asignar" (pendiente urgente)
   return acts.filter((a, i, arr) => arr.findIndex((b) => b[0] === a[0]) === i);
 }
@@ -140,6 +146,7 @@ async function onClick(e) {
   const c = e.target.closest('[data-c]');
   if (c) {
     if (c.dataset.c === 'nueva') { if (await openCitaForm()) reload(); }
+    else if (c.dataset.c === 'bloqueos') { await openBloqueos(); reload(); }
     else if (c.dataset.c === 'limpiar') {
       root.querySelectorAll('#tab-lista .toolbar input, #tab-lista .toolbar select').forEach((i) => { i.value = ''; });
       table.setFilters({ q: '', estado: '', area: '', motivo: '', desde: '', hasta: '' });
@@ -147,28 +154,37 @@ async function onClick(e) {
     else if (c.dataset.c === 'agenda-next') { agendaDate = stepWeekday(agendaDate, 1); renderAgenda(); }
     else if (c.dataset.c === 'agenda-hoy') { agendaDate = todayISO(); renderAgenda(); }
     else if (c.dataset.c === 'agenda-retry') renderAgenda();
-    else if (c.dataset.c === 'agendar') { if (await openCitaForm({ fecha: agendaDate, hora: c.dataset.hora })) reload(); }
+    else if (c.dataset.c === 'agendar') { if (await openCitaForm({ fecha: c.dataset.fecha || agendaDate, hora: c.dataset.hora })) reload(); }
+    else if (c.dataset.c === 'semana-prev') { agendaDate = addDays(lunesDe(agendaDate), -7); renderSemana(); }
+    else if (c.dataset.c === 'semana-next') { agendaDate = addDays(lunesDe(agendaDate), 7); renderSemana(); }
+    else if (c.dataset.c === 'semana-hoy') { agendaDate = todayISO(); renderSemana(); }
+    else if (c.dataset.c === 'semana-retry') renderSemana();
+    else if (c.dataset.c === 'ver-dia') {
+      agendaDate = c.dataset.fecha;
+      root.querySelector('[data-tab="agenda"]').click();
+    }
     return;
   }
   const tab = e.target.closest('[data-tab]');
   if (tab) {
     root.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('active', b === tab));
-    const ag = tab.dataset.tab === 'agenda';
-    root.querySelector('#tab-lista').classList.toggle('hidden', ag);
-    root.querySelector('#tab-agenda').classList.toggle('hidden', !ag);
-    history.replaceState(null, '', ag ? '#/citas?vista=agenda' : '#/citas');
-    if (ag) renderAgenda(); else table.load();
+    const v = tab.dataset.tab;
+    ['lista', 'agenda', 'semana'].forEach((k) => root.querySelector(`#tab-${k}`).classList.toggle('hidden', k !== v));
+    history.replaceState(null, '', v === 'lista' ? '#/citas' : `#/citas?vista=${v}`);
+    if (v === 'agenda') renderAgenda(); else if (v === 'semana') renderSemana(); else table.load();
     return;
   }
   const a = e.target.closest('[data-act]');
   if (!a) return;
-  const cita = table?.row(a.dataset.id) || agendaRows.find((r) => r.id === a.dataset.id) || { id: a.dataset.id };
+  const cita = table?.row(a.dataset.id) || agendaRows.find((r) => r.id === a.dataset.id)
+    || semanaRows.find((r) => r.id === a.dataset.id) || { id: a.dataset.id };
   if (await runAction(a.dataset.act, cita)) reload();
 }
 
 function reload() {
   if (!root) return;
   if (!root.querySelector('#tab-agenda').classList.contains('hidden')) renderAgenda();
+  else if (!root.querySelector('#tab-semana').classList.contains('hidden')) renderSemana();
   else table.load();
 }
 
@@ -191,6 +207,13 @@ export async function runAction(act, c) {
         must(await sb.from('citas_med').update({ estado: 'no_asistio' }).eq('id', c.id).select('id').single());
         toast('Inasistencia registrada.', 'success'); return true;
       }
+      case 'reabrir': {
+        const ok = await confirmDialog({ title: 'Reabrir cita', message: `La cita ${c.folio_txt || ''} volverá a quedar confirmada para que puedas registrar la atención. Úsalo si el colaborador sí asistió.`, confirmText: 'Reabrir' });
+        if (!ok) return false;
+        must(await sb.from('citas_med').update({ estado: 'confirmada' }).eq('id', c.id).select('id').single());
+        toast('Cita reabierta. Ya puedes registrar la atención.', 'success'); return true;
+      }
+      case 'constancia': await imprimirConstancia(c.id); return false;
       case 'cancelar': {
         const rechazo = state.isAdmin && c.estado === 'pendiente';
         const r = await confirmDialog({
@@ -281,20 +304,32 @@ async function renderAgenda() {
     refreshIcons(); return;
   }
   try {
-    const [citasRes, ocupRes] = await Promise.all([
+    const [citasRes, ocupRes, bloqueos] = await Promise.all([
       sb.from('v_citas_med').select('id, folio_txt, fecha, hora, colaborador, num_empleado, area, motivo, descripcion, estado, solicitante, solicitado_por, tipo')
         .eq('fecha', agendaDate).neq('estado', 'cancelada').order('hora'),
       sb.rpc('med_horarios_ocupados', { p_fecha: agendaDate }),
+      getBloqueos(agendaDate),
     ]);
     must(citasRes); must(ocupRes);
     if (t !== agendaToken) return;
     agendaRows = citasRes.data;
+    const diaBloq = bloqueoDe(bloqueos, agendaDate);
+    if (diaBloq && !agendaRows.length) {
+      body.innerHTML = emptyState({ ico: 'calendar-off', title: `Sin servicio: ${diaBloq.motivo}`,
+        text: state.isAdmin ? 'Puedes quitar o cambiar este bloqueo con el botón Días sin servicio.' : 'Este día no hay consulta. Elige otro día o usa Cita de urgencia.' });
+      refreshIcons(); return;
+    }
     const ocupados = new Set((ocupRes.data || []).map((h) => fmtTime(h)));
     const now = nowHHMM();
     const rows = SLOTS.map((slot) => {
       const here = agendaRows.filter((c) => c.tipo !== 'urgente' && fmtTime(c.hora) === slot);
       const pasada = agendaDate < hoy || (agendaDate === hoy && slot <= now);
       const libre = !ocupados.has(slot);
+      const bloq = bloqueoDe(bloqueos, agendaDate, slot);
+      if (bloq && !here.length) {
+        return `<div class="agenda-slot blocked"><span class="hora">${slot}</span>
+          <div class="who"><b>Sin servicio</b><span>${esc(bloq.motivo)}</span></div><span></span></div>`;
+      }
       const puedeAgendar = libre && (state.isAdmin ? agendaDate >= hoy : !pasada);
       const citasHTML = here.map((c) => `
         <div class="agenda-slot ${pasada ? 'past' : ''}">
@@ -321,7 +356,8 @@ async function renderAgenda() {
         <div class="who"><b>${esc(c.colaborador)} ${estadoPill(c.estado)} ${pill('Urgente', 'bad')}</b>
           <span>${esc(c.folio_txt)} · ${esc(c.hora ? 'Horario especial' : 'Horario por asignar')} · ${esc(c.area)}${state.isAdmin ? ` · Solicitó ${esc(c.solicitante)}` : ''}</span></div>
         ${actionsHTML(c)}</div>`).join('')}</div>` : '';
-    body.innerHTML = `${urgHTML}<p class="hint" style="margin:0 0 10px">${fmtNum(ocupados.size)} de ${SLOTS.length} horarios ocupados${state.isAdmin ? '' : ` · ${fmtNum(total)} cita(s) tuyas este día`}.</p>
+    const bloqHTML = bloqueos.length ? `<div class="notice warn">${icon('calendar-off')}<span><b>Sin servicio:</b> ${bloqueos.map((b) => `${esc(bloqueoTxt(b))} · ${esc(b.motivo)}`).join('; ')}</span></div>` : '';
+    body.innerHTML = `${bloqHTML}${urgHTML}<p class="hint" style="margin:0 0 10px">${fmtNum(ocupados.size)} de ${SLOTS.length} horarios ocupados${state.isAdmin ? '' : ` · ${fmtNum(total)} cita(s) tuyas este día`}.</p>
       <div class="agenda">${rows.join('')}</div>`;
     refreshIcons();
   } catch (err) {
@@ -330,6 +366,177 @@ async function renderAgenda() {
     body.innerHTML = errorState(err).replace('data-action="retry"', 'data-c="agenda-retry"');
     refreshIcons();
   }
+}
+
+// ---------- Agenda semanal ----------
+let semanaRows = [], semanaToken = 0;
+const lunesDe = (iso) => addDays(iso, 1 - isoDow(iso));
+const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'];
+
+async function renderSemana() {
+  const t = ++semanaToken;
+  const card = root?.querySelector('#semana-card');
+  if (!card) return;
+  const hoy = todayISO();
+  const lunes = lunesDe(agendaDate);
+  const dias = DIAS.map((_, i) => addDays(lunes, i));
+  card.innerHTML = `
+    <div class="agenda-nav">
+      <button class="icon-btn" data-c="semana-prev" aria-label="Semana anterior">${icon('chevron-left')}</button>
+      <button class="icon-btn" data-c="semana-next" aria-label="Semana siguiente">${icon('chevron-right')}</button>
+      <button class="btn secondary" data-c="semana-hoy">Esta semana</button>
+      <span class="agenda-day" style="text-transform:none">Semana del ${esc(fmtDate(dias[0]))} al ${esc(fmtDate(dias[4]))}</span>
+    </div>
+    <div id="semana-body"><div class="skeleton" style="height:120px"></div></div>`;
+  refreshIcons();
+  const body = card.querySelector('#semana-body');
+  try {
+    const [citasRes, bloqueos, ...ocup] = await Promise.all([
+      sb.from('v_citas_med').select('id, folio_txt, fecha, hora, colaborador, num_empleado, area, motivo, descripcion, estado, solicitante, solicitado_por, tipo')
+        .gte('fecha', dias[0]).lte('fecha', dias[4]).neq('estado', 'cancelada').order('hora'),
+      getBloqueos(dias[0], dias[4]),
+      ...dias.map((d) => sb.rpc('med_horarios_ocupados', { p_fecha: d })),
+    ]);
+    must(citasRes); ocup.forEach(must);
+    if (t !== semanaToken) return;
+    semanaRows = citasRes.data;
+    const ocupados = dias.map((_, i) => new Set((ocup[i].data || []).map(fmtTime)));
+    const now = nowHHMM();
+    const chip = (c) => `<button type="button" class="wk-chip st-${esc(c.estado)} ${c.tipo === 'urgente' ? 'urg' : ''}" data-act="ver" data-id="${esc(c.id)}" title="${esc(`${c.folio_txt} · ${c.colaborador} · ${ESTADOS[c.estado]?.label || c.estado}`)}">
+        ${c.tipo === 'urgente' ? `<b>${esc(fmtTime(c.hora))}</b> ` : ''}${esc(c.colaborador)}</button>`;
+    const head = dias.map((d, i) => {
+      const b = bloqueoDe(bloqueos, d);
+      return `<div class="wk-head ${d === hoy ? 'today' : ''}"><button type="button" class="link-btn" data-c="ver-dia" data-fecha="${d}">${DIAS[i]} ${esc(d.slice(8, 10))}/${esc(d.slice(5, 7))}</button>
+        ${b ? `<small class="wk-off">${esc(b.motivo)}</small>` : ''}</div>`;
+    }).join('');
+    const urgentes = dias.map((d) => semanaRows.filter((c) => c.fecha === d && c.tipo === 'urgente'));
+    const urgRow = urgentes.some((u) => u.length)
+      ? `<div class="wk-hora">${icon('siren')}</div>${urgentes.map((u) => `<div class="wk-cell">${u.map(chip).join('')}</div>`).join('')}` : '';
+    const filas = SLOTS.map((s) => `<div class="wk-hora mono">${s}</div>${dias.map((d, i) => {
+      const here = semanaRows.filter((c) => c.fecha === d && c.tipo !== 'urgente' && fmtTime(c.hora) === s);
+      if (here.length) return `<div class="wk-cell">${here.map(chip).join('')}</div>`;
+      const pasada = d < hoy || (d === hoy && s <= now);
+      if (bloqueoDe(bloqueos, d, s)) return '<div class="wk-cell off" title="Sin servicio"></div>';
+      if (ocupados[i].has(s)) return '<div class="wk-cell busy"><span>Ocupado</span></div>';
+      if (pasada) return '<div class="wk-cell past"></div>';
+      return `<div class="wk-cell free"><button type="button" data-c="agendar" data-fecha="${d}" data-hora="${s}" aria-label="Agendar ${DIAS[i]} ${s}">${icon('plus')}</button></div>`;
+    }).join('')}`).join('');
+    body.innerHTML = `<div class="wk-scroll"><div class="wk-grid"><div class="wk-hora"></div>${head}${urgRow}${filas}</div></div>
+      <p class="hint" style="margin:10px 0 0">Toca una cita para ver el detalle o un espacio libre (+) para agendar. ${state.isAdmin ? '' : 'Solo ves el nombre de las citas que tú solicitaste.'}</p>`;
+    refreshIcons();
+  } catch (err) {
+    if (t !== semanaToken) return;
+    console.error(err);
+    body.innerHTML = errorState(err).replace('data-action="retry"', 'data-c="semana-retry"');
+    refreshIcons();
+  }
+}
+
+// ---------- Días u horarios sin servicio (solo Servicio Médico) ----------
+async function openBloqueos() {
+  const hoy = todayISO();
+  const lista = async (cont) => {
+    cont.innerHTML = '<div class="skeleton" style="height:60px"></div>';
+    try {
+      const rows = await getBloqueos(hoy, addDays(hoy, 730));
+      cont.innerHTML = rows.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Horario</th><th>Motivo</th><th class="actions"></th></tr></thead><tbody>
+        ${rows.map((b) => `<tr><td>${esc(fmtDate(b.fecha))}<div class="cell-sub">${esc(fmtLongDate(b.fecha).split(',')[0])}</div></td>
+          <td>${esc(bloqueoTxt(b))}</td><td>${esc(b.motivo)} ${b.tipo === 'festivo' ? pill('Festivo', 'info') : ''}</td>
+          <td class="actions"><button type="button" class="icon-btn bad" data-del="${esc(b.id)}" title="Quitar" aria-label="Quitar">${icon('trash-2')}</button></td></tr>`).join('')}
+        </tbody></table></div>` : '<p class="hint">No hay días sin servicio próximos.</p>';
+      refreshIcons();
+    } catch (err) { cont.innerHTML = `<p class="hint" style="color:var(--bad)">${esc(errMsg(err))}</p>`; }
+  };
+  return openModal({
+    title: 'Días sin servicio', size: 'lg', submitText: 'Agregar', confirmDiscard: false,
+    subtitle: 'Festivos, vacaciones, cursos o ausencias. Nadie podrá agendar citas normales en esos horarios.',
+    body: `
+      <div class="form-grid">
+        <div class="field"><label for="bq-fecha">Fecha <span class="req">*</span></label>
+          <input id="bq-fecha" name="fecha" type="date" required min="${hoy}"></div>
+        <div class="field"><label for="bq-hasta">Hasta (opcional, varios días)</label>
+          <input id="bq-hasta" name="hasta" type="date" min="${hoy}"></div>
+      </div>
+      <label class="switch-row" for="bq-todo"><span><b>Todo el día</b></span><input type="checkbox" id="bq-todo" name="todo" checked></label>
+      <div class="form-grid hidden" id="bq-horas">
+        <div class="field"><label for="bq-ini">Desde</label><select id="bq-ini" name="ini">${SLOTS.map((s) => `<option>${s}</option>`).join('')}</select></div>
+        <div class="field"><label for="bq-fin">Hasta</label><select id="bq-fin" name="fin">${[...SLOTS.slice(1), '17:20'].map((s) => `<option ${s === '17:20' ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label for="bq-tipo">Tipo</label><select id="bq-tipo" name="tipo">
+          <option value="ausencia">Ausencia del médico</option><option value="festivo">Día festivo</option><option value="otro">Otro</option></select></div>
+        <div class="field"><label for="bq-motivo">Motivo <span class="req">*</span></label>
+          <input id="bq-motivo" name="motivo" required maxlength="120" placeholder="Ej. vacaciones, curso, junta"></div>
+      </div>
+      <div class="notice" id="bq-aviso" hidden></div>
+      <div class="section-title">${icon('calendar-off')} Próximos</div>
+      <div id="bq-lista"></div>`,
+    onOpen: ({ form }) => {
+      const cont = form.querySelector('#bq-lista');
+      lista(cont);
+      form.elements.todo.addEventListener('change', () => form.querySelector('#bq-horas').classList.toggle('hidden', form.elements.todo.checked));
+      cont.addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-del]'); if (!b) return;
+        if (!(await confirmDialog({ title: 'Quitar día sin servicio', message: 'Se podrá volver a agendar en ese horario.', confirmText: 'Quitar', danger: true }))) return;
+        const { error } = await sb.from('dias_sin_servicio_med').delete().eq('id', b.dataset.del);
+        if (error) toast(errMsg(error), 'error'); else { toast('Día liberado.', 'success'); lista(cont); }
+      });
+    },
+    onSubmit: async ({ form, setError }) => {
+      if (!checkForm(form, { hasta: (v, f) => (v && v < f.fecha.value ? 'Debe ser igual o posterior a la fecha inicial.' : '') })) return false;
+      const v = formValues(form);
+      const todo = !!form.elements.todo.checked;
+      if (!todo && v.fin <= v.ini) { setError('La hora final debe ser posterior a la inicial.'); return false; }
+      const fechas = [];
+      for (let d = v.fecha; d <= (v.hasta || v.fecha) && fechas.length < 120; d = addDays(d, 1)) if (isWeekday(d)) fechas.push(d);
+      if (!fechas.length) { setError('El periodo no incluye días hábiles.'); return false; }
+      must(await sb.from('dias_sin_servicio_med').insert(fechas.map((f) => ({
+        fecha: f, tipo: v.tipo, motivo: v.motivo, hora_inicio: todo ? null : v.ini, hora_fin: todo ? null : v.fin,
+      }))));
+      // Avisar de citas ya agendadas que quedan dentro del bloqueo (no se cancelan solas)
+      const { data } = await sb.from('v_citas_med').select('folio_txt, fecha, hora, colaborador')
+        .in('fecha', fechas).in('estado', ['pendiente', 'confirmada']).not('hora', 'is', null);
+      const afectadas = (data || []).filter((c) => todo || (fmtTime(c.hora) >= v.ini && fmtTime(c.hora) < v.fin));
+      form.reset(); form.querySelector('#bq-horas').classList.add('hidden');
+      const aviso = form.querySelector('#bq-aviso');
+      aviso.hidden = !afectadas.length;
+      aviso.innerHTML = afectadas.length ? `${icon('alert-triangle')}<span><b>${afectadas.length} cita(s) ya agendada(s) en ese periodo:</b> ${afectadas.map((c) => `${esc(c.folio_txt)} ${esc(fmtDate(c.fecha))} ${esc(fmtTime(c.hora))} h (${esc(c.colaborador)})`).join(', ')}. Reprográmalas o cancélalas para avisar a quien las pidió.</span>` : '';
+      refreshIcons();
+      toast(fechas.length === 1 ? 'Día sin servicio registrado.' : `${fechas.length} días sin servicio registrados.`, 'success');
+      lista(form.querySelector('#bq-lista'));
+      return false; // el modal sigue abierto para registrar más
+    },
+  });
+}
+
+// ---------- Constancia de atención (imprimible, sin datos clínicos) ----------
+export async function imprimirConstancia(id) {
+  const { data, error } = await sb.rpc('med_constancia', { p_cita: id });
+  if (error || !data?.[0]) { toast(error ? errMsg(error) : 'La constancia solo está disponible para citas atendidas.', 'error'); return; }
+  const c = data[0];
+  const salida = new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(c.atendido_at));
+  document.getElementById('print-area')?.remove();
+  const el = document.createElement('div');
+  el.id = 'print-area';
+  el.innerHTML = `
+    <div class="pc-head"><div class="brand-logo pc-logo" role="img" aria-label="Pet's Table"></div>
+      <div><h1>Constancia de atención</h1><p>Servicio Médico · Salud laboral · Pet's Table S.A. de C.V.</p></div></div>
+    <p class="pc-text">Se hace constar que <b>${esc(c.colaborador)}</b>${c.num_empleado ? `, No. de empleado <b>${esc(c.num_empleado)}</b>` : ''}${c.area ? `, del área de <b>${esc(c.area)}</b>` : ''},
+      acudió a Servicio Médico el <b>${esc(fmtLongDate(c.fecha))}</b>.</p>
+    <table class="pc-table">
+      <tr><th>Folio</th><td>${esc(c.folio_txt)}</td></tr>
+      <tr><th>${c.tipo === 'urgente' ? 'Horario asignado (urgencia)' : 'Horario de la cita'}</th><td>${esc(fmtTime(c.hora))} h</td></tr>
+      <tr><th>Registro de la atención</th><td>${esc(salida)} h</td></tr>
+      ${c.puesto ? `<tr><th>Puesto</th><td>${esc(c.puesto)}</td></tr>` : ''}
+    </table>
+    <p class="pc-note">Este documento solo acredita la asistencia al servicio médico; no contiene información clínica.</p>
+    <div class="pc-firmas"><div><span></span>${esc(c.atendio || 'Servicio Médico')}<small>Atendió</small></div><div><span></span>Jefe inmediato<small>Enterado</small></div></div>
+    <p class="pc-foot">Emitida el ${esc(fmtDateTime(new Date().toISOString()))} h</p>`;
+  document.body.appendChild(el);
+  document.body.classList.add('printing');
+  const limpiar = () => { document.body.classList.remove('printing'); el.remove(); window.removeEventListener('afterprint', limpiar); };
+  window.addEventListener('afterprint', limpiar);
+  setTimeout(() => window.print(), 50);
 }
 
 // ---------- Formulario de solicitud / reprogramación ----------
@@ -403,17 +610,27 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
         if (!isWeekday(fecha)) { cont.innerHTML = '<span class="hint" style="color:var(--bad)">Sin servicio en fin de semana. Elige un día de lunes a viernes.</span>'; return; }
         if (fecha < hoy) { cont.innerHTML = '<span class="hint" style="color:var(--bad)">La fecha no puede ser pasada.</span>'; return; }
         cont.innerHTML = '<div class="skeleton" style="height:38px;grid-column:1/-1"></div>';
-        const { data, error } = await sb.rpc('med_horarios_ocupados', { p_fecha: fecha });
+        let data, bloqueos;
+        try {
+          const [r, b] = await Promise.all([sb.rpc('med_horarios_ocupados', { p_fecha: fecha }), getBloqueos(fecha)]);
+          data = must(r).data; bloqueos = b;
+        } catch (error) {
+          if (t === slotToken) cont.innerHTML = `<span class="hint" style="color:var(--bad)">${esc(errMsg(error))}</span>`;
+          return;
+        }
         if (t !== slotToken) return;
-        if (error) { cont.innerHTML = `<span class="hint" style="color:var(--bad)">${esc(errMsg(error))}</span>`; return; }
+        const dia = bloqueoDe(bloqueos, fecha);
+        if (dia) { cont.innerHTML = `<span class="hint" style="color:var(--bad)">Sin servicio ese día: ${esc(dia.motivo)}. Elige otra fecha o usa Cita de urgencia.</span>`; return; }
         const ocup = new Set((data || []).map(fmtTime));
         const now = nowHHMM();
         const own = editing && fecha === cita.fecha ? fmtTime(cita.hora) : null;
         cont.innerHTML = SLOTS.map((s) => {
           const past = fecha === hoy && s <= now && !state.isAdmin;
-          const dis = (ocup.has(s) && s !== own) || past;
-          return `<label class="slot"><input type="radio" name="hora" value="${s}" required ${dis ? 'disabled' : ''} ${!dis && s === prev ? 'checked' : ''}><span>${s}</span></label>`;
+          const bloq = bloqueoDe(bloqueos, fecha, s);
+          const dis = (ocup.has(s) && s !== own) || past || !!bloq;
+          return `<label class="slot" ${bloq ? `title="Sin servicio: ${esc(bloq.motivo)}"` : ''}><input type="radio" name="hora" value="${s}" required ${dis ? 'disabled' : ''} ${!dis && s === prev ? 'checked' : ''}><span>${s}</span></label>`;
         }).join('');
+        if (bloqueos.length) cont.insertAdjacentHTML('beforeend', `<span class="hint" style="grid-column:1/-1">Sin servicio de ${bloqueos.map((b) => `${esc(bloqueoTxt(b))} (${esc(b.motivo)})`).join(', ')}.</span>`);
         if (!cont.querySelector('input:not(:disabled)')) cont.insertAdjacentHTML('beforeend', '<span class="hint" style="grid-column:1/-1;color:var(--bad)">No hay horarios disponibles este día.</span>');
       };
       form.elements.fecha.addEventListener('change', () => loadSlots());
@@ -532,6 +749,7 @@ function colaboradorPicker(container, hidden) {
 }
 
 // ---------- Detalle ----------
+ganchos.openDetalle = (id) => openDetalle(id);
 export async function openDetalle(id) {
   let c, at = null, meds = [];
   try {

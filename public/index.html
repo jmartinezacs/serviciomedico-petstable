@@ -64,7 +64,7 @@
         <div class="login-msg hidden" id="login-msg" role="alert"></div>
         <div class="login-chips"><span><i data-lucide="calendar-check"></i> Citas</span><span><i data-lucide="pill"></i> Inventario</span><span><i data-lucide="shield-check"></i> Datos protegidos</span></div>
       </form>
-      <footer class="login-foot">© <span id="year"></span> Pet's Table S.A. de C.V.</footer>
+      <footer class="login-foot">© <span id="year"></span> Pet's Table S.A. de C.V.<a id="login-privacy" class="hidden" href="#" target="_blank" rel="noopener noreferrer">Aviso de privacidad</a></footer>
     </section>
   </main>
 
@@ -114,6 +114,13 @@
     </div>
 
     <nav class="mobile-nav" id="mobile-nav" aria-label="Navegación rápida"></nav>
+
+    <!-- Aviso de nueva versión publicada -->
+    <div class="update-bar hidden" id="update-bar" role="status">
+      <i data-lucide="sparkles"></i><span>Hay una nueva versión disponible (<b id="update-ver"></b>).</span>
+      <button class="btn primary sm" data-action="reload-app"><i data-lucide="refresh-cw"></i> Actualizar</button>
+      <button class="icon-btn" data-action="update-later" aria-label="Más tarde"><i data-lucide="x"></i></button>
+    </div>
 
     <!-- Botones flotantes: nueva cita e inicio -->
     <div class="fabs">

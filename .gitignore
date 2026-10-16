@@ -6,6 +6,7 @@ node_modules
 Thumbs.db
 *.log
 *.zip
+.claude/
 
 # Restos de la primera versión (despliegue con compilación en Vercel); ya no se usan
 entrega/

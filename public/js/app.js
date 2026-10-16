@@ -13,12 +13,14 @@ import inventario from './modules/inventario.js';
 import usuarios from './modules/usuarios.js';
 import bitacora from './modules/bitacora.js';
 import perfil from './modules/perfil.js';
+import reportes from './modules/reportes.js';
 
 const ROUTES = {
   panel:          { mod: dashboard,     icon: 'layout-dashboard', label: 'Panel',          roles: ['admin', 'usuario'], mobile: true },
   citas:          { mod: citas,         icon: 'calendar-days',    label: 'Citas',          labelUser: 'Mis citas', roles: ['admin', 'usuario'], mobile: true },
   colaboradores:  { mod: colaboradores, icon: 'users',            label: 'Colaboradores',  roles: ['admin', 'usuario'], mobile: true },
   inventario:     { mod: inventario,    icon: 'pill',             label: 'Inventario',     roles: ['admin'], mobile: true },
+  reportes:       { mod: reportes,      icon: 'file-spreadsheet', label: 'Reportes',       roles: ['admin'] },
   usuarios:       { mod: usuarios,      icon: 'user-cog',         label: 'Usuarios',       roles: ['admin'] },
   bitacora:       { mod: bitacora,      icon: 'history',          label: 'Bitácora',       roles: ['admin'] },
   perfil:         { mod: perfil,        icon: 'circle-user',      label: 'Mi perfil',      roles: ['admin', 'usuario'], mobile: true },
@@ -86,6 +88,36 @@ function showLogin(message) {
   btn.innerHTML = `${icon('log-in')} Entrar`;
   $('#login-remember').checked = prefs.get('med.remember') !== '0';
   refreshIcons();
+  cargarAvisoPrivacidad();
+}
+
+// Enlace al aviso de privacidad (lo configura un administrador; visible sin sesión)
+async function cargarAvisoPrivacidad() {
+  const a = $('#login-privacy');
+  try {
+    const { data } = await sb.rpc('med_aviso_privacidad');
+    const ok = typeof data === 'string' && /^https:\/\/\S+$/.test(data);
+    if (ok) a.href = data;
+    a.classList.toggle('hidden', !ok);
+  } catch { a.classList.add('hidden'); }
+}
+
+// ---------------- Nueva versión publicada ----------------
+// version.json se genera junto con index.html; si cambia, se ofrece recargar
+let nuevaVersion = false;
+async function revisarVersion() {
+  if (nuevaVersion || !navigator.onLine || document.hidden) return;
+  try {
+    const r = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) return;
+    const { version } = await r.json();
+    if (version && version !== APP_VERSION) {
+      nuevaVersion = true;
+      $('#update-ver').textContent = version;
+      $('#update-bar').classList.remove('hidden');
+      refreshIcons();
+    }
+  } catch { /* sin conexión o archivo no disponible */ }
 }
 
 function startApp() {
@@ -102,6 +134,9 @@ function startApp() {
     booted = true;
     startClock();
     window.addEventListener('hashchange', route);
+    revisarVersion();
+    setInterval(revisarVersion, 10 * 60 * 1000);
+    document.addEventListener('visibilitychange', revisarVersion);
   }
   closeMenu();
   route();
@@ -182,6 +217,8 @@ function bindGlobalEvents() {
         break;
       }
       case 'logout': await logout(); break;
+      case 'reload-app': location.reload(); break;
+      case 'update-later': $('#update-bar').classList.add('hidden'); break;
       case 'toggle-pw': togglePw(a); break;
       case 'forgot': await forgotPassword(); break;
       default: break;

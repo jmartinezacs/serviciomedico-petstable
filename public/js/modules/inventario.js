@@ -9,6 +9,7 @@ import {
   sb, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, nullIfEmpty, bindCounters,
   DataTable, paged, sanitizeSearch, debounce, pill, must, fmtNum, fmtDate, fmtDateTime, todayISO, addDays,
   dayStartTs, dayEndTs, plural, cantUnidad, equivEmpaque, existenciaHTML,
+  emptyState, errorState, refreshIcons, toCSV, descargar,
 } from '../core.js';
 
 let root, tStock, tLotes, tMovs, tab = 'stock';
@@ -57,7 +58,7 @@ function bindCaptura(form, segId, inputName, getMed, maxBase = null) {
 export default {
   async render(el, params = {}) {
     root = el;
-    tab = ['stock', 'lotes', 'movs'].includes(params.tab) ? params.tab : 'stock';
+    tab = ['stock', 'lotes', 'movs', 'reabasto'].includes(params.tab) ? params.tab : 'stock';
     el.innerHTML = `
       <section class="page-intro">
         <div><span class="eyebrow">Medicamentos</span><h1>Inventario</h1>
@@ -72,7 +73,9 @@ export default {
         <button role="tab" data-tab="stock">${icon('boxes')} Existencias</button>
         <button role="tab" data-tab="lotes">${icon('layers')} Lotes y caducidades</button>
         <button role="tab" data-tab="movs">${icon('arrow-left-right')} Movimientos</button>
+        <button role="tab" data-tab="reabasto">${icon('shopping-cart')} Reabasto</button>
       </div>
+      <div class="card hidden" data-pane="reabasto"><div id="reabasto-box"></div></div>
       <div class="card" data-pane="stock">
         <div class="toolbar">
           <div class="search">${icon('search')}<input type="search" id="s-q" placeholder="Buscar por clave o nombre" aria-label="Buscar"></div>
@@ -126,7 +129,54 @@ async function showTab(name) {
   root.querySelectorAll('[data-pane]').forEach((p) => p.classList.toggle('hidden', p.dataset.pane !== name));
   if (name === 'stock') { tStock ??= stockTable(); return root._apply.stock(); }
   if (name === 'lotes') { tLotes ??= lotesTable(); return root._apply.lotes(); }
+  if (name === 'reabasto') return renderReabasto();
   tMovs ??= movsTable(); return root._apply.movs();
+}
+
+// ---------- Reabasto: consumo, cobertura y pedido sugerido ----------
+let reabastoRows = [];
+async function renderReabasto() {
+  const box = root?.querySelector('#reabasto-box');
+  if (!box) return;
+  box.innerHTML = '<div class="skeleton" style="height:120px"></div>';
+  try {
+    const [{ data }, { data: cfg }] = await Promise.all([
+      sb.rpc('med_reabasto', { p_dias: 90 }).then(must),
+      sb.from('config_med').select('dias_cobertura').eq('id', 1).single().then(must),
+    ]);
+    if (!root) return;
+    reabastoRows = data;
+    const pedir = data.filter((m) => m.sugerido > 0);
+    const row = (m) => `<tr>
+      <td data-label="Medicamento"><div class="td-in"><div class="cell-main">${esc(m.nombre)}</div><div class="cell-sub mono">${esc(m.clave)}</div></div></td>
+      <td data-label="Existencia" class="num"><div class="td-in">${existenciaHTML(m.existencia, m)}</div></td>
+      <td data-label="Consumo mensual" class="num"><div class="td-in">${m.consumo ? `${esc(cantUnidad(Number(m.consumo_mensual), m.unidad))}<div class="cell-sub">${esc(cantUnidad(m.consumo, m.unidad))} en 90 días</div>` : '<span class="cell-sub">Sin consumo</span>'}</div></td>
+      <td data-label="Cobertura" class="num"><div class="td-in">${m.dias_cobertura == null ? '<span class="cell-sub">—</span>' : pill(`${fmtNum(m.dias_cobertura)} días`, m.dias_cobertura < 15 ? 'bad' : m.dias_cobertura < cfg.dias_cobertura ? 'warn' : 'ok')}</div></td>
+      <td data-label="Pedido sugerido" class="num"><div class="td-in">${m.sugerido > 0 ? `<b>${esc(cantUnidad(m.sugerido, m.unidad))}</b>${Number(m.contenido_empaque) > 1 ? `<div class="cell-sub">≈ ${esc(`${fmtNum(m.sugerido_empaques)} ${plural(m.empaque, m.sugerido_empaques)}`)}</div>` : ''}` : '<span class="cell-sub">No requiere</span>'}</div></td>
+    </tr>`;
+    box.innerHTML = `
+      <div class="card-head"><div><h3>Pedido sugerido</h3>
+        <p>Consumo real de los últimos 90 días (medicamentos entregados en consultas). Se sugiere cubrir ${fmtNum(cfg.dias_cobertura)} días y nunca quedar por debajo del mínimo. La cobertura objetivo se cambia en Usuarios → Configuración.</p></div>
+        <button class="btn secondary" data-i="exportar-reabasto" ${data.length ? '' : 'disabled'}>${icon('file-spreadsheet')} Exportar a Excel</button></div>
+      ${data.length ? `<p class="hint">${pedir.length ? `${fmtNum(pedir.length)} de ${fmtNum(data.length)} medicamentos requieren reabasto.` : 'Ningún medicamento requiere reabasto por ahora.'}</p>
+        <div class="table-wrap responsive"><table class="table"><thead><tr><th>Medicamento</th><th class="num">Existencia</th><th class="num">Consumo mensual</th><th class="num">Cobertura</th><th class="num">Pedido sugerido</th></tr></thead>
+        <tbody>${data.map(row).join('')}</tbody></table></div>`
+        : emptyState({ ico: 'pill', title: 'Sin medicamentos activos', text: 'Registra medicamentos para calcular el reabasto.' })}`;
+  } catch (err) {
+    console.error(err);
+    box.innerHTML = errorState(err).replace('data-action="retry"', 'data-i="reabasto-retry"');
+  }
+  refreshIcons();
+}
+function exportarReabasto() {
+  descargar(`reabasto-${todayISO()}.csv`, toCSV(reabastoRows, [
+    { label: 'Clave', get: (m) => m.clave }, { label: 'Medicamento', get: (m) => m.nombre },
+    { label: 'Unidad', get: (m) => m.unidad }, { label: 'Existencia vigente', get: (m) => m.existencia },
+    { label: 'Stock mínimo', get: (m) => m.stock_minimo }, { label: 'Consumo 90 días', get: (m) => m.consumo },
+    { label: 'Consumo mensual', get: (m) => Number(m.consumo_mensual) }, { label: 'Días de cobertura', get: (m) => m.dias_cobertura },
+    { label: 'Pedido sugerido (unidades)', get: (m) => m.sugerido }, { label: 'Empaque', get: (m) => m.empaque },
+    { label: 'Contenido por empaque', get: (m) => m.contenido_empaque }, { label: 'Pedido sugerido (empaques)', get: (m) => m.sugerido_empaques },
+  ]));
 }
 
 function stockTable() {
@@ -229,6 +279,8 @@ async function onClick(e) {
   if (t) { history.replaceState(null, '', `#/inventario?tab=${t.dataset.tab}`); showTab(t.dataset.tab); return; }
   const i = e.target.closest('[data-i]');
   if (i) {
+    if (i.dataset.i === 'exportar-reabasto') { exportarReabasto(); return; }
+    if (i.dataset.i === 'reabasto-retry') { renderReabasto(); return; }
     if (i.dataset.i === 'nuevo-med' && await openMedicamentoForm()) refresh();
     if (i.dataset.i === 'entrada' && await openEntrada()) refresh();
     if (i.dataset.i === 'salida') {
@@ -287,6 +339,7 @@ function refresh() {
   if (tab === 'stock') tStock?.load();
   if (tab === 'lotes') tLotes?.load();
   if (tab === 'movs') tMovs?.load();
+  if (tab === 'reabasto') renderReabasto();
 }
 
 // ---------- Formularios ----------

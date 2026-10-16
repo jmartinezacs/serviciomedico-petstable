@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository layout and publishing
 
-- **Published site.** The repo root holds the 4 files Vercel publishes: `index.html`, `sw.js`, `manifest.webmanifest` and `apple-touch-icon.png`.
+- **Published site.** The repo root holds the 5 files Vercel publishes: `index.html`, `sw.js`, `manifest.webmanifest`, `apple-touch-icon.png` and `version.json`. The app polls `version.json` and offers "Actualizar" when it differs from `APP_VERSION`.
   - `index.html` is **generated**, so never edit it by hand.
   - `vercel.json` (no build, output `.`, headers) and `.vercelignore` keep everything else out of the deployment.
 - **Sources.** Sources live in `public/`, `supabase/`, `tests/`, `tools/` and `fuentes/`. `fuentes/` holds the original icon.
@@ -73,7 +73,9 @@ powershell -ExecutionPolicy Bypass -File tools\serve.ps1 -Port 5173
 
 Other frontend files:
 - `js/app.js` handles the session and auth gating, the hash router (`#/ruta?query`), the header with clock, theme toggle and menu, and the FABs.
-- Each route renders one module from `js/modules/`: dashboard, citas, colaboradores, inventario, usuarios, bitacora or perfil.
+- Each route renders one module from `js/modules/`: dashboard, citas, colaboradores, inventario, reportes, usuarios, bitacora or perfil.
+- **No circular imports.** The bundler evaluates modules in `$order`, so a module cannot import one that comes later. To call across, publish the function on `ganchos` in `core.js` (e.g. `citas.js` sets `ganchos.openDetalle`, which `colaboradores.js` calls).
+- `core.js` also holds `getBloqueos`/`bloqueoDe` (days or slots without service) and the export helpers `fetchAll`, `toCSV` (Excel-safe CSV) and `descargar`.
 - `css/app.css` is a base stylesheet followed by per-version blocks (`/* v1.1 */` … ). Later blocks override earlier ones.
   - Color tokens are defined on `:root` and `[data-theme=dark]`.
   - The login is always dark because its tokens are scoped under `.login`.
@@ -107,6 +109,8 @@ Other frontend files:
 - **Citas.**
   - `tipo` is `normal` or `urgente`.
   - Normal citas use 20-min slots on weekdays. A partial unique index on `(fecha, hora)` prevents double booking.
+  - `dias_sin_servicio_med` holds holidays and doctor absences, either a full day or an hour range. LFT holidays for 2026–2027 are preloaded. Blocks reject normal citas, through `med_motivo_bloqueo` in the trigger, but still allow urgent ones.
+  - The pg_cron job `med_inasistencias` (19:05 MX, Mon–Fri) marks past confirmed citas as `no_asistio`. An admin can reopen a `no_asistio` cita back to `confirmada`.
   - An urgent cita has `hora` null until an admin assigns a time or rejects it.
   - States go pendiente → confirmada → atendida, plus cancelada and no asistió. Citas are cancelled, never deleted.
 - **Views:** `v_citas_med`, `v_stock_med`, `v_lotes_med` and `v_movimientos_med` use `security_invoker`.
@@ -121,9 +125,10 @@ Other frontend files:
   - Resend needs the secrets `RESEND_API_KEY`, `MED_EMAIL_FROM` and `MED_SITE_URL`.
 - **`recordatorios_med`** runs the scheduled reminders.
   - It has `verify_jwt` set to false and is protected by the `x-med-cron` header, which must match `med_private.cron`.
-  - It is called by the pg_cron job `med_recordatorio_pendientes` every hour, on the hour.
+  - It is called by the pg_cron job `med_recordatorio_pendientes` every 20 minutes.
   - It acts only Monday to Friday, 07:00 to 19:00 MX time.
-  - It sends admins with `recibe_avisos` a reminder about pending citas, plus a low-stock and expired-lots reminder at 09:00.
+  - On the top-of-hour run, it reminds admins with `recibe_avisos` about pending citas. At 09:00 it also sends a low-stock and expired-lots reminder.
+  - It reminds each cita's requester at 18:00 on the previous business day, and again about 1 hour before. These reminders are recorded in `avisos_med` (`recordatorio_dia`/`recordatorio_hora`) so they never repeat.
 
 ## Testing the UI without real credentials
 

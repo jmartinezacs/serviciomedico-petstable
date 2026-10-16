@@ -417,23 +417,29 @@ async function renderPadecimientos(box) {
 async function renderConfig() {
   const card = root.querySelector('#cfg-card');
   card.innerHTML = '<div class="skeleton" style="height:40px"></div>';
-  const { data, error } = await sb.from('config_med').select('dias_alerta_caducidad, updated_at').eq('id', 1).single();
+  const { data, error } = await sb.from('config_med').select('dias_alerta_caducidad, dias_cobertura, aviso_privacidad_url, updated_at').eq('id', 1).single();
   if (error) {
     card.innerHTML = `<div class="empty error"><b>No se pudo cargar la configuración</b><p>${esc(errMsg(error))}</p>
       <button class="btn secondary" data-cfg="retry">${icon('refresh-cw')} Reintentar</button></div>`;
     refreshIcons(); return;
   }
   card.innerHTML = `
-    <div class="card-head"><div><h3>Alertas de inventario</h3><p>Última modificación: ${fmtDateTime(data.updated_at)}</p></div></div>
+    <div class="card-head"><div><h3>Inventario y privacidad</h3><p>Última modificación: ${fmtDateTime(data.updated_at)}</p></div></div>
     <form id="cfg-form" novalidate style="max-width:520px">
       <div class="field"><label for="cfg-dias">Días de anticipación para alertar caducidad <span class="req">*</span></label>
         <input id="cfg-dias" name="dias" type="number" inputmode="numeric" min="1" max="365" step="1" required value="${data.dias_alerta_caducidad}">
         <small class="hint">Un lote se marca “Por caducar” cuando le quedan este número de días o menos. Valor inicial asumido: 60 días.</small></div>
+      <div class="field"><label for="cfg-cob">Cobertura objetivo del pedido sugerido (días) <span class="req">*</span></label>
+        <input id="cfg-cob" name="cobertura" type="number" inputmode="numeric" min="7" max="365" step="1" required value="${data.dias_cobertura}">
+        <small class="hint">Inventario → Reabasto sugiere pedir lo necesario para cubrir estos días según el consumo de los últimos 90 días (nunca menos que el stock mínimo). Valor inicial asumido: 60 días.</small></div>
+      <div class="field"><label for="cfg-aviso">Enlace al aviso de privacidad</label>
+        <input id="cfg-aviso" name="aviso" type="url" maxlength="300" placeholder="https://…" pattern="https://.+" data-pattern-msg="Debe empezar con https://" value="${esc(data.aviso_privacidad_url || '')}">
+        <small class="hint">Se muestra en la pantalla de inicio de sesión. El texto del aviso lo define el área legal; aquí solo se enlaza. Déjalo vacío para ocultarlo.</small></div>
       <div class="form-error" role="alert"></div>
       <button type="submit" class="btn primary">${icon('save')} Guardar</button>
     </form>
     <div class="section-title" style="margin-top:22px">${icon('clock')} Horario de citas</div>
-    <p class="hint" style="margin:0">Lunes a viernes de 09:00 a 17:30, en bloques de 20 minutos (último bloque a las 17:00); las citas de urgencia no usan bloques; un horario solo puede tener una cita activa. Esta regla se valida en la base de datos.</p>
+    <p class="hint" style="margin:0">Lunes a viernes de 09:00 a 17:30, en bloques de 20 minutos (último bloque a las 17:00); las citas de urgencia no usan bloques; un horario solo puede tener una cita activa. Los festivos y ausencias se registran en Citas → Días sin servicio. Las citas confirmadas que no se atendieron se marcan como inasistencia a las 19:05 (se pueden reabrir). Estas reglas se validan en la base de datos.</p>
     <div class="section-title" style="margin-top:22px">${icon('stethoscope')} Catálogo de padecimientos</div>
     <div id="pad-box"><div class="skeleton" style="height:36px"></div></div>`;
   refreshIcons();
@@ -446,7 +452,10 @@ async function renderConfig() {
     busy = true;
     const btn = form.querySelector('button[type=submit]'); btn.disabled = true;
     try {
-      must(await sb.from('config_med').update({ dias_alerta_caducidad: Number(form.dias.value) }).eq('id', 1).select('id').single());
+      must(await sb.from('config_med').update({
+        dias_alerta_caducidad: Number(form.dias.value), dias_cobertura: Number(form.cobertura.value),
+        aviso_privacidad_url: form.aviso.value.trim() || null,
+      }).eq('id', 1).select('id').single());
       toast('Configuración guardada.', 'success');
     } catch (err) { form.querySelector('.form-error').textContent = errMsg(err); }
     busy = false; btn.disabled = false;

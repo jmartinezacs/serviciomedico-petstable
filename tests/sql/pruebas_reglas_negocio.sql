@@ -102,3 +102,62 @@ begin
 
   raise exception 'RESULTADOS (todo revertido):%', r;
 end $t$;
+
+-- =====================================================================
+-- v1.6: días sin servicio, reapertura de inasistencias, constancia,
+-- reabasto, aviso de privacidad e inasistencia automática.
+-- Ejecutar como bloque independiente en un día hábil (también se revierte por completo).
+-- =====================================================================
+do $t$
+declare
+  r text := '';
+  v_area uuid; v_col uuid; v_c1 uuid; v_c2 uuid; n int; v_txt text;
+  v_hoy date := public.med_hoy();
+  d_fut date := public.med_hoy() + ((8 - extract(isodow from public.med_hoy())::int) % 7 + 8);
+  d_fest date := (select min(fecha) from public.dias_sin_servicio_med where tipo = 'festivo' and hora_inicio is null and fecha > public.med_hoy());
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims', '{"email":"javier.martinez@petstable.mx","role":"authenticated"}', true);
+  insert into public.dias_sin_servicio_med (fecha, hora_inicio, hora_fin, tipo, motivo) values (d_fut, '10:00', '11:00', 'ausencia', 'Junta médica');
+  select id into v_area from public.areas_med limit 1;
+  insert into public.colaboradores_med (nombre, area_id) values ('Prueba V16', v_area) returning id into v_col;
+
+  perform set_config('request.jwt.claims', '{"email":"abigail.ordaz@petstable.mx","role":"authenticated"}', true);
+  begin insert into public.citas_med (colaborador_id, fecha, hora, motivo) values (v_col, d_fut, '10:20', 'malestar'); r := r || E'\n[U] FALLA cita en bloqueo';
+  exception when others then r := r || E'\n[U] OK horario bloqueado rechazado'; end;
+  insert into public.citas_med (colaborador_id, fecha, hora, motivo) values (v_col, d_fut, '11:00', 'malestar') returning id into v_c1;
+  r := r || E'\n[U] OK 11:00 permitido';
+  if d_fest is not null then
+    begin insert into public.citas_med (colaborador_id, fecha, hora, motivo) values (v_col, d_fest, '10:00', 'malestar'); r := r || E'\n[U] FALLA festivo';
+    exception when others then r := r || E'\n[U] OK festivo rechazado'; end;
+    insert into public.citas_med (colaborador_id, fecha, motivo, descripcion, tipo) values (v_col, d_fest, 'malestar', 'dolor fuerte', 'urgente');
+    r := r || E'\n[U] OK urgencia en festivo permitida';
+  end if;
+  begin insert into public.dias_sin_servicio_med (fecha, motivo) values (d_fut + 1, 'x'); r := r || E'\n[U] FALLA usuario creó bloqueo';
+  exception when others then r := r || E'\n[U] OK usuario no crea bloqueos'; end;
+  begin perform * from public.med_reabasto(90); r := r || E'\n[U] FALLA reabasto visible';
+  exception when others then r := r || E'\n[U] OK reabasto solo admin'; end;
+
+  perform set_config('request.jwt.claims', '{"email":"javier.martinez@petstable.mx","role":"authenticated"}', true);
+  begin update public.citas_med set hora = '10:40' where id = v_c1; r := r || E'\n[A] FALLA reprogramó a bloqueo';
+  exception when others then r := r || E'\n[A] OK reprogramar a bloqueo rechazado'; end;
+  insert into public.citas_med (colaborador_id, fecha, hora, motivo) values (v_col, v_hoy, '09:00', 'malestar') returning id into v_c2;
+  update public.citas_med set estado = 'confirmada' where id = v_c2;
+  update public.citas_med set estado = 'no_asistio' where id = v_c2;
+  update public.citas_med set estado = 'confirmada' where id = v_c2;
+  r := r || E'\n[A] reapertura estado=' || (select estado from public.citas_med where id = v_c2) || ' (esperado confirmada)';
+  perform public.med_atender_cita(v_c2, null, null, '[]'::jsonb, (select id from public.padecimientos_med limit 1));
+  perform set_config('request.jwt.claims', '{"email":"abigail.ordaz@petstable.mx","role":"authenticated"}', true);
+  select count(*) into n from public.med_constancia(v_c2); r := r || E'\n[U] constancia de cita ajena=' || n || ' (esperado 0)';
+  perform set_config('request.jwt.claims', '{"email":"javier.martinez@petstable.mx","role":"authenticated"}', true);
+  select folio_txt into v_txt from public.med_constancia(v_c2); r := r || E'\n[A] constancia=' || coalesce(v_txt, 'NULL');
+  begin update public.config_med set aviso_privacidad_url = 'http://inseguro.com' where id = 1; r := r || E'\n[A] FALLA url http aceptada';
+  exception when others then r := r || E'\n[A] OK url sin https rechazada'; end;
+
+  insert into public.citas_med (colaborador_id, fecha, hora, motivo) values (v_col, v_hoy, '09:20', 'malestar') returning id into v_c2;
+  update public.citas_med set estado = 'confirmada' where id = v_c2;
+  perform set_config('role', 'postgres', true);
+  perform public.med_marcar_inasistencias();
+  r := r || E'\n[cron] estado=' || (select estado from public.citas_med where id = v_c2) || ' (esperado no_asistio)';
+  raise exception 'RESULTADOS v1.6:%', r;
+end $t$;

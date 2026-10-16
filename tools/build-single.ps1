@@ -13,7 +13,7 @@ function Read-Text($rel) { ([IO.File]::ReadAllText((Join-Path $Src $rel), [Text.
 
 # ---------- 1. Empaquetar módulos ES en un script clásico ----------
 $order = @('core', 'modules/colaboradores', 'modules/inventario', 'modules/citas', 'modules/dashboard',
-           'modules/usuarios', 'modules/bitacora', 'modules/perfil', 'app')
+           'modules/usuarios', 'modules/bitacora', 'modules/perfil', 'modules/reportes', 'app')
 function Resolve-Key([string]$from, [string]$spec) {
   $s = $spec -replace '\.js$', ''
   if ($s.StartsWith('../')) { return $s.Substring(3) }
@@ -87,4 +87,7 @@ Copy-Item (Join-Path $Src 'apple-touch-icon.png') (Join-Path $Out 'apple-touch-i
 # Archivos que no pueden ir dentro del HTML: service worker (avisos push) y manifiesto
 Copy-Item (Join-Path $Src 'sw.js') (Join-Path $Out 'sw.js') -Force
 Copy-Item (Join-Path $Src 'manifest.webmanifest') (Join-Path $Out 'manifest.webmanifest') -Force
-Get-Item (@('index.html', 'apple-touch-icon.png', 'sw.js', 'manifest.webmanifest') | ForEach-Object { Join-Path $Out $_ }) | ForEach-Object { '{0,-24} {1,10:N0} bytes' -f $_.Name, $_.Length }
+# Versión publicada: la app la consulta para ofrecer "Actualizar" cuando cambia
+if ($configJs -notmatch 'APP_VERSION:\s*["'']([^"'']+)["'']') { throw 'No se encontró APP_VERSION en config.js' }
+[IO.File]::WriteAllText((Join-Path $Out 'version.json'), "{`"version`":`"$($Matches[1])`"}`n", $utf8)
+Get-Item (@('index.html', 'apple-touch-icon.png', 'sw.js', 'manifest.webmanifest', 'version.json') | ForEach-Object { Join-Path $Out $_ }) | ForEach-Object { '{0,-24} {1,10:N0} bytes' -f $_.Name, $_.Length }
