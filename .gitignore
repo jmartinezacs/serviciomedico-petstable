@@ -1,0 +1,13 @@
+.env
+.env.*
+.vercel
+node_modules
+.DS_Store
+Thumbs.db
+*.log
+*.zip
+
+# Restos de la primera versión (despliegue con compilación en Vercel); ya no se usan
+entrega/
+scripts/
+package.json

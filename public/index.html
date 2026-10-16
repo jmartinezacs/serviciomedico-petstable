@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Servicio Médico</title>
+  <meta name="description" content="Servicio Médico — Salud laboral de Pet's Table S.A. de C.V.: citas médicas e inventario de medicamentos.">
+  <meta name="robots" content="noindex, nofollow">
+
+  <!-- Instalación en pantalla de inicio (iOS / Android) -->
+  <meta name="application-name" content="Servicio médico">
+  <meta name="apple-mobile-web-app-title" content="Servicio médico">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="theme-color" content="#F58020">
+  <meta name="format-detection" content="telephone=no">
+
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+  <link rel="icon" href="/favicon.ico?v=1" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png?v=1">
+  <link rel="manifest" href="/manifest.webmanifest?v=1">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css?v=1.0.0">
+
+  <script src="/js/theme-init.js"></script>
+</head>
+<body>
+  <!-- Pantalla de carga -->
+  <div class="splash" id="splash" role="status" aria-live="polite">
+    <div class="brand-logo" role="img" aria-label="Pet's Table"></div>
+    <div class="spinner"></div>
+    <small>Cargando Servicio Médico…</small>
+  </div>
+
+  <!-- ============ Inicio de sesión ============ -->
+  <main class="login hidden" id="login">
+    <div class="login-glow g1"></div><div class="login-glow g2"></div>
+    <section class="login-wrap">
+      <div class="brand-logo login-logo" role="img" aria-label="Pet's Table"></div>
+      <form class="login-card" id="login-form" novalidate>
+        <img class="app-icon" src="/img/app-icon-128.png" alt="" width="64" height="64">
+        <h1>Servicio Médico</h1>
+        <p class="login-sub">Salud laboral · Pet's Table S.A. de C.V.</p>
+        <div class="field">
+          <label for="login-email">Correo corporativo</label>
+          <input id="login-email" name="email" type="email" autocomplete="username" inputmode="email" placeholder="nombre@petstable.mx" required maxlength="120">
+        </div>
+        <div class="field">
+          <label for="login-password">Contraseña</label>
+          <div class="pw-wrap">
+            <input id="login-password" name="password" type="password" autocomplete="current-password" required maxlength="128" placeholder="••••••••">
+            <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar contraseña"><i data-lucide="eye"></i></button>
+          </div>
+        </div>
+        <div class="login-options">
+          <label class="check"><input type="checkbox" id="login-remember" checked> Mantener sesión</label>
+          <button type="button" class="link-btn" data-action="forgot">¿Olvidaste tu contraseña?</button>
+        </div>
+        <button type="submit" class="btn primary block lg" id="login-submit"><i data-lucide="log-in"></i> Entrar</button>
+        <div class="login-msg hidden" id="login-msg" role="alert"></div>
+        <div class="login-chips"><span><i data-lucide="calendar-check"></i> Citas</span><span><i data-lucide="pill"></i> Inventario</span><span><i data-lucide="shield-check"></i> Datos protegidos</span></div>
+      </form>
+      <footer class="login-foot">© <span id="year"></span> Pet's Table S.A. de C.V.</footer>
+    </section>
+  </main>
+
+  <!-- ============ Aplicación ============ -->
+  <div id="app" class="hidden">
+    <header class="top">
+      <div class="top-left">
+        <div class="brand-logo top-logo" role="img" aria-label="Pet's Table"></div>
+        <div class="top-title">
+          <h2>Servicio Médico</h2>
+          <p>Salud laboral - Pet's Table S.A. de C.V.</p>
+        </div>
+        <button class="menu-btn" data-action="toggle-menu" aria-label="Abrir menú" aria-controls="sidebar" aria-expanded="false"><i data-lucide="menu"></i></button>
+      </div>
+      <div class="top-center">
+        <span class="clock-line"><span id="clock-date"></span> · <span id="clock-time" class="mono"></span></span>
+        <span class="live" id="net-status">En vivo</span>
+      </div>
+      <div class="header-actions">
+        <button class="theme-toggle" data-action="toggle-theme" aria-label="Cambiar entre modo claro y oscuro" title="Modo claro / oscuro">
+          <span class="t-opt t-sun" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><defs><radialGradient id="sunG" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#FFE45C"/><stop offset="1" stop-color="#FFA41B"/></radialGradient></defs><g stroke="#FFB300" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.6" y1="4.6" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.4" y2="19.4"/><line x1="4.6" y1="19.4" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.4" y2="4.6"/></g><circle cx="12" cy="12" r="5.6" fill="url(#sunG)" stroke="#F58020" stroke-width="1"/></svg></span>
+          <span class="t-opt t-moon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><defs><linearGradient id="moonG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFF6C8"/><stop offset="1" stop-color="#C9B8FF"/></linearGradient></defs><path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1Z" fill="url(#moonG)" stroke="#A89BFF" stroke-width="1"/><circle cx="17.5" cy="5" r="1" fill="#FFE45C"/><circle cx="20.5" cy="8.5" r=".7" fill="#FFE45C"/></svg></span>
+        </button>
+        <button class="top-user" data-action="go-profile" aria-label="Mi perfil">
+          <span class="avatar" id="top-avatar"></span>
+          <span class="top-user-info"><b id="top-name"></b><span id="top-role"></span></span>
+        </button>
+        <button class="hbtn" data-action="logout" aria-label="Cerrar sesión"><i data-lucide="log-out"></i><span class="lbl">Salir</span></button>
+      </div>
+    </header>
+
+    <aside class="sidebar" id="sidebar" aria-label="Navegación principal">
+      <div class="side-head">
+        <div class="nav-label">Menú</div>
+        <button class="menu-btn sm" data-action="close-menu" aria-label="Cerrar menú"><i data-lucide="x"></i></button>
+      </div>
+      <nav class="nav" id="nav"></nav>
+      <div class="side-foot">
+        <small id="app-version"></small>
+        <button class="side-logout" data-action="logout"><i data-lucide="log-out"></i> Cerrar sesión</button>
+      </div>
+    </aside>
+    <div class="drawer-backdrop" data-action="close-menu"></div>
+
+    <div class="main">
+      <div class="content" id="view" tabindex="-1"></div>
+    </div>
+
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Navegación rápida"></nav>
+
+    <!-- Botones flotantes: nueva cita e inicio -->
+    <div class="fabs">
+      <button class="fab fab-cita" data-action="fab-cita" aria-label="Nueva cita"><i data-lucide="calendar-plus"></i><span class="fab-tip">Nueva cita</span></button>
+      <button class="fab fab-home" data-action="go-home" aria-label="Ir al panel principal"><i data-lucide="house"></i><span class="fab-tip">Panel principal</span></button>
+    </div>
+  </div>
+
+  <div id="modal-root"></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <!-- Librerías (versiones fijas) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.453.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="/js/config.js?v=1.0.0"></script>
+  <script type="module" src="/js/app.js?v=1.0.0"></script>
+</body>
+</html>
