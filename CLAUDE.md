@@ -119,6 +119,8 @@ Other frontend files:
   - `categoria` is `medicamento`, `insumo` or `equipo`. Equipment cannot be dispensed.
   - `control` is `pieza` or `envase`.
 
+  Stock is always kept in a single unit, `unidad`. `empaque` is the presentation, and `contenido_empaque` only remembers how many units the last package entry had; it is a capture aid, not a second unit. `clave` is assigned by the trigger `med_clave_automatica` (MED-/INS-/EQ- plus the next number) and never changes.
+
   `lotes_med.caducidad` may be null, but only for non-medication items. For `envase` items, `lotes_med.nivel` (25/50/75/100) is how full the open container is. Recording a use creates a `uso` movement with quantity 0. When a container is finished, 1 unit is deducted. Both go through `med_usar_envase`, which `med_registrar_uso` and `med_atender_cita` call; `med_atender_cita` items carry `{lote_id, nivel}` for these.
 - **Views:** `v_citas_med`, `v_stock_med`, `v_lotes_med` and `v_movimientos_med` use `security_invoker`.
 - **Secrets:** the VAPID keys and the cron secret live in the `med_private` schema. Only service_role can read them, through RPCs.

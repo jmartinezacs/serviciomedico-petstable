@@ -86,6 +86,11 @@ Todas las reglas se aplican **en la base de datos** (RLS, triggers y funciones).
 
 Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aerosoles, botes sin conteo, rollos, bolsas) se controlan **por envase**. La existencia es el número de envases y se registra cuánto queda del envase abierto (lleno, ¾, ½ o ¼). Ese registro de uso no descuenta nada; al marcar "Se terminó" se descuenta 1 envase.
 
+**v1.9:**
+- El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
+- La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
+- Al dar de alta un artículo se puede registrar su existencia inicial.
+
 Las entradas y salidas se capturan por unidad o por empaque. Al capturar por empaque se indica cuántas unidades trae cada uno (por ejemplo, 3 cajas de 10 = 30 tabletas) y ese contenido se recuerda para la próxima vez.
 
 El stock mínimo de medicamentos e insumos es una propuesta inicial, ajustable en Inventario → Editar.

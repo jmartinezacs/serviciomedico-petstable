@@ -50,7 +50,7 @@ function bindCaptura(form, segId, inputName, getMed, getMax = () => null) {
   const paint = () => {
     const m = getMed(); const t = total(); const max = getMax();
     const nom = m ? (modo === 'empaque' ? m.empaque : m.unidad) : '';
-    if (label) label.innerHTML = `Cantidad${nom ? ` de ${esc(plural(nom, 2))}` : ''} <span class="req">*</span>`;
+    if (label) label.innerHTML = `Cantidad${nom ? ` de ${esc(plural(nom, 2))}` : ''}${input.required ? ' <span class="req">*</span>' : ''}`;
     form.querySelector(`#${segId}`)?.querySelectorAll('[data-modo]').forEach((x) => x.classList.toggle('active', x.dataset.modo === modo));
     const cw = form.querySelector('[data-cont]');
     if (cw) { cw.classList.toggle('hidden', modo !== 'empaque'); contIn().required = modo === 'empaque'; }
@@ -355,7 +355,22 @@ function refresh() {
 }
 
 // ---------- Formularios ----------
+// Alta / edición de artículo. El inventario siempre se lleva en una sola unidad (tableta, cápsula,
+// pieza…), salvo los artículos "por envase" (gel, crema, frasco gotero…). La clave se genera sola.
+const PREFIJO = { medicamento: 'MED', insumo: 'INS', equipo: 'EQ' };
 async function openMedicamentoForm(m = null) {
+  const manana = addDays(todayISO(), 1);
+  let claves = [];
+  if (!m) {
+    try { claves = must(await sb.from('medicamentos_med').select('clave')).data.map((x) => x.clave); } catch { claves = []; }
+  }
+  const siguiente = (cat) => {
+    const p = PREFIJO[cat] || 'MED';
+    const n = Math.max(0, ...claves.map((c) => (new RegExp(`^${p}-(\\d+)$`).exec(c) || [])[1]).filter(Boolean).map(Number));
+    return `${p}-${String(n + 1).padStart(3, '0')}`;
+  };
+  const ctrl0 = m?.control === 'envase' ? 'envase' : 'pieza';
+  let cap = null;
   return openModal({
     title: m ? 'Editar artículo' : 'Nuevo artículo', submitText: m ? 'Guardar cambios' : 'Registrar', size: 'lg',
     body: `
@@ -363,62 +378,102 @@ async function openMedicamentoForm(m = null) {
         <div class="field"><label for="md-cat">Categoría <span class="req">*</span></label>
           <select id="md-cat" name="categoria" required>${Object.entries(CATEGORIAS).map(([k, v]) => `<option value="${k}" ${(m?.categoria || 'medicamento') === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
           <small class="hint">El equipo no se entrega en consultas ni genera alertas.</small></div>
-        <div class="field"><label for="md-ctrl">Cómo se controla <span class="req">*</span></label>
-          <select id="md-ctrl" name="control" required>
-            <option value="pieza" ${m?.control !== 'envase' ? 'selected' : ''}>Por pieza (se cuenta: tabletas, jeringas…)</option>
-            <option value="envase" ${m?.control === 'envase' ? 'selected' : ''}>Por envase (gel, crema, frasco, aerosol, rollo…)</option></select>
-          <small class="hint">Por envase: se registra cuánto queda del envase abierto en cada uso y se descuenta al terminarse.</small></div>
-      </div>
-      <div class="form-grid">
-        <div class="field"><label for="md-clave">Clave <span class="req">*</span></label>
-          <input id="md-clave" name="clave" required maxlength="30" autocomplete="off" value="${esc(m?.clave || '')}" placeholder="Ej. PARA-500">
-          <small class="hint">Identificador interno único.</small></div>
-        <div class="field"><label for="md-nombre">Nombre y concentración <span class="req">*</span></label>
+        <div class="field"><label>Clave</label>
+          <div class="clave-auto mono" id="md-clave">${esc(m?.clave || siguiente('medicamento'))}</div>
+          <small class="hint">${m ? 'La clave no se modifica.' : 'Se asigna automáticamente.'}</small></div>
+        <div class="field full"><label for="md-nombre">Nombre y concentración <span class="req">*</span></label>
           <input id="md-nombre" name="nombre" required minlength="2" maxlength="120" value="${esc(m?.nombre || '')}" placeholder="Ej. Paracetamol 500 mg"></div>
       </div>
-      <fieldset><legend>Doble unidad de control</legend>
+      <div class="field"><label>¿Cómo se lleva su inventario? <span class="req">*</span></label>
+        <div class="opt-cards">
+          <label><input type="radio" name="control" value="pieza" ${ctrl0 === 'pieza' ? 'checked' : ''}><span><b>Por unidad</b><small>Se cuentan tabletas, cápsulas, ampolletas, piezas…</small></span></label>
+          <label><input type="radio" name="control" value="envase" ${ctrl0 === 'envase' ? 'checked' : ''}><span><b>Por envase</b><small>Geles, cremas, frascos gotero, aerosoles, rollos: se registra cuánto queda del envase abierto.</small></span></label>
+        </div></div>
+      <div class="form-grid">
+        <div class="field" id="md-unidad-f"><label for="md-unidad">Se cuenta en <span class="req">*</span></label>
+          <input id="md-unidad" name="unidad" maxlength="30" list="md-unidades" value="${esc(ctrl0 === 'pieza' ? (m?.unidad || 'tableta') : 'tableta')}">
+          <datalist id="md-unidades">${UNIDADES.map((u) => `<option value="${u}">`).join('')}</datalist>
+          <small class="hint">Lo que se entrega: tableta, cápsula, pieza…</small></div>
+        <div class="field"><label for="md-empaque">Presentación (envase) <span class="req">*</span></label>
+          <input id="md-empaque" name="empaque" required maxlength="30" list="md-empaques" value="${esc(m?.empaque || 'caja')}">
+          <datalist id="md-empaques">${EMPAQUES.map((u) => `<option value="${u}">`).join('')}</datalist>
+          <small class="hint">En qué viene: caja, frasco, bote, tubo…</small></div>
+        <div class="field"><label for="md-min" id="md-min-l">Stock mínimo <span class="req">*</span></label>
+          <input id="md-min" name="stock_minimo" type="number" inputmode="numeric" min="0" max="1000000" step="1" required value="${esc(m?.stock_minimo ?? 0)}">
+          <small class="hint" id="md-min-hint"></small></div>
+        <div class="field"><label for="md-pres">Descripción (opcional)</label>
+          <input id="md-pres" name="presentacion" maxlength="120" value="${esc(m?.presentacion || '')}" placeholder="Ej. Blíster de 10 tabletas"></div>
+      </div>
+      ${m ? `<p class="hint">Para cambiar la existencia usa Registrar entrada, Registrar salida o Ajuste por conteo físico.</p>` : `
+      <fieldset><legend>Existencia inicial (opcional)</legend>
         <div class="form-grid">
-          <div class="field"><label for="md-unidad">Unidad mínima <span class="req">*</span></label>
-            <input id="md-unidad" name="unidad" required maxlength="30" list="md-unidades" value="${esc(m?.unidad || 'tableta')}">
-            <datalist id="md-unidades">${UNIDADES.map((u) => `<option value="${u}">`).join('')}</datalist>
-            <small class="hint">Lo que se entrega al paciente: tableta, cápsula, ml (aproximado en líquidos)…</small></div>
-          <div class="field"><label for="md-empaque">Empaque <span class="req">*</span></label>
-            <input id="md-empaque" name="empaque" required maxlength="30" list="md-empaques" value="${esc(m?.empaque || 'caja')}">
-            <datalist id="md-empaques">${EMPAQUES.map((u) => `<option value="${u}">`).join('')}</datalist>
-            <small class="hint">Como se compra o almacena: caja, frasco, bote…</small></div>
-          <div class="field"><label for="md-cont">Contenido por empaque <span class="req">*</span></label>
-            <input id="md-cont" name="contenido_empaque" type="number" inputmode="numeric" min="1" max="100000" step="1" required value="${esc(m?.contenido_empaque ?? 1)}">
-            <small class="hint" id="md-cont-hint"></small></div>
-          <div class="field"><label for="md-min">Stock mínimo (en unidad mínima) <span class="req">*</span></label>
-            <input id="md-min" name="stock_minimo" type="number" inputmode="numeric" min="0" max="1000000" step="1" required value="${esc(m?.stock_minimo ?? 0)}">
-            <small class="hint" id="md-min-hint"></small></div>
+          <div class="field"><label for="md-lote">Lote <span class="req" data-medreq>*</span></label>
+            <input id="md-lote" name="lote" maxlength="40" autocomplete="off" placeholder="Número de lote del fabricante"></div>
+          <div class="field"><label for="md-cad">Caducidad <span class="req" data-medreq>*</span></label>
+            <input id="md-cad" name="caducidad" type="date" min="${manana}"></div>
+          <div class="field full"><label>Capturar cantidad</label><div id="md-modo-wrap"></div></div>
+          <div class="field"><label for="md-cant">Cantidad</label>
+            <input id="md-cant" name="cantidad" type="number" inputmode="numeric" min="1" max="100000" step="1">
+            <small class="hint" data-total="cantidad"></small></div>
         </div>
-      </fieldset>
-      <div class="field"><label for="md-pres">Descripción de la presentación</label>
-        <input id="md-pres" name="presentacion" maxlength="120" value="${esc(m?.presentacion || '')}" placeholder="Ej. Caja con 2 blísteres de 10 tabletas"></div>`,
+        <small class="hint">Si la dejas vacía, registra la existencia después con Registrar entrada.</small>
+      </fieldset>`}`,
     onOpen: ({ form }) => {
-      const upd = () => {
-        const mm = { unidad: form.elements.unidad.value || 'unidad', empaque: form.elements.empaque.value || 'empaque', contenido_empaque: Number(form.elements.contenido_empaque.value) || 1 };
-        form.querySelector('#md-cont-hint').textContent = `1 ${mm.empaque} = ${cantUnidad(mm.contenido_empaque, mm.unidad)}`;
-        const min = Number(form.elements.stock_minimo.value) || 0;
-        const eq = equivEmpaque(min, mm);
-        form.querySelector('#md-min-hint').textContent = min ? `Alerta por debajo de ${cantUnidad(min, mm.unidad)}${eq ? ` (≈ ${eq})` : ''}.` : 'Sin alerta de stock mínimo.';
+      const datos = () => {
+        const env = form.elements.control.value === 'envase';
+        const empaque = form.elements.empaque.value.trim() || 'envase';
+        const unidad = env ? empaque : (form.elements.unidad.value.trim() || 'unidad');
+        return { control: env ? 'envase' : 'pieza', unidad, empaque, contenido_empaque: m?.contenido_empaque || 1, categoria: form.elements.categoria.value };
       };
-      form.addEventListener('input', upd); upd();
+      let firma = '';
+      const upd = () => {
+        const d = datos();
+        form.querySelector('#md-unidad-f').classList.toggle('hidden', d.control === 'envase');
+        form.elements.unidad.required = d.control !== 'envase';
+        if (!m) form.querySelector('#md-clave').textContent = siguiente(d.categoria);
+        form.querySelector('#md-min-l').innerHTML = `Stock mínimo (${esc(plural(d.unidad, 2))}) <span class="req">*</span>`;
+        const min = Number(form.elements.stock_minimo.value) || 0;
+        form.querySelector('#md-min-hint').textContent = d.categoria === 'equipo' ? 'El equipo no genera alertas.' : min ? `Alerta cuando haya menos de ${cantUnidad(min, d.unidad)}.` : 'Sin alerta de stock mínimo.';
+        if (m) return;
+        form.querySelectorAll('[data-medreq]').forEach((x) => { x.hidden = d.categoria !== 'medicamento'; });
+        // La captura (por unidad o por envase) se redibuja si cambia la unidad o la presentación
+        const f = `${d.control}|${d.unidad}|${d.empaque}`;
+        if (f !== firma) {
+          firma = f;
+          form.querySelector('#md-modo-wrap').innerHTML = capturaHTML('md-modo', d);
+          if (!cap) cap = bindCaptura(form, 'md-modo', 'cantidad', datos); else cap.reset();
+        } else cap?.paint();
+      };
+      form.addEventListener('input', upd); form.addEventListener('change', upd); upd();
     },
-    onSubmit: async ({ form }) => {
+    onSubmit: async ({ form, setError }) => {
       if (!checkForm(form)) return false;
       const v = formValues(form);
+      const env = v.control === 'envase';
       const payload = {
-        clave: v.clave, nombre: v.nombre, unidad: v.unidad, empaque: v.empaque, contenido_empaque: Number(v.contenido_empaque),
-        presentacion: nullIfEmpty(v.presentacion), stock_minimo: Number(v.stock_minimo),
-        categoria: v.categoria, control: v.control,
+        nombre: v.nombre, categoria: v.categoria, control: v.control, empaque: v.empaque,
+        unidad: env ? v.empaque : v.unidad, presentacion: nullIfEmpty(v.presentacion), stock_minimo: Number(v.stock_minimo),
       };
-      // Por envase la unidad es el propio envase (tubo, frasco…)
-      if (v.control === 'envase') { payload.unidad = v.empaque; payload.contenido_empaque = 1; }
-      if (m) must(await sb.from('medicamentos_med').update(payload).eq('id', m.id).select('id').single());
-      else must(await sb.from('medicamentos_med').insert(payload).select('id').single());
-      toast(m ? 'Artículo actualizado.' : 'Artículo registrado.', 'success');
+      if (m) {
+        must(await sb.from('medicamentos_med').update(payload).eq('id', m.id).select('id').single());
+        toast('Artículo actualizado.', 'success');
+        return true;
+      }
+      // Existencia inicial opcional
+      const total = v.cantidad ? cap.total() : 0;
+      if (v.cantidad) {
+        if (!total) { setError('Indica cuántas unidades trae cada envase.'); return false; }
+        if (v.categoria === 'medicamento' && (!v.lote || !v.caducidad)) { setError('Para registrar la existencia de un medicamento indica lote y caducidad.'); return false; }
+        if (v.caducidad && v.caducidad < manana) { setError('La caducidad debe ser posterior a hoy.'); return false; }
+      }
+      if (cap?.modo() === 'empaque') payload.contenido_empaque = cap.contenido();
+      const { data } = must(await sb.from('medicamentos_med').insert(payload).select('id, clave').single());
+      if (total) {
+        const { error } = await sb.rpc('med_registrar_entrada', { p_medicamento: data.id, p_lote: v.lote, p_caducidad: v.caducidad || null, p_cantidad: total, p_motivo: 'Existencia inicial' });
+        if (error) { toast(`Artículo ${data.clave} registrado, pero no se pudo registrar la existencia: ${errMsg(error)}`, 'warning', 8000); return true; }
+      }
+      toast(`Artículo ${data.clave} registrado${total ? ` con ${cantUnidad(total, payload.unidad)}` : ''}.`, 'success', 6000);
+      return true;
     },
   });
 }

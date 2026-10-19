@@ -80,10 +80,9 @@ export function equivEmpaque(n, m) {
   if (!e) return `menos de 1 ${m.empaque}`;
   return r ? `${fmtNum(e)} ${plural(m.empaque, e)} + ${cantUnidad(r, m.unidad)}` : `${fmtNum(e)} ${plural(m.empaque, e)}`;
 }
-// Celda estándar: cantidad en unidad mínima y su equivalencia en empaques
+// Celda estándar: el inventario se lleva siempre en una sola unidad (tableta, pieza, tubo…)
 export function existenciaHTML(n, m, cls = '') {
-  const eq = equivEmpaque(n, m);
-  return `<b class="${cls}">${esc(cantUnidad(n, m.unidad))}</b>${eq ? `<div class="cell-sub">≈ ${esc(eq)}</div>` : ''}`;
+  return `<b class="${cls}">${esc(cantUnidad(n, m.unidad))}</b>`;
 }
 export function initials(name) {
   return String(name || '?').trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase();

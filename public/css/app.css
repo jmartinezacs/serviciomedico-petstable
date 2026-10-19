@@ -1051,3 +1051,12 @@ body { transition: none; }
 .nivel-seg .fin input:checked + span { background: var(--bad-bg); border-color: var(--bad-line); color: var(--bad); }
 .nivel-seg input:focus-visible + span { outline: 2px solid var(--orange); outline-offset: 2px; }
 .nivel-seg input:disabled + span { opacity: .5; cursor: default; }
+/* Alta de artículo: forma de llevar el inventario y clave automática */
+.opt-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.opt-cards label { position: relative; cursor: pointer; }
+.opt-cards input { position: absolute; opacity: 0; pointer-events: none; }
+.opt-cards span { display: flex; flex-direction: column; gap: 3px; height: 100%; padding: 11px 13px; border: 1px solid var(--input-line); border-radius: 12px; background: var(--input); }
+.opt-cards small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.opt-cards input:checked + span { border-color: var(--turq); background: var(--turq-soft); box-shadow: 0 0 0 1px var(--turq) inset; }
+.opt-cards input:focus-visible + span { outline: 2px solid var(--orange); outline-offset: 2px; }
+.clave-auto { display: flex; align-items: center; min-height: 42px; padding: 0 12px; border: 1px dashed var(--input-line); border-radius: 10px; background: var(--soft); font-weight: 800; color: var(--text); }
