@@ -7,7 +7,7 @@ import {
   sb, state, esc, icon, refreshIcons, todayISO, addDays, fmtDate, fmtTime, fmtDateTime, fmtNum,
   MOTIVOS, ESTADOS, estadoPill, pill, makeChart, destroyCharts, emptyState, errorState, navigate,
   monthShort, prefs, must, avatarHTML, cantUnidad, nowHHMM, isWeekday, fmtLongDate, SLOTS, push, toast, errMsg,
-  getBloqueos, bloqueoDe,
+  getBloqueos, bloqueoDe, getAreas,
 } from '../core.js';
 import { openCitaForm, openDetalle } from './citas.js';
 import { openEntrada } from './inventario.js';
@@ -43,6 +43,8 @@ export default {
           <p>${state.isAdmin ? 'Resumen de citas e inventario del servicio médico.' : 'Resumen de las citas que has solicitado.'}</p>
         </div>
         <div class="toolbar" style="margin:0">
+          ${state.isAdmin ? `<label class="sr-only" for="dash-area">Área</label>
+          <select id="dash-area"><option value="">Todas las áreas</option></select>` : ''}
           <label class="sr-only" for="dash-period">Periodo</label>
           <select id="dash-period">
             <option value="mes">Mes en curso</option><option value="30">Últimos 30 días</option>
@@ -67,6 +69,17 @@ export default {
       load();
     });
     el.querySelectorAll('#dash-desde, #dash-hasta').forEach((i) => i.addEventListener('change', load));
+    // Filtro por área (administradores): limita las cifras de citas a colaboradores de esa área
+    const selArea = el.querySelector('#dash-area');
+    if (selArea) {
+      getAreas().then((areas) => {
+        if (!root) return;
+        selArea.insertAdjacentHTML('beforeend', areas.map((a) => `<option value="${esc(a.id)}">${esc(a.nombre)}</option>`).join(''));
+        const guardada = prefs.get('med.dash.area');
+        if (guardada && areas.some((a) => a.id === guardada)) { selArea.value = guardada; load(); }
+      }).catch(() => {});
+      selArea.addEventListener('change', () => { prefs.set('med.dash.area', selArea.value); load(); });
+    }
     el.addEventListener('click', onClick);
     el.addEventListener('keydown', (e) => {
       if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-dash][role="link"]')) { e.preventDefault(); e.target.click(); }
@@ -169,6 +182,7 @@ async function load() {
   const body = root?.querySelector('#dash-body');
   if (!body) return;
   const per = root.querySelector('#dash-period').value;
+  const area = root.querySelector('#dash-area')?.value || null;
   const [desde, hasta] = periodRange(per, root.querySelector('#dash-desde').value, root.querySelector('#dash-hasta').value);
   if (!desde || !hasta || hasta < desde) {
     body.innerHTML = emptyState({ ico: 'calendar-x', title: 'Periodo inválido', text: 'La fecha final debe ser igual o posterior a la inicial.' });
@@ -178,13 +192,13 @@ async function load() {
   const hoy = todayISO();
   try {
     const reqs = [
-      sb.rpc('med_dashboard', { p_desde: desde, p_hasta: hasta }),
+      sb.rpc('med_dashboard', { p_desde: desde, p_hasta: hasta, p_area: area }),
       sb.from('v_citas_med').select('id, folio_txt, fecha, hora, colaborador, area, motivo, estado, tipo')
-        .in('estado', ['pendiente', 'confirmada']).gte('fecha', hoy).order('fecha').order('hora').limit(6),
+        .in('estado', ['pendiente', 'confirmada']).gte('fecha', hoy).match(area ? { area_id: area } : {}).order('fecha').order('hora').limit(6),
     ];
     if (state.isAdmin) {
       reqs.push(
-        sb.rpc('med_estadisticas_padecimientos', { p_desde: desde, p_hasta: hasta }),
+        sb.rpc('med_estadisticas_padecimientos', { p_desde: desde, p_hasta: hasta, p_area: area }),
         sb.from('v_lotes_med').select('id, medicamento, unidad, lote, caducidad, existencia, dias_para_caducar, estado_caducidad')
           .gt('existencia', 0).in('estado_caducidad', ['caducado', 'por_caducar']).order('caducidad').limit(6),
         sb.from('v_stock_med').select('id, clave, nombre, existencia_vigente, stock_minimo, unidad, estado_stock')
@@ -285,7 +299,7 @@ function adminHTML(k, prox, lotes, stock, act, pad) {
     </div>
     ${k.total ? `
     <div class="grid grid-main mt">
-      ${chartCard('ch-serie', 'Citas en el periodo', k.serie_por_dia ? 'Por día (sin canceladas)' : 'Por mes (sin canceladas)')}
+      ${chartCard('ch-serie', 'Citas en el periodo', k.serie_por_dia ? 'Por día' : 'Por mes')}
       ${chartCard('ch-estado', 'Citas por estado', `${fmtNum(k.total)} citas en el periodo`)}
     </div>
     <div class="grid grid-2 mt">
@@ -392,8 +406,9 @@ function drawCharts(k, pad) {
     data: {
       labels: serie.map((s) => fmtPeriodo(s.periodo)),
       datasets: [
-        { label: 'Citas', data: serie.map((s) => s.total), backgroundColor: 'rgba(245,128,32,.85)', borderRadius: 6, maxBarThickness: 28 },
-        { label: 'Atendidas', data: serie.map((s) => s.atendidas), type: 'line', borderColor: '#1BC7C7', backgroundColor: '#1BC7C7', tension: .35, pointRadius: 3 },
+        // Barras agrupadas: citas solicitadas (sin canceladas) y atendidas, lado a lado
+        { label: 'Citas', data: serie.map((s) => s.total), backgroundColor: '#F58020', borderRadius: 6, maxBarThickness: 26 },
+        { label: 'Atendidas', data: serie.map((s) => s.atendidas), backgroundColor: '#1BB56F', borderRadius: 6, maxBarThickness: 26 },
       ],
     },
   });
@@ -408,12 +423,12 @@ function drawCharts(k, pad) {
   });
   makeChart(document.getElementById('ch-area'), {
     type: 'bar',
-    data: { labels: (k.por_area || []).map((a) => a.area), datasets: [{ label: 'Citas', data: (k.por_area || []).map((a) => a.n), backgroundColor: '#1BC7C7', borderRadius: 6, maxBarThickness: 22 }] },
+    data: { labels: (k.por_area || []).map((a) => a.area), datasets: [{ label: 'Citas', data: (k.por_area || []).map((a) => a.n), backgroundColor: (k.por_area || []).map((_, i) => PAD_COLORES[i % PAD_COLORES.length]), borderRadius: 6, maxBarThickness: 22 }] },
     options: { indexAxis: 'y', plugins: { legend: { display: false } } },
   });
   makeChart(document.getElementById('ch-motivo'), {
     type: 'bar',
-    data: { labels: (k.por_motivo || []).map((m) => MOTIVOS[m.motivo] || m.motivo), datasets: [{ label: 'Citas', data: (k.por_motivo || []).map((m) => m.n), backgroundColor: '#F58020', borderRadius: 6, maxBarThickness: 30 }] },
+    data: { labels: (k.por_motivo || []).map((m) => MOTIVOS[m.motivo] || m.motivo), datasets: [{ label: 'Citas', data: (k.por_motivo || []).map((m) => m.n), backgroundColor: (k.por_motivo || []).map((_, i) => PAD_COLORES[(i + 3) % PAD_COLORES.length]), borderRadius: 6, maxBarThickness: 30 }] },
     options: { plugins: { legend: { display: false } } },
   });
   makeChart(document.getElementById('ch-top'), {
