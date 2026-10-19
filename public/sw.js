@@ -6,12 +6,18 @@ self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data ? e.data.text() : '' }; }
+  // Aviso visible: vibra, se mantiene en pantalla hasta que la persona lo atiende
+  // y vuelve a sonar aunque reemplace a uno anterior con la misma etiqueta.
   e.waitUntil(self.registration.showNotification(d.title || 'Servicio Médico', {
     body: d.body || '',
     icon: '/apple-touch-icon.png',
     badge: '/apple-touch-icon.png',
-    tag: d.tag || undefined,
-    renotify: !!d.tag,
+    tag: d.tag || `med-${Date.now()}`,
+    renotify: true,
+    requireInteraction: true,
+    silent: false,
+    vibrate: [300, 120, 300, 120, 500],
+    timestamp: Date.now(),
     data: { url: d.url || '/' },
   }));
 });

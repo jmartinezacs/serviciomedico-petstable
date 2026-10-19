@@ -71,7 +71,8 @@ Deno.serve(async (req) => {
     if (!c) return json(404, { error: 'Cita no encontrada.' });
     const reciente = Date.now() - new Date(evento === 'nueva_cita' ? c.created_at : c.updated_at).getTime() < 15 * 60 * 1000;
     const esSolicitante = c.solicitado_por === yo.id;
-    const esAdmin = yo.rol === 'admin';
+    // Solo el médico (es_medico) gestiona citas; los demás actúan como solicitantes
+    const esAdmin = yo.rol === 'admin' && !!yo.es_medico;
 
     // Validación del evento contra el estado real de la cita
     let ok = reciente;
@@ -124,7 +125,7 @@ Deno.serve(async (req) => {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
           JSON.stringify({ title, body: msg, url: '/#/citas', tag: `${c.id}-${evento}` }),
-          { TTL: 60 * 60 * 24 },
+          { TTL: 60 * 60 * 24, urgency: 'high' },
         );
         push++;
       } catch (e) {

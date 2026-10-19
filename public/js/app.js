@@ -67,6 +67,7 @@ async function loadProfileAndStart() {
     }
     state.profile = p;
     state.isAdmin = p.rol === 'admin';
+    state.isMedico = state.isAdmin && !!p.es_medico;
     startApp();
   } catch (err) {
     console.error(err);

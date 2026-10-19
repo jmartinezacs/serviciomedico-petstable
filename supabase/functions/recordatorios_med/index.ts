@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
     for (const s of subs || []) {
       for (const a of destinos.get(s.usuario_id) || []) {
         try {
-          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(a), { TTL: 60 * 50 });
+          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(a), { TTL: 60 * 50, urgency: 'high' });
           enviados++;
         } catch (e) {
           const code = (e as { statusCode?: number }).statusCode;

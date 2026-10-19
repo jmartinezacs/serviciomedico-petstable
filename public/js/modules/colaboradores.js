@@ -45,7 +45,7 @@ export default {
         { label: 'Puesto', render: (c) => esc(c.puesto || '—') },
         { label: 'Estado', render: (c) => (c.activo ? pill('Activo', 'ok') : pill('Inactivo', 'gray')) },
         ...(admin ? [{ label: 'Acciones', cls: 'actions', render: (c) => `<div class="row-actions">
-          <button class="icon-btn ok" data-ka="historial" data-id="${esc(c.id)}" title="Historial de atención" aria-label="Historial de atención">${icon('clipboard-list')}</button>
+          ${state.isMedico ? `<button class="icon-btn ok" data-ka="historial" data-id="${esc(c.id)}" title="Historial de atención" aria-label="Historial de atención">${icon('clipboard-list')}</button>` : ''}
           <button class="icon-btn" data-ka="editar" data-id="${esc(c.id)}" title="Editar" aria-label="Editar">${icon('pencil')}</button>
           <button class="icon-btn ${c.activo ? 'warn' : 'ok'}" data-ka="toggle" data-id="${esc(c.id)}" title="${c.activo ? 'Desactivar' : 'Activar'}" aria-label="${c.activo ? 'Desactivar' : 'Activar'}">${icon(c.activo ? 'user-minus' : 'user-check')}</button>
           <button class="icon-btn bad" data-ka="eliminar" data-id="${esc(c.id)}" title="Eliminar" aria-label="Eliminar">${icon('trash-2')}</button></div>` }] : []),

@@ -106,6 +106,11 @@ Other frontend files:
     - `med_atender_cita` closes the cita, saves the atención and its padecimiento, and dispenses from lotes.
     - `med_registrar_entrada`/`_salida` and `med_ajustar_lote` handle manual stock moves.
   - `lotes_med` has no direct writes, and `movimientos_med` is insert-only.
+- **Doctor role.** `usuarios_med.es_medico` is true only for servicio.medico@petstable.mx. `med_es_medico()` checks it, and the frontend reads it as `state.isMedico`.
+  - Only the doctor manages citas: confirm, assign time, reschedule, cancel, attend, no-show and reopen.
+  - Only the doctor can read `atenciones_med`, which holds padecimiento, symptoms and notes.
+  - Other admins act like requesters on citas, but can book for anyone.
+- **Colaborador search.** `colaboradores_med.nombre_norm` is a generated column, accent-free and lowercase, used to search colaboradores.
 - **Colaboradores and users.** Every `usuarios_med` row has a linked colaborador through `colaboradores_med.usuario_id`. The trigger `usuarios_med_colaborador` keeps its name, area and puesto in sync.
 - **Citas.**
   - Who can book: a non-admin may only book a cita for themselves or for a colaborador of their own area, enforced by `med_puede_citar` in the trigger. Admins may book for anyone.

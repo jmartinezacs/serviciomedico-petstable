@@ -116,24 +116,24 @@ export function horaTxt(c) { return c.hora ? `${fmtTime(c.hora)} h` : 'Por asign
 
 // ---------- Acciones disponibles según rol y estado ----------
 function availableActions(c) {
-  const hoy = todayISO(), now = nowHHMM();
+  const hoy = todayISO();
   const abierta = c.estado === 'pendiente' || c.estado === 'confirmada';
-  const pasada = c.hora && (c.fecha < hoy || (c.fecha === hoy && fmtTime(c.hora) <= now));
   const own = c.solicitado_por === state.profile.id;
   const urg = c.tipo === 'urgente';
   const acts = [];
-  if (state.isAdmin) {
+  // Solo el médico (servicio.medico) gestiona la cita; los demás, como solicitantes
+  if (state.isMedico) {
     if (c.estado === 'pendiente') acts.push(urg ? ['asignar', 'clock-plus', 'Asignar horario especial y confirmar', 'ok'] : ['confirmar', 'check', 'Confirmar', 'ok']);
     if (abierta && c.fecha <= hoy) acts.push(['atender', 'stethoscope', 'Registrar atención', 'ok']);
     if (abierta) acts.push(urg ? ['asignar', 'calendar-clock', 'Cambiar horario', ''] : ['reprogramar', 'calendar-clock', 'Reprogramar', '']);
-    if (abierta && pasada) acts.push(['no_asistio', 'user-x', 'Marcar inasistencia', 'warn']);
+    if (abierta && c.fecha <= hoy) acts.push(['no_asistio', 'user-x', 'No asistió', 'warn']);
     if (abierta) acts.push(['cancelar', 'x-circle', c.estado === 'pendiente' ? 'Rechazar' : 'Cancelar', 'bad']);
     if (c.estado === 'no_asistio') acts.push(['reabrir', 'rotate-ccw', 'Reabrir (sí asistió)', '']);
   } else if (own) {
     if (c.estado === 'pendiente' && !urg) acts.push(['reprogramar', 'calendar-clock', 'Modificar', '']);
     if (abierta) acts.push(['cancelar', 'x-circle', 'Cancelar', 'bad']);
   }
-  if (c.estado === 'atendida' && (state.isAdmin || own)) acts.push(['constancia', 'printer', 'Constancia de atención', '']);
+  if (c.estado === 'atendida' && (state.isMedico || own)) acts.push(['constancia', 'printer', 'Constancia de atención', '']);
   // Evita duplicar "asignar" (pendiente urgente)
   return acts.filter((a, i, arr) => arr.findIndex((b) => b[0] === a[0]) === i);
 }
@@ -216,7 +216,7 @@ export async function runAction(act, c) {
       }
       case 'constancia': await imprimirConstancia(c.id); return false;
       case 'cancelar': {
-        const rechazo = state.isAdmin && c.estado === 'pendiente';
+        const rechazo = state.isMedico && c.estado === 'pendiente';
         const r = await confirmDialog({
           title: rechazo ? 'Rechazar solicitud' : 'Cancelar cita', danger: true, confirmText: rechazo ? 'Rechazar' : 'Cancelar cita',
           message: `Se ${rechazo ? 'rechazará la solicitud' : 'cancelará la cita'} ${c.folio_txt || ''} del ${fmtDate(c.fecha)}${c.hora ? ` a las ${fmtTime(c.hora)} h` : ''}. Se avisará a quien la solicitó.`,
@@ -331,7 +331,7 @@ async function renderAgenda() {
         return `<div class="agenda-slot blocked"><span class="hora">${slot}</span>
           <div class="who"><b>Sin servicio</b><span>${esc(bloq.motivo)}</span></div><span></span></div>`;
       }
-      const puedeAgendar = libre && (state.isAdmin ? agendaDate >= hoy : !pasada);
+      const puedeAgendar = libre && (state.isMedico ? agendaDate >= hoy : !pasada);
       const citasHTML = here.map((c) => `
         <div class="agenda-slot ${pasada ? 'past' : ''}">
           <span class="hora">${slot}</span>
@@ -584,14 +584,14 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
       <div id="cf-slots" class="slots" role="radiogroup" aria-label="Horarios disponibles"></div>
       <small class="hint">Lunes a viernes de 9:00 a 17:30, bloques de 20 minutos. Los horarios tachados no están disponibles.</small>
     </div>
-    ${state.isAdmin && !editing ? `<div class="field hidden" id="cf-hora-esp"><label for="cf-hora-urg">Horario especial (opcional)</label>
+    ${state.isMedico && !editing ? `<div class="field hidden" id="cf-hora-esp"><label for="cf-hora-urg">Horario especial (opcional)</label>
       <input type="time" id="cf-hora-urg" name="hora_urg" step="60"><small class="hint">Si lo dejas vacío, podrás asignarlo después.</small></div>` : ''}
     <div class="notice warn hidden" id="cf-urg-nota">${icon('siren')}<span>La solicitud llegará como <b>urgente</b> a Servicio Médico, que te avisará el horario asignado o si la rechaza.</span></div>
-    <div class="field">
-      <label for="cf-desc"><span id="cf-desc-lbl">Descripción breve (opcional)</span></label>
-      <textarea id="cf-desc" name="descripcion" maxlength="300" data-counter placeholder="Ej. revisión de presión arterial">${editing ? esc(cita.descripcion || '') : ''}</textarea>
+    ${editing ? '' : `<div class="field hidden" id="cf-desc-f">
+      <label for="cf-desc">Motivo de la urgencia <span class="req">*</span></label>
+      <textarea id="cf-desc" name="descripcion" maxlength="300" data-counter placeholder="Ej. dolor intenso, herida que requiere curación"></textarea>
       <small class="hint">No incluyas diagnósticos ni información clínica sensible. Servicio Médico registrará lo necesario durante la atención.</small>
-    </div>`;
+    </div>`}`;
 
   let slotToken = 0;
   return openModal({
@@ -603,12 +603,10 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
       bindCounters(form);
       if (!editing) {
         const picker = colaboradorPicker(form.querySelector('#cf-col'), form.elements.colaborador_id);
-        // Un usuario normalmente solicita la cita para sí mismo: se propone de inicio
-        if (!state.isAdmin) {
-          sb.from('colaboradores_med').select('id, nombre, num_empleado, usuario_id, area:areas_med(nombre)')
-            .eq('usuario_id', state.profile.id).eq('activo', true).maybeSingle()
-            .then(({ data }) => { if (data && !form.elements.colaborador_id.value) picker.select(data); });
-        }
+        // Quien solicita (usuario o administrador) aparece de inicio; se puede cambiar
+        sb.from('colaboradores_med').select('id, nombre, num_empleado, usuario_id, area:areas_med(nombre)')
+          .eq('usuario_id', state.profile.id).eq('activo', true).maybeSingle()
+          .then(({ data }) => { if (data && !form.elements.colaborador_id.value) picker.select(data); });
       }
       const loadSlots = async (keep) => {
         const t = ++slotToken;
@@ -635,7 +633,7 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
         const now = nowHHMM();
         const own = editing && fecha === cita.fecha ? fmtTime(cita.hora) : null;
         cont.innerHTML = SLOTS.map((s) => {
-          const past = fecha === hoy && s <= now && !state.isAdmin;
+          const past = fecha === hoy && s <= now && !state.isMedico;
           const bloq = bloqueoDe(bloqueos, fecha, s);
           const dis = (ocup.has(s) && s !== own) || past || !!bloq;
           return `<label class="slot" ${bloq ? `title="Sin servicio: ${esc(bloq.motivo)}"` : ''}><input type="radio" name="hora" value="${s}" required ${dis ? 'disabled' : ''} ${!dis && s === prev ? 'checked' : ''}><span>${s}</span></label>`;
@@ -651,8 +649,7 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
         form.querySelector('#cf-horario').classList.toggle('hidden', urg);
         form.querySelector('#cf-hora-esp')?.classList.toggle('hidden', !urg);
         form.querySelector('#cf-urg-nota').classList.toggle('hidden', !urg);
-        form.elements.descripcion.required = urg;
-        form.querySelector('#cf-desc-lbl').innerHTML = urg ? 'Motivo de la urgencia <span class="req">*</span>' : 'Descripción breve (opcional)';
+        if (form.elements.descripcion) { form.elements.descripcion.required = urg; form.querySelector('#cf-desc-f').classList.toggle('hidden', !urg); }
         if (urg && !form.elements.fecha.value) form.elements.fecha.value = hoy;
         loadSlots(h0);
       };
@@ -669,14 +666,15 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
       if (urg) {
         const { data } = must(await sb.from('citas_med').insert({
           colaborador_id: v.colaborador_id, fecha: v.fecha, motivo: v.motivo, descripcion: v.descripcion,
-          tipo: 'urgente', hora: state.isAdmin && v.hora_urg ? v.hora_urg : null,
+          tipo: 'urgente', hora: state.isMedico && v.hora_urg ? v.hora_urg : null,
         }).select('id, folio').single());
         avisar('nueva_cita', data.id);
         toast(`Solicitud urgente CM-${String(data.folio).padStart(5, '0')} enviada a Servicio Médico.`, 'success', 6000);
         return true;
       }
       if (!v.hora) { setError('Selecciona un horario disponible o marca Cita de urgencia.'); return false; }
-      const payload = { fecha: v.fecha, hora: v.hora, motivo: v.motivo, descripcion: nullIfEmpty(v.descripcion) };
+      // Citas normales: sin descripción (al editar se conserva la que tuviera)
+      const payload = { fecha: v.fecha, hora: v.hora, motivo: v.motivo };
       try {
         if (editing) {
           must(await sb.from('citas_med').update(payload).eq('id', cita.id).select('id').single());
@@ -730,7 +728,9 @@ function colaboradorPicker(container, hidden) {
   const search = debounce(async () => {
     const t = ++tok; const q = sanitizeSearch(input.value);
     let qb = sb.from('colaboradores_med').select('id, nombre, num_empleado, usuario_id, area:areas_med(nombre)').eq('activo', true).order('nombre').limit(8);
-    if (q) qb = qb.or(`nombre.ilike.*${q}*,num_empleado.ilike.*${q}*`);
+    // Sin importar acentos ni mayúsculas, y cada palabra en cualquier orden ("julian" encuentra "Julián")
+    const palabras = q.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(' ').filter(Boolean);
+    for (const w of palabras) qb = qb.ilike('nombre_norm', `%${w}%`);
     // Usuarios: solo para sí mismos o para colaboradores de su área (también se valida en la base de datos)
     if (!state.isAdmin) {
       const { id, area_id: area } = state.profile;
@@ -770,7 +770,7 @@ export async function openDetalle(id) {
   let c, at = null, meds = [];
   try {
     const reqs = [sb.from('v_citas_med').select('*').eq('id', id).single()];
-    if (state.isAdmin) {
+    if (state.isMedico) {
       reqs.push(
         sb.from('atenciones_med').select('sintomatologia, nota, atendido_at, atendido:usuarios_med!atenciones_med_atendido_por_fkey(nombre), padecimiento:padecimientos_med(nombre)').eq('cita_id', id).maybeSingle(),
         sb.from('v_movimientos_med').select('medicamento, unidad, lote, caducidad, cantidad, tipo, motivo').eq('cita_id', id).order('created_at'),
@@ -796,7 +796,7 @@ export async function openDetalle(id) {
       ${box('Última actualización', fmtDateTime(c.updated_at))}
       ${c.estado === 'cancelada' ? box('Cancelación', `${esc(c.motivo_cancelacion || '')}<div class="cell-sub">Por ${esc(c.cancelado_por_nombre || '—')}</div>`, true) : ''}
     </div>
-    ${state.isAdmin && c.estado === 'atendida' ? `
+    ${state.isMedico && c.estado === 'atendida' ? `
       <div class="section-title">${icon('stethoscope')} Atención</div>
       <div class="detail-grid">
         ${box('Padecimiento', esc(at?.padecimiento?.nombre || 'Sin clasificar'), true)}
@@ -844,7 +844,10 @@ export async function openAtender(c) {
     </div>
     <div class="field"><label for="at-pad">Padecimiento atendido <span class="req">*</span></label>
       <select id="at-pad" name="padecimiento" required><option value="">Selecciona…</option>
-        ${padecimientos.map((p) => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}</select>
+        ${padecimientos.map((p) => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}
+        <option value="__otro">Otro (escribir)…</option></select>
+      <div class="hidden" id="at-pad-otro" style="margin-top:8px"><input name="padecimiento_otro" maxlength="80" autocomplete="off" placeholder="Escribe el padecimiento">
+        <small class="hint">Se agregará a la lista para las siguientes consultas.</small></div>
       <small class="hint">Se usa para las estadísticas por padecimiento y departamento. El catálogo se edita en Usuarios → Configuración.</small></div>
     <div class="field"><label for="at-sint">Sintomatología referida</label>
       <textarea id="at-sint" name="sintomatologia" maxlength="500" data-counter placeholder="Ej. cefalea leve desde la mañana"></textarea></div>
@@ -912,6 +915,13 @@ export async function openAtender(c) {
     onOpen: ({ form }) => {
       bindCounters(form);
       form.querySelector('#at-add')?.addEventListener('click', () => addRow(form));
+      // Padecimiento fuera de la lista: "Otro" permite escribirlo
+      form.elements.padecimiento.addEventListener('change', () => {
+        const otro = form.elements.padecimiento.value === '__otro';
+        form.querySelector('#at-pad-otro').classList.toggle('hidden', !otro);
+        form.elements.padecimiento_otro.required = otro;
+        if (otro) form.elements.padecimiento_otro.focus();
+      });
     },
     onSubmit: async ({ form, setError }) => {
       if (!checkForm(form)) return false;
@@ -935,7 +945,20 @@ export async function openAtender(c) {
         message: `La cita ${c.folio_txt} quedará como atendida${items.length ? ` y se descontarán ${items.length} renglón(es) de medicamentos` : ''}. Esta acción no se puede deshacer.`,
       });
       if (!ok) return false;
-      must(await sb.rpc('med_atender_cita', { p_cita: c.id, p_sintomatologia: nullIfEmpty(v.sintomatologia), p_nota: nullIfEmpty(v.nota), p_items: items, p_padecimiento: v.padecimiento }));
+      // "Otro": se usa el existente con el mismo nombre o se agrega al catálogo
+      let padecimiento = v.padecimiento;
+      if (padecimiento === '__otro') {
+        const nombre = v.padecimiento_otro.replace(/\s+/g, ' ').trim();
+        if (nombre.length < 2) { setError('Escribe el padecimiento.'); return false; }
+        const { data: ya } = await sb.from('padecimientos_med').select('id, activo').ilike('nombre', nombre.replace(/[%_\\]/g, '\\$&')).maybeSingle();
+        if (ya) {
+          padecimiento = ya.id;
+          if (!ya.activo) await sb.from('padecimientos_med').update({ activo: true }).eq('id', ya.id);
+        } else {
+          padecimiento = must(await sb.from('padecimientos_med').insert({ nombre }).select('id').single()).data.id;
+        }
+      }
+      must(await sb.rpc('med_atender_cita', { p_cita: c.id, p_sintomatologia: nullIfEmpty(v.sintomatologia), p_nota: nullIfEmpty(v.nota), p_items: items, p_padecimiento: padecimiento }));
       toast(`Atención registrada para ${c.colaborador}.`, 'success');
     },
   });

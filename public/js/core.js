@@ -30,7 +30,7 @@ export const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_AN
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: authStorage, storageKey: 'med-auth' },
 });
 
-export const state = { session: null, profile: null, isAdmin: false };
+export const state = { session: null, profile: null, isAdmin: false, isMedico: false };
 // Funciones que un módulo publica para otro sin importarlo (evita dependencias circulares)
 export const ganchos = {};
 
@@ -422,6 +422,48 @@ export function paged(q, { from, to, sort }, extraOrder = []) {
 const charts = new Set();
 export function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 export const PALETTE = ['#F58020', '#1BC7C7', '#0B2235', '#1BB56F', '#7A5BE6', '#E0464E', '#FFB020', '#5B8DEF'];
+// Etiqueta de datos: el valor centrado dentro de cada barra o segmento de pastel
+// (se dibuja en el canvas, así que también aparece al copiar la gráfica)
+const etiquetasDatos = {
+  id: 'medEtiquetas',
+  afterDatasetsDraw(chart) {
+    const tipo = chart.config.type;
+    if (!['bar', 'doughnut', 'pie'].includes(tipo)) return;
+    const { ctx } = chart;
+    const horiz = chart.options.indexAxis === 'y';
+    ctx.save();
+    ctx.font = '800 11px Inter, Segoe UI, system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    chart.data.datasets.forEach((ds, di) => {
+      const meta = chart.getDatasetMeta(di);
+      if (meta.hidden || meta.type === 'line') return;
+      meta.data.forEach((el, i) => {
+        const v = Number(ds.data[i]);
+        if (!v || el.hidden) return;
+        const label = new Intl.NumberFormat('es-MX').format(v);
+        let x, y, dentro = true;
+        if (tipo === 'bar') {
+          const p = el.getProps(['x', 'y', 'base'], true);
+          const largo = horiz ? Math.abs(p.x - p.base) : Math.abs(p.base - p.y);
+          const ancho = ctx.measureText(label).width + 6;
+          dentro = largo >= (horiz ? ancho : 16);
+          if (dentro) { x = horiz ? (p.x + p.base) / 2 : p.x; y = horiz ? p.y : (p.y + p.base) / 2; }
+          else { x = horiz ? p.x + ancho / 2 + 2 : p.x; y = horiz ? p.y : p.y - 9; }
+        } else {
+          if (el.circumference < 0.12) return;
+          ({ x, y } = el.tooltipPosition(true));
+        }
+        if (dentro) {
+          ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(9, 13, 18, .45)'; ctx.lineJoin = 'round';
+          ctx.strokeText(label, x, y);
+          ctx.fillStyle = '#FFFFFF';
+        } else ctx.fillStyle = cssVar('--text') || '#172431';
+        ctx.fillText(label, x, y);
+      });
+    });
+    ctx.restore();
+  },
+};
 export function makeChart(canvas, config) {
   if (!window.Chart || !canvas) return null;
   const muted = cssVar('--muted') || '#687B8C', line = cssVar('--line') || '#E3EAEF', text = cssVar('--text') || '#172431';
@@ -429,6 +471,7 @@ export function makeChart(canvas, config) {
   window.Chart.defaults.color = muted;
   const c = new window.Chart(canvas, {
     ...config,
+    plugins: [...(config.plugins || []), etiquetasDatos],
     options: {
       responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
       plugins: {

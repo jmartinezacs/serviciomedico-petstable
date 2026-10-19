@@ -13,7 +13,13 @@ async function pintarNotificaciones(box) {
     ? (state.profile.recibe_avisos !== false ? 'Recibirás avisos de nuevas citas si tu usuario tiene activada la opción “Recibe avisos”, y de los cambios en las citas que solicites.' : 'Recibirás avisos de los cambios en las citas que solicites.')
     : 'Recibirás un aviso cuando Servicio Médico confirme, cancele o reprograme tus citas.';
   const txt = {
-    activo: [pill('Activadas', 'ok'), quien, `<button class="btn secondary" data-n="off">${icon('bell-off')} Desactivar en este dispositivo</button>`],
+    activo: [pill('Activadas', 'ok'), quien, `<div class="page-actions" style="justify-content:flex-start">
+        <button class="btn primary" data-n="test">${icon('bell-ring')} Enviar aviso de prueba</button>
+        <button class="btn secondary" data-n="off">${icon('bell-off')} Desactivar en este dispositivo</button></div>
+      <details class="notif-ajustes"><summary>${icon('smartphone')} ¿No suena o no aparece en la pantalla bloqueada?</summary>
+        <p><b>Android (Chrome):</b> mantén presionado el aviso de prueba → Configuración, o ve a Ajustes → Aplicaciones → Chrome → Notificaciones → busca este sitio y activa <b>Mostrar en pantalla emergente</b>, <b>Sonido</b> y <b>Pantalla de bloqueo</b>. Revisa también que “No molestar” esté apagado.</p>
+        <p><b>iPhone:</b> Ajustes → Notificaciones → Servicio médico → activa <b>Permitir notificaciones</b>, <b>Pantalla bloqueada</b>, <b>Tiras</b> (estilo “Persistente”) y <b>Sonidos</b>. Revisa que el modo Concentración no lo silencie.</p>
+      </details>`],
     inactivo: [pill('Desactivadas', 'gray'), quien, `<button class="btn primary" data-n="on">${icon('bell')} Activar notificaciones</button>`],
     bloqueado: [pill('Bloqueadas', 'bad'), 'Las notificaciones están bloqueadas para este sitio. Permítelas desde la configuración del navegador (ícono del candado junto a la dirección) y vuelve a intentarlo.', ''],
     instalar: [pill('Requiere instalar', 'warn'), 'En iPhone/iPad las notificaciones solo funcionan con la app instalada: toca Compartir → “Agregar a pantalla de inicio”, ábrela desde ese ícono y regresa aquí para activarlas.', ''],
@@ -21,7 +27,17 @@ async function pintarNotificaciones(box) {
   }[est];
   box.innerHTML = `<p style="margin:0 0 8px">${txt[0]}</p><p class="hint" style="margin:0 0 10px">${esc(txt[1])}</p>${txt[2]}`;
   refreshIcons();
-  box.querySelector('[data-n]')?.addEventListener('click', async (e) => {
+  box.querySelector('[data-n="test"]')?.addEventListener('click', async () => {
+    // Aviso local con las mismas opciones que los avisos reales (vibración, permanece en pantalla)
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification('Aviso de prueba · Servicio Médico', {
+        body: 'Así se verán los avisos de citas en este dispositivo.', icon: '/apple-touch-icon.png', badge: '/apple-touch-icon.png',
+        tag: `prueba-${Date.now()}`, renotify: true, requireInteraction: true, silent: false, vibrate: [300, 120, 300, 120, 500], data: { url: '/#/perfil' },
+      });
+    } catch (err) { toast(errMsg(err), 'error'); }
+  });
+  box.querySelector('[data-n="on"], [data-n="off"]')?.addEventListener('click', async (e) => {
     const b = e.currentTarget; b.disabled = true;
     try {
       if (b.dataset.n === 'on') { await push.activar(); toast('Notificaciones activadas en este dispositivo.', 'success'); }
