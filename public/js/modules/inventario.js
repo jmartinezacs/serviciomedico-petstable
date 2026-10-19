@@ -18,9 +18,11 @@ const STOCK_PILL = { ok: ['Suficiente', 'ok'], bajo: ['Bajo mínimo', 'warn'], a
 const CAD_PILL = { vigente: ['Vigente', 'ok'], por_caducar: ['Por caducar', 'warn'], caducado: ['Caducado', 'bad'], sin_caducidad: ['Sin caducidad', 'gray'] };
 const TIPO_PILL = { entrada: ['Entrada', 'ok'], salida: ['Salida', 'bad'], ajuste: ['Ajuste', 'info'], dispensacion: ['Dispensación', 'orange'], uso: ['Uso de envase', 'gray'] };
 // Unidad mínima de control (se cuenta pieza por pieza o de forma aproximada en líquidos)
-const UNIDADES = ['tableta', 'cápsula', 'gragea', 'pieza', 'sobre', 'ampolleta', 'parche', 'óvulo', 'supositorio', 'ml', 'g', 'dosis'];
+const UNIDADES = ['Tableta', 'Cápsula', 'Gragea', 'Pieza', 'Sobre', 'Ampolleta', 'Parche', 'Óvulo', 'Supositorio', 'ml', 'g', 'Dosis'];
 // Empaque o presentación de compra
-const EMPAQUES = ['caja', 'frasco', 'bote', 'blíster', 'tubo', 'sobre', 'bolsa', 'paquete', 'pieza'];
+const EMPAQUES = ['Caja', 'Frasco', 'Bote', 'Blíster', 'Tubo', 'Sobre', 'Bolsa', 'Paquete', 'Pieza'];
+// En formularios y menús la primera letra va en mayúscula (se guarda en minúsculas)
+const mayus = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 const CATEGORIAS = { medicamento: 'Medicamento', insumo: 'Insumo médico', equipo: 'Equipo y mobiliario' };
 const NIVELES = { 100: 'Lleno', 75: '¾', 50: '½', 25: '¼' };
@@ -198,7 +200,6 @@ function stockTable() {
       { label: 'Clave', sort: 'clave', render: (m) => `<span class="mono cell-main">${esc(m.clave)}</span>` },
       { label: 'Artículo', sort: 'nombre', render: (m) => `<div class="cell-main">${esc(m.nombre)}</div><div class="cell-sub">${esc([CATEGORIAS[m.categoria], m.presentacion].filter(Boolean).join(' · '))}</div>` },
       { label: 'Existencia vigente', cls: 'num', sort: 'existencia_vigente', render: (m) => `${existenciaHTML(m.existencia_vigente, m)}${envase(m) && m.nivel_abierto ? `<div class="cell-sub">1 ${esc(m.unidad)} ${esc(nivelTxt(m.nivel_abierto))}</div>` : ''}${m.existencia_caducada ? `<div class="cell-sub" style="color:var(--bad)">${esc(cantUnidad(m.existencia_caducada, m.unidad))} caducadas</div>` : ''}` },
-      { label: 'Empaque', render: (m) => (envase(m) ? `<span class="cell-sub">Por envase (nivel de uso)</span>` : Number(m.contenido_empaque) > 1 ? `${esc(m.empaque)}<div class="cell-sub">${esc(cantUnidad(m.contenido_empaque, m.unidad))} c/u</div>` : `<span class="cell-sub">Por ${esc(m.unidad)}</span>`) },
       { label: 'Mínimo', cls: 'num', sort: 'stock_minimo', render: (m) => (m.stock_minimo ? esc(cantUnidad(m.stock_minimo, m.unidad)) : '<span class="cell-sub">Sin alerta</span>') },
       { label: 'Próx. caducidad', sort: 'proxima_caducidad', render: (m) => (m.proxima_caducidad ? fmtDate(m.proxima_caducidad) : '<span class="cell-sub">—</span>') },
       { label: 'Estado', render: (m) => (!m.activo ? pill('Inactivo', 'gray') : m.categoria === 'equipo' ? pill('Equipo', 'gray') : pill(...stockPill(m))) },
@@ -243,6 +244,7 @@ function lotesTable() {
       { label: 'Acciones', cls: 'actions', render: (l) => `<div class="row-actions">
         ${envase(l) ? `<button class="icon-btn ok" data-la="uso" data-id="${esc(l.id)}" title="Registrar uso del envase" aria-label="Registrar uso del envase" ${l.existencia > 0 && l.estado_caducidad !== 'caducado' ? '' : 'disabled'}>${icon('droplet')}</button>` : ''}
         <button class="icon-btn bad" data-la="salida" data-id="${esc(l.id)}" title="Registrar salida" aria-label="Registrar salida" ${l.existencia > 0 ? '' : 'disabled'}>${icon('package-minus')}</button>
+        <button class="icon-btn" data-la="editar" data-id="${esc(l.id)}" title="Editar lote y caducidad" aria-label="Editar lote y caducidad">${icon('pencil')}</button>
         <button class="icon-btn" data-la="ajuste" data-id="${esc(l.id)}" title="Ajuste por conteo físico" aria-label="Ajuste por conteo físico">${icon('clipboard-check')}</button>
         <button class="icon-btn" data-la="historial" data-id="${esc(l.id)}" title="Ver movimientos" aria-label="Ver movimientos">${icon('history')}</button></div>` },
     ],
@@ -339,6 +341,7 @@ async function onClick(e) {
     if (!l) return;
     if (la.dataset.la === 'uso' && await openUso(l)) refresh();
     if (la.dataset.la === 'salida' && await openSalida(l)) refresh();
+    if (la.dataset.la === 'editar' && await openEditarLote(l)) refresh();
     if (la.dataset.la === 'ajuste' && await openAjuste(l)) refresh();
     if (la.dataset.la === 'historial') {
       root.querySelector('#m-q').value = l.lote;
@@ -385,17 +388,23 @@ async function openMedicamentoForm(m = null) {
           <input id="md-nombre" name="nombre" required minlength="2" maxlength="120" value="${esc(m?.nombre || '')}" placeholder="Ej. Paracetamol 500 mg"></div>
       </div>
       <div class="field"><label>¿Cómo se lleva su inventario? <span class="req">*</span></label>
-        <div class="opt-cards">
-          <label><input type="radio" name="control" value="pieza" ${ctrl0 === 'pieza' ? 'checked' : ''}><span><b>Por unidad</b><small>Se cuentan tabletas, cápsulas, ampolletas, piezas…</small></span></label>
-          <label><input type="radio" name="control" value="envase" ${ctrl0 === 'envase' ? 'checked' : ''}><span><b>Por envase</b><small>Geles, cremas, frascos gotero, aerosoles, rollos: se registra cuánto queda del envase abierto.</small></span></label>
+        <div class="modo-inv" role="radiogroup" aria-label="Cómo se lleva su inventario">
+          <label class="modo-opt"><input type="radio" name="control" value="pieza" ${ctrl0 === 'pieza' ? 'checked' : ''}>
+            <span class="modo-card"><span class="modo-ico uni">${icon('pill')}</span>
+              <span class="modo-txt"><b>Por unidad</b><small>Se cuentan una por una: tabletas, cápsulas, ampolletas o piezas.</small><em>Ej. 28 tabletas</em></span>
+              <span class="modo-check">${icon('check')}</span></span></label>
+          <label class="modo-opt"><input type="radio" name="control" value="envase" ${ctrl0 === 'envase' ? 'checked' : ''}>
+            <span class="modo-card"><span class="modo-ico env">${icon('droplets')}</span>
+              <span class="modo-txt"><b>Por envase</b><small>Geles, cremas, frascos gotero, aerosoles o rollos: se registra cuánto queda del envase abierto.</small><em>Ej. 2 tubos · uno a la mitad</em></span>
+              <span class="modo-check">${icon('check')}</span></span></label>
         </div></div>
       <div class="form-grid">
         <div class="field" id="md-unidad-f"><label for="md-unidad">Se cuenta en <span class="req">*</span></label>
-          <input id="md-unidad" name="unidad" maxlength="30" list="md-unidades" value="${esc(ctrl0 === 'pieza' ? (m?.unidad || 'tableta') : 'tableta')}">
+          <input id="md-unidad" name="unidad" maxlength="30" list="md-unidades" value="${esc(mayus(ctrl0 === 'pieza' ? (m?.unidad || 'tableta') : 'tableta'))}">
           <datalist id="md-unidades">${UNIDADES.map((u) => `<option value="${u}">`).join('')}</datalist>
           <small class="hint">Lo que se entrega: tableta, cápsula, pieza…</small></div>
         <div class="field"><label for="md-empaque">Presentación (envase) <span class="req">*</span></label>
-          <input id="md-empaque" name="empaque" required maxlength="30" list="md-empaques" value="${esc(m?.empaque || 'caja')}">
+          <input id="md-empaque" name="empaque" required maxlength="30" list="md-empaques" value="${esc(mayus(m?.empaque || 'caja'))}">
           <datalist id="md-empaques">${EMPAQUES.map((u) => `<option value="${u}">`).join('')}</datalist>
           <small class="hint">En qué viene: caja, frasco, bote, tubo…</small></div>
         <div class="field"><label for="md-min" id="md-min-l">Stock mínimo <span class="req">*</span></label>
@@ -421,8 +430,8 @@ async function openMedicamentoForm(m = null) {
     onOpen: ({ form }) => {
       const datos = () => {
         const env = form.elements.control.value === 'envase';
-        const empaque = form.elements.empaque.value.trim() || 'envase';
-        const unidad = env ? empaque : (form.elements.unidad.value.trim() || 'unidad');
+        const empaque = form.elements.empaque.value.trim().toLowerCase() || 'envase';
+        const unidad = env ? empaque : (form.elements.unidad.value.trim().toLowerCase() || 'unidad');
         return { control: env ? 'envase' : 'pieza', unidad, empaque, contenido_empaque: m?.contenido_empaque || 1, categoria: form.elements.categoria.value };
       };
       let firma = '';
@@ -657,6 +666,27 @@ async function openUso(l) {
       if (!n) { setError('Indica cuánto queda del envase.'); return false; }
       must(await sb.rpc('med_registrar_uso', { p_lote: l.id, p_nivel: Number(n.value), p_motivo: nullIfEmpty(form.elements.detalle.value.trim()) }));
       toast(n.value === '0' ? `Envase terminado: se descontó 1 ${l.unidad}.` : 'Uso registrado.', 'success');
+    },
+  });
+}
+
+// Edición manual del número de lote y la caducidad (no cambia la existencia)
+async function openEditarLote(l) {
+  const esMed = l.categoria === 'medicamento';
+  return openModal({
+    title: 'Editar lote', subtitle: `${l.medicamento} · ${cantUnidad(l.existencia, l.unidad)}`, submitText: 'Guardar cambios', size: 'sm',
+    body: `
+      <div class="field"><label for="el-lote">Número de lote <span class="req">*</span></label>
+        <input id="el-lote" name="lote" required maxlength="40" autocomplete="off" value="${esc(l.lote)}"></div>
+      <div class="field"><label for="el-cad">Caducidad ${esMed ? '<span class="req">*</span>' : ''}</label>
+        <input id="el-cad" name="caducidad" type="date" ${esMed ? 'required' : ''} value="${esc(l.caducidad || '')}">
+        ${esMed ? '' : '<small class="hint">Déjala vacía si no caduca.</small>'}</div>
+      <p class="hint">La existencia no cambia. El cambio queda registrado en la bitácora.</p>`,
+    onSubmit: async ({ form }) => {
+      if (!checkForm(form)) return false;
+      const v = formValues(form);
+      must(await sb.rpc('med_editar_lote', { p_lote: l.id, p_codigo: v.lote, p_caducidad: v.caducidad || null }));
+      toast('Lote actualizado.', 'success');
     },
   });
 }

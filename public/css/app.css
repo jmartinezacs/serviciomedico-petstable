@@ -1060,3 +1060,29 @@ body { transition: none; }
 .opt-cards input:checked + span { border-color: var(--turq); background: var(--turq-soft); box-shadow: 0 0 0 1px var(--turq) inset; }
 .opt-cards input:focus-visible + span { outline: 2px solid var(--orange); outline-offset: 2px; }
 .clave-auto { display: flex; align-items: center; min-height: 42px; padding: 0 12px; border: 1px dashed var(--input-line); border-radius: 10px; background: var(--soft); font-weight: 800; color: var(--text); }
+
+/* ===================== v1.10 ===================== */
+/* "¿Cómo se lleva su inventario?" */
+.modo-inv { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.field .modo-opt { position: relative; display: block; margin: 0; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; }
+.modo-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.modo-card { position: relative; display: flex; align-items: flex-start; gap: 12px; height: 100%; padding: 14px 44px 14px 14px; border: 1.5px solid var(--input-line); border-radius: 16px; background: var(--card); transition: border-color .15s, box-shadow .15s, transform .15s, background .15s; }
+.modo-opt:hover .modo-card { border-color: var(--orange); box-shadow: 0 6px 18px rgba(245, 128, 32, .12); transform: translateY(-1px); }
+.modo-ico { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; }
+.modo-ico svg { width: 21px; height: 21px; }
+.modo-ico.uni { background: var(--orange-soft); color: var(--orange); }
+.modo-ico.env { background: var(--turq-soft); color: var(--turq-strong); }
+.modo-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.modo-txt b { font-size: 14px; font-weight: 800; color: var(--text); }
+.modo-txt small { font-size: 12.5px; font-weight: 500; line-height: 1.4; color: var(--muted); }
+.modo-txt em { margin-top: 4px; align-self: flex-start; font-style: normal; font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); }
+.modo-check { position: absolute; top: 12px; right: 12px; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--input-line); display: grid; place-items: center; color: transparent; background: var(--card); }
+.modo-check svg { width: 13px; height: 13px; stroke-width: 3; }
+.modo-opt input:checked + .modo-card { border-color: var(--turq); background: linear-gradient(135deg, var(--turq-soft), transparent 70%); box-shadow: 0 0 0 3px rgba(27, 199, 199, .14); }
+.modo-opt input:checked + .modo-card .modo-check { background: var(--turq); border-color: var(--turq); color: #fff; }
+.modo-opt input:checked + .modo-card em { background: var(--card); color: var(--turq-strong); }
+.modo-opt input:focus-visible + .modo-card { outline: 2px solid var(--orange); outline-offset: 2px; }
+
+/* Menús desplegables: primera letra en mayúscula */
+.cs-val::first-letter, .cs-opt > span::first-letter { text-transform: uppercase; }
+.cs-opt > span { display: block; }

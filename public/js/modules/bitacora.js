@@ -9,7 +9,7 @@ import {
 
 const TABLAS = {
   citas_med: 'Citas', atenciones_med: 'Atenciones', colaboradores_med: 'Colaboradores', medicamentos_med: 'Medicamentos',
-  usuarios_med: 'Usuarios', areas_med: 'Áreas', config_med: 'Configuración',
+  usuarios_med: 'Usuarios', areas_med: 'Áreas', config_med: 'Configuración', lotes_med: 'Lotes',
 };
 const ACC = { INSERT: ['Alta', 'ok'], UPDATE: ['Cambio', 'info'], DELETE: ['Baja', 'bad'] };
 let root, table;

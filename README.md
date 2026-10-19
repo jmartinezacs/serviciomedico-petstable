@@ -90,6 +90,7 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v1.10:** en Lotes y caducidades, el médico puede editar a mano el número de lote y la caducidad con `med_editar_lote`. La existencia no cambia y el cambio queda en la bitácora.
 
 Las entradas y salidas se capturan por unidad o por empaque. Al capturar por empaque se indica cuántas unidades trae cada uno (por ejemplo, 3 cajas de 10 = 30 tabletas) y ese contenido se recuerda para la próxima vez.
 
