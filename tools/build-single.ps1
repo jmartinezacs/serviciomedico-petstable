@@ -87,7 +87,10 @@ Copy-Item (Join-Path $Src 'apple-touch-icon.png') (Join-Path $Out 'apple-touch-i
 # Archivos que no pueden ir dentro del HTML: service worker (avisos push) y manifiesto
 Copy-Item (Join-Path $Src 'sw.js') (Join-Path $Out 'sw.js') -Force
 Copy-Item (Join-Path $Src 'manifest.webmanifest') (Join-Path $Out 'manifest.webmanifest') -Force
+# Íconos de las notificaciones push (insignia monocromática para la barra de estado de Android)
+Copy-Item (Join-Path $Src 'img/notif-badge.png') (Join-Path $Out 'notif-badge.png') -Force
+Copy-Item (Join-Path $Src 'img/notif-icon.png') (Join-Path $Out 'notif-icon.png') -Force
 # Versión publicada: la app la consulta para ofrecer "Actualizar" cuando cambia
 if ($configJs -notmatch 'APP_VERSION:\s*["'']([^"'']+)["'']') { throw 'No se encontró APP_VERSION en config.js' }
 [IO.File]::WriteAllText((Join-Path $Out 'version.json'), "{`"version`":`"$($Matches[1])`"}`n", $utf8)
-Get-Item (@('index.html', 'apple-touch-icon.png', 'sw.js', 'manifest.webmanifest', 'version.json') | ForEach-Object { Join-Path $Out $_ }) | ForEach-Object { '{0,-24} {1,10:N0} bytes' -f $_.Name, $_.Length }
+Get-Item (@('index.html', 'apple-touch-icon.png', 'sw.js', 'manifest.webmanifest', 'version.json', 'notif-badge.png', 'notif-icon.png') | ForEach-Object { Join-Path $Out $_ }) | ForEach-Object { '{0,-24} {1,10:N0} bytes' -f $_.Name, $_.Length }

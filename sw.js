@@ -10,14 +10,16 @@ self.addEventListener('push', (e) => {
   // y vuelve a sonar aunque reemplace a uno anterior con la misma etiqueta.
   e.waitUntil(self.registration.showNotification(d.title || 'Servicio Médico', {
     body: d.body || '',
-    icon: '/apple-touch-icon.png',
-    badge: '/apple-touch-icon.png',
+    icon: '/notif-icon.png',
+    // Android pinta la insignia de la barra de estado como silueta: debe ser blanca sobre transparente
+    badge: '/notif-badge.png',
     tag: d.tag || `med-${Date.now()}`,
     renotify: true,
     requireInteraction: true,
     silent: false,
     vibrate: [300, 120, 300, 120, 500],
     timestamp: Date.now(),
+    actions: [{ action: 'ver', title: 'Ver ahora' }],
     data: { url: d.url || '/' },
   }));
 });

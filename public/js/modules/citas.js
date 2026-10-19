@@ -123,10 +123,10 @@ function availableActions(c) {
   const acts = [];
   // Solo el médico (servicio.medico) gestiona la cita; los demás, como solicitantes
   if (state.isMedico) {
-    if (c.estado === 'pendiente') acts.push(urg ? ['asignar', 'clock-plus', 'Asignar horario especial y confirmar', 'ok'] : ['confirmar', 'check', 'Confirmar', 'ok']);
+    if (c.estado === 'pendiente') acts.push(urg ? ['asignar', 'clock-plus', 'Asignar horario especial y confirmar', 'fill-ok'] : ['confirmar', 'check', 'Confirmar', 'fill-ok']);
     if (abierta && c.fecha <= hoy) acts.push(['atender', 'stethoscope', 'Registrar atención', 'ok']);
     if (abierta) acts.push(urg ? ['asignar', 'calendar-clock', 'Cambiar horario', ''] : ['reprogramar', 'calendar-clock', 'Reprogramar', '']);
-    if (abierta && c.fecha <= hoy) acts.push(['no_asistio', 'user-x', 'No asistió', 'warn']);
+    if (abierta && c.fecha <= hoy) acts.push(['no_asistio', 'user-x', 'No asistió', 'fill-violet']);
     if (abierta) acts.push(['cancelar', 'x-circle', c.estado === 'pendiente' ? 'Rechazar' : 'Cancelar', 'bad']);
     if (c.estado === 'no_asistio') acts.push(['reabrir', 'rotate-ccw', 'Reabrir (sí asistió)', '']);
   } else if (own) {
@@ -809,7 +809,7 @@ export async function openDetalle(id) {
         ${meds.map((m) => `<tr><td>${esc(m.medicamento)}</td><td class="mono">${esc(m.lote)}</td><td>${fmtDate(m.caducidad)}</td><td class="num">${esc(m.tipo === 'uso' ? m.motivo : cantUnidad(-m.cantidad, m.unidad))}</td></tr>`).join('')}
         </tbody></table></div>` : '<p class="hint">No se entregaron medicamentos.</p>'}` : ''}
     ${acts.length ? `<div class="section-title">Acciones</div><div class="page-actions">
-      ${acts.map(([a, ic, t, cls]) => `<button type="button" class="btn ${a === 'cancelar' || a === 'no_asistio' ? 'secondary' : a === 'atender' || a === 'confirmar' ? 'primary' : 'secondary'}" data-detail-act="${a}">${icon(ic)} ${esc(t)}</button>`).join('')}
+      ${acts.map(([a, ic, t, cls]) => `<button type="button" class="btn ${cls === 'fill-ok' ? 'btn-confirmar' : cls === 'fill-violet' ? 'btn-noasistio' : a === 'atender' ? 'primary' : 'secondary'}" data-detail-act="${a}">${icon(ic)} ${esc(t)}</button>`).join('')}
     </div>` : ''}`;
 
   const choice = await openModal({

@@ -32,7 +32,7 @@ async function pintarNotificaciones(box) {
     try {
       const reg = await navigator.serviceWorker.ready;
       await reg.showNotification('Aviso de prueba · Servicio Médico', {
-        body: 'Así se verán los avisos de citas en este dispositivo.', icon: '/apple-touch-icon.png', badge: '/apple-touch-icon.png',
+        body: 'Así se verán los avisos de citas en este dispositivo.', icon: '/notif-icon.png', badge: '/notif-badge.png', actions: [{ action: 'ver', title: 'Ver ahora' }],
         tag: `prueba-${Date.now()}`, renotify: true, requireInteraction: true, silent: false, vibrate: [300, 120, 300, 120, 500], data: { url: '/#/perfil' },
       });
     } catch (err) { toast(errMsg(err), 'error'); }

@@ -1094,3 +1094,14 @@ body { transition: none; }
 .notif-ajustes summary svg { width: 16px; height: 16px; color: var(--orange); }
 .notif-ajustes p { margin: 8px 0 0; line-height: 1.5; color: var(--muted); }
 .notif-ajustes p b { color: var(--text); }
+
+/* ===================== v1.12 ===================== */
+/* Acciones clave del médico con color propio: Confirmar (verde) y No asistió (violeta) */
+.icon-btn.fill-ok { background: #1BB56F; border-color: #1BB56F; color: #fff; box-shadow: 0 4px 12px rgba(27, 181, 111, .3); }
+.icon-btn.fill-ok:hover { background: #15985C; border-color: #15985C; color: #fff; }
+.icon-btn.fill-violet { background: #7A5BE6; border-color: #7A5BE6; color: #fff; box-shadow: 0 4px 12px rgba(122, 91, 230, .3); }
+.icon-btn.fill-violet:hover { background: #6646D6; border-color: #6646D6; color: #fff; }
+.btn.btn-confirmar { background: #1BB56F; border-color: #1BB56F; color: #fff; }
+.btn.btn-confirmar:hover { background: #15985C; border-color: #15985C; color: #fff; }
+.btn.btn-noasistio { background: #7A5BE6; border-color: #7A5BE6; color: #fff; }
+.btn.btn-noasistio:hover { background: #6646D6; border-color: #6646D6; color: #fff; }
