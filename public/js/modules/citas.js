@@ -567,6 +567,7 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
         ? `<div class="chip-selected"><div><b>${esc(cita.colaborador)}</b><br><span>${esc([cita.num_empleado, cita.area].filter(Boolean).join(' · '))}</span></div></div>`
         : `<div id="cf-col"></div>`}
       <input type="hidden" name="colaborador_id" value="${editing ? esc(cita.colaborador_id) : ''}" ${editing ? '' : 'required'}>
+      ${!editing && !state.isAdmin ? '<small class="hint">Puedes solicitar la cita para ti o para un colaborador de tu misma área.</small>' : ''}
     </div>
     <div class="form-grid">
       <div class="field"><label for="cf-fecha">Fecha <span class="req">*</span></label>
@@ -599,7 +600,15 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
     body,
     onOpen: ({ form }) => {
       bindCounters(form);
-      if (!editing) colaboradorPicker(form.querySelector('#cf-col'), form.elements.colaborador_id);
+      if (!editing) {
+        const picker = colaboradorPicker(form.querySelector('#cf-col'), form.elements.colaborador_id);
+        // Un usuario normalmente solicita la cita para sí mismo: se propone de inicio
+        if (!state.isAdmin) {
+          sb.from('colaboradores_med').select('id, nombre, num_empleado, usuario_id, area:areas_med(nombre)')
+            .eq('usuario_id', state.profile.id).eq('activo', true).maybeSingle()
+            .then(({ data }) => { if (data && !form.elements.colaborador_id.value) picker.select(data); });
+        }
+      }
       const loadSlots = async (keep) => {
         const t = ++slotToken;
         const cont = form.querySelector('#cf-slots');
@@ -711,7 +720,7 @@ function colaboradorPicker(container, hidden) {
   };
   const draw = (q) => {
     list.innerHTML = results.map((c, i) => `<button type="button" role="option" data-i="${i}" class="${i === hl ? 'hl' : ''}">
-        <b>${esc(c.nombre)}</b><br><span class="muted">${esc([c.num_empleado, c.area?.nombre].filter(Boolean).join(' · '))}</span></button>`).join('')
+        <b>${esc(c.nombre)}</b>${c.usuario_id && c.usuario_id === state.profile.id ? ' (tú)' : ''}<br><span class="muted">${esc([c.num_empleado, c.area?.nombre].filter(Boolean).join(' · '))}</span></button>`).join('')
       + (results.length ? '' : `<div class="muted" style="padding:9px 10px">${q ? 'Sin coincidencias.' : 'Escribe para buscar.'}</div>`)
       + `<button type="button" class="combo-new" data-new>${icon('user-plus')} Registrar nuevo colaborador${q ? `: “${esc(q)}”` : ''}</button>`;
     list.classList.remove('hidden'); input.setAttribute('aria-expanded', 'true');
@@ -719,8 +728,13 @@ function colaboradorPicker(container, hidden) {
   };
   const search = debounce(async () => {
     const t = ++tok; const q = sanitizeSearch(input.value);
-    let qb = sb.from('colaboradores_med').select('id, nombre, num_empleado, area:areas_med(nombre)').eq('activo', true).order('nombre').limit(8);
+    let qb = sb.from('colaboradores_med').select('id, nombre, num_empleado, usuario_id, area:areas_med(nombre)').eq('activo', true).order('nombre').limit(8);
     if (q) qb = qb.or(`nombre.ilike.*${q}*,num_empleado.ilike.*${q}*`);
+    // Usuarios: solo para sí mismos o para colaboradores de su área (también se valida en la base de datos)
+    if (!state.isAdmin) {
+      const { id, area_id: area } = state.profile;
+      qb = area ? qb.or(`area_id.eq.${area},usuario_id.eq.${id}`) : qb.eq('usuario_id', id);
+    }
     const { data, error } = await qb;
     if (t !== tok) return;
     results = error ? [] : data; hl = results.length ? 0 : -1;
@@ -741,11 +755,12 @@ function colaboradorPicker(container, hidden) {
     if (opt) { select(results[Number(opt.dataset.i)]); return; }
     if (e.target.closest('[data-new]')) {
       list.classList.add('hidden');
-      const nuevo = await openColaboradorForm({ nombre: input.value.trim() });
+      const nuevo = await openColaboradorForm({ nombre: input.value.trim(), areaId: state.isAdmin ? '' : state.profile.area_id || '' });
       if (nuevo && nuevo.id) select(nuevo);
     }
   });
   input.addEventListener('blur', () => setTimeout(() => { list.classList.add('hidden'); input.setAttribute('aria-expanded', 'false'); }, 150));
+  return { select };
 }
 
 // ---------- Detalle ----------

@@ -475,6 +475,35 @@ export async function getAreas({ force = false, soloActivas = false } = {}) {
   return soloActivas ? areasCache.filter((a) => a.activo) : areasCache;
 }
 export function invalidateAreas() { areasCache = null; }
+// Agrega a un <select> de áreas la opción "+ Registrar nueva área…" (solo administradores
+// pueden crear áreas); la nueva área queda seleccionada sin salir del formulario.
+export function permitirNuevaArea(select) {
+  if (!state.isAdmin || !select) return;
+  select.insertAdjacentHTML('beforeend', '<option value="__nueva">+ Registrar nueva área…</option>');
+  let prev = select.value;
+  select.addEventListener('change', async () => {
+    if (select.value !== '__nueva') { prev = select.value; return; }
+    const nueva = await openModal({
+      title: 'Nueva área', size: 'sm', submitText: 'Registrar área', confirmDiscard: false,
+      body: `<div class="field"><label for="na-nombre">Nombre del área <span class="req">*</span></label>
+        <input id="na-nombre" name="nombre" required minlength="2" maxlength="80" autocomplete="off"></div>`,
+      onSubmit: async ({ form }) => {
+        if (!checkForm(form)) return false;
+        const nombre = form.elements.nombre.value.trim().replace(/\s+/g, ' ');
+        const { data } = must(await sb.from('areas_med').insert({ nombre }).select('id, nombre').single());
+        invalidateAreas();
+        toast(`Área "${data.nombre}" registrada.`, 'success');
+        return data;
+      },
+    });
+    if (nueva?.id) {
+      select.insertBefore(new Option(nueva.nombre, nueva.id), select.querySelector('option[value="__nueva"]'));
+      prev = nueva.id;
+    }
+    select.value = prev;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
 
 // ---------- Días u horarios sin servicio (festivos, ausencias del médico) ----------
 export async function getBloqueos(desde, hasta = desde) {

@@ -47,7 +47,7 @@
 | Acción | Administrador | Usuario |
 |---|:-:|:-:|
 | Panel con KPI y gráficas | ✔ (todo) | ✔ (solo sus citas) |
-| Solicitar cita (normal o de urgencia) para un colaborador | ✔ | ✔ |
+| Solicitar cita (normal o de urgencia) | Para cualquier colaborador | Para sí mismo o colaboradores de su misma área |
 | Ver citas, agenda del día y agenda semanal | Todas | Las que solicitó (los demás horarios aparecen "Ocupado") |
 | Modificar / cancelar cita pendiente propia | ✔ | ✔ |
 | Confirmar, reprogramar, asignar horario de urgencia, marcar o reabrir inasistencia | ✔ | — |
@@ -74,6 +74,10 @@ Todas las reglas se aplican **en la base de datos** (RLS, triggers y funciones).
 4. Los medicamentos se descuentan al registrar la atención; además hay entradas, salidas y ajustes manuales.
 5. Datos clínicos mínimos: motivo, padecimiento, sintomatología y nota breve. Solo los consultan los administradores.
 6. Recordatorios al médico solo de lunes a viernes; aviso de bajo stock al médico.
+7. Todos los usuarios del sistema son también colaboradores de su área. Un usuario solicita citas para sí mismo o para colaboradores de su misma área; los administradores, para todos.
+8. Al registrar un colaborador o usuario, un administrador puede crear el área desde el mismo formulario.
+
+**Carga inicial (archivo del médico, 18/10/2026):** 71 colaboradores por área y 45 renglones de fármacos (44 medicamentos, 48 lotes). Criterios usados: caducidad con solo mes/año → último día del mes; sin número de lote → lote `S/N-AAAA-MM-DD`; tubos, botes, frascos y aerosoles se cuentan por pieza; contenido por empaque 1 y stock mínimo 0 hasta que el médico los defina. Los insumos médicos y el equipo de la segunda columna del archivo no se cargaron.
 
 **Supuestos documentados (ajustables)**
 
@@ -143,7 +147,7 @@ Todas las reglas se aplican **en la base de datos** (RLS, triggers y funciones).
 
 ### Pendiente en el panel de Supabase (lo hace un administrador del proyecto)
 1. **Authentication → URL Configuration → Redirect URLs:** agregar `https://TU-DOMINIO.vercel.app/**` (para "¿Olvidaste tu contraseña?").
-2. **Authentication → Providers → Email → Leaked password protection:** activarla.
+2. **Authentication → Attack Protection → "Prevent use of leaked passwords":** activarla. Solo está disponible en el plan Pro de Supabase; en el plan gratuito la opción aparece bloqueada.
 
 ---
 

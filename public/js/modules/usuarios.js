@@ -8,7 +8,7 @@
 import {
   sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, DataTable, paged,
   sanitizeSearch, debounce, getAreas, pill, must, fmtDateTime, avatarHTML, prepararFoto, subirFoto,
-  borrarFotoPropia, refreshIcons, fieldError,
+  borrarFotoPropia, refreshIcons, fieldError, permitirNuevaArea,
 } from '../core.js';
 
 let root, table, cuentas = new Map();
@@ -221,6 +221,7 @@ async function openUsuarioForm(u = null) {
       ${u ? '' : `<div class="acc-box"><div class="section-title" style="margin:4px 0 6px">${icon('key-round')} Cuenta de acceso</div>
         <div id="us-acc"><span class="hint">Escribe el correo para verificar si ya tiene cuenta Pet's Table.</span></div></div>`}`,
     onOpen: ({ form }) => {
+      permitirNuevaArea(form.elements.area_id);
       const prev = form.querySelector('#us-prev');
       const nombreVal = () => form.elements.nombre.value || '?';
       form.querySelector('#us-foto').addEventListener('change', async (ev) => {

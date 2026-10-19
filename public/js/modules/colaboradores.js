@@ -6,7 +6,7 @@
 import {
   sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, nullIfEmpty,
   DataTable, paged, sanitizeSearch, debounce, getAreas, invalidateAreas, pill, must, fmtNum,
-  fmtDate, fmtTime, estadoPill, MOTIVOS, cantUnidad, refreshIcons, ganchos,
+  fmtDate, fmtTime, estadoPill, MOTIVOS, cantUnidad, refreshIcons, ganchos, permitirNuevaArea,
 } from '../core.js';
 
 let root, table, areasTable;
@@ -233,15 +233,16 @@ function initAreas() {
 }
 
 // ---------- Formularios ----------
-export async function openColaboradorForm({ colaborador = null, nombre = '' } = {}) {
+export async function openColaboradorForm({ colaborador = null, nombre = '', areaId = '' } = {}) {
   let areas;
   try { areas = await getAreas({ soloActivas: true }); } catch (err) { toast(errMsg(err), 'error'); return false; }
-  if (!areas.length) { toast('Primero registra al menos un área activa.', 'warning'); return false; }
-  const c = colaborador;
+  if (!areas.length && !state.isAdmin) { toast('Primero un administrador debe registrar al menos un área activa.', 'warning'); return false; }
+  const c = colaborador || (areaId ? { area_id: areaId } : null);
+  const editando = !!colaborador;
   return openModal({
-    title: c ? 'Editar colaborador' : 'Nuevo colaborador',
-    subtitle: c ? '' : 'Registra a la persona que recibirá atención.',
-    submitText: c ? 'Guardar cambios' : 'Registrar',
+    title: editando ? 'Editar colaborador' : 'Nuevo colaborador',
+    subtitle: editando ? '' : 'Registra a la persona que recibirá atención.',
+    submitText: editando ? 'Guardar cambios' : 'Registrar',
     body: `
       <div class="form-grid">
         <div class="field full"><label for="k-nombre">Nombre completo <span class="req">*</span></label>
@@ -252,11 +253,13 @@ export async function openColaboradorForm({ colaborador = null, nombre = '' } = 
         <div class="field"><label for="k-area-sel">Área <span class="req">*</span></label>
           <select id="k-area-sel" name="area_id" required><option value="">Selecciona…</option>
             ${areas.map((a) => `<option value="${esc(a.id)}" ${c?.area_id === a.id ? 'selected' : ''}>${esc(a.nombre)}</option>`).join('')}
-            ${c && !areas.some((a) => a.id === c.area_id) ? `<option value="${esc(c.area_id)}" selected>${esc(c.area?.nombre || 'Área inactiva')}</option>` : ''}
-          </select></div>
+            ${editando && !areas.some((a) => a.id === c.area_id) ? `<option value="${esc(c.area_id)}" selected>${esc(c.area?.nombre || 'Área inactiva')}</option>` : ''}
+          </select>
+          ${state.isAdmin ? '<small class="hint">¿No aparece? Elige “+ Registrar nueva área…”.</small>' : ''}</div>
         <div class="field full"><label for="k-puesto">Puesto</label>
           <input id="k-puesto" name="puesto" maxlength="100" autocomplete="off" value="${esc(c?.puesto || '')}"></div>
       </div>`,
+    onOpen: ({ form }) => permitirNuevaArea(form.elements.area_id),
     onSubmit: async ({ form }) => {
       if (!checkForm(form, {
         num_empleado: (v) => (v && !/^[A-Za-z0-9 _/-]+$/.test(v.trim()) ? 'Usa solo letras, números, espacios y guiones.' : ''),
@@ -265,10 +268,10 @@ export async function openColaboradorForm({ colaborador = null, nombre = '' } = 
       const v = formValues(form);
       const payload = { nombre: v.nombre.replace(/\s+/g, ' '), num_empleado: nullIfEmpty(v.num_empleado), area_id: v.area_id, puesto: nullIfEmpty(v.puesto) };
       const sel = 'id, nombre, num_empleado, area_id, area:areas_med(nombre)';
-      const { data } = c
+      const { data } = editando
         ? must(await sb.from('colaboradores_med').update(payload).eq('id', c.id).select(sel).single())
         : must(await sb.from('colaboradores_med').insert(payload).select(sel).single());
-      toast(c ? 'Colaborador actualizado.' : `${data.nombre} registrado.`, 'success');
+      toast(editando ? 'Colaborador actualizado.' : `${data.nombre} registrado.`, 'success');
       return data;
     },
   });

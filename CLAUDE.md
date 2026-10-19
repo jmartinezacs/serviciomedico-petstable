@@ -106,7 +106,9 @@ Other frontend files:
     - `med_atender_cita` closes the cita, saves the atención and its padecimiento, and dispenses from lotes.
     - `med_registrar_entrada`/`_salida` and `med_ajustar_lote` handle manual stock moves.
   - `lotes_med` has no direct writes, and `movimientos_med` is insert-only.
+- **Colaboradores and users.** Every `usuarios_med` row has a linked colaborador through `colaboradores_med.usuario_id`. The trigger `usuarios_med_colaborador` keeps its name, area and puesto in sync.
 - **Citas.**
+  - Who can book: a non-admin may only book a cita for themselves or for a colaborador of their own area, enforced by `med_puede_citar` in the trigger. Admins may book for anyone.
   - `tipo` is `normal` or `urgente`.
   - Normal citas use 20-min slots on weekdays. A partial unique index on `(fecha, hora)` prevents double booking.
   - `dias_sin_servicio_med` holds holidays and doctor absences, either a full day or an hour range. LFT holidays for 2026–2027 are preloaded. Blocks reject normal citas, through `med_motivo_bloqueo` in the trigger, but still allow urgent ones.
