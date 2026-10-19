@@ -115,6 +115,11 @@ Other frontend files:
   - The pg_cron job `med_inasistencias` (19:05 MX, Mon–Fri) marks past confirmed citas as `no_asistio`. An admin can reopen a `no_asistio` cita back to `confirmada`.
   - An urgent cita has `hora` null until an admin assigns a time or rejects it.
   - States go pendiente → confirmada → atendida, plus cancelada and no asistió. Citas are cancelled, never deleted.
+- **Inventory.** `medicamentos_med` holds every inventory item, distinguished by two fields:
+  - `categoria` is `medicamento`, `insumo` or `equipo`. Equipment cannot be dispensed.
+  - `control` is `pieza` or `envase`.
+
+  `lotes_med.caducidad` may be null, but only for non-medication items. For `envase` items, `lotes_med.nivel` (25/50/75/100) is how full the open container is. Recording a use creates a `uso` movement with quantity 0. When a container is finished, 1 unit is deducted. Both go through `med_usar_envase`, which `med_registrar_uso` and `med_atender_cita` call; `med_atender_cita` items carry `{lote_id, nivel}` for these.
 - **Views:** `v_citas_med`, `v_stock_med`, `v_lotes_med` and `v_movimientos_med` use `security_invoker`.
 - **Secrets:** the VAPID keys and the cron secret live in the `med_private` schema. Only service_role can read them, through RPCs.
 

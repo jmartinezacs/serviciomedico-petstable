@@ -15,44 +15,55 @@ import {
 let root, tStock, tLotes, tMovs, tab = 'stock';
 
 const STOCK_PILL = { ok: ['Suficiente', 'ok'], bajo: ['Bajo mínimo', 'warn'], agotado: ['Agotado', 'bad'] };
-const CAD_PILL = { vigente: ['Vigente', 'ok'], por_caducar: ['Por caducar', 'warn'], caducado: ['Caducado', 'bad'] };
-const TIPO_PILL = { entrada: ['Entrada', 'ok'], salida: ['Salida', 'bad'], ajuste: ['Ajuste', 'info'], dispensacion: ['Dispensación', 'orange'] };
+const CAD_PILL = { vigente: ['Vigente', 'ok'], por_caducar: ['Por caducar', 'warn'], caducado: ['Caducado', 'bad'], sin_caducidad: ['Sin caducidad', 'gray'] };
+const TIPO_PILL = { entrada: ['Entrada', 'ok'], salida: ['Salida', 'bad'], ajuste: ['Ajuste', 'info'], dispensacion: ['Dispensación', 'orange'], uso: ['Uso de envase', 'gray'] };
 // Unidad mínima de control (se cuenta pieza por pieza o de forma aproximada en líquidos)
 const UNIDADES = ['tableta', 'cápsula', 'gragea', 'pieza', 'sobre', 'ampolleta', 'parche', 'óvulo', 'supositorio', 'ml', 'g', 'dosis'];
 // Empaque o presentación de compra
 const EMPAQUES = ['caja', 'frasco', 'bote', 'blíster', 'tubo', 'sobre', 'bolsa', 'paquete', 'pieza'];
 
-// Selector "capturar en empaques / en unidades" con total calculado en unidad mínima
-function unidadCapturaHTML(id, m) {
-  const c = Number(m?.contenido_empaque) || 1;
-  return `<div class="seg" role="radiogroup" aria-label="Capturar cantidad en" id="${id}">
-      <button type="button" data-modo="unidad" class="active">${esc(plural(m?.unidad || 'unidad', 2))}</button>
-      ${c > 1 ? `<button type="button" data-modo="empaque">${esc(plural(m.empaque, 2))} (${fmtNum(c)} c/u)</button>` : ''}
-    </div>`;
+const CATEGORIAS = { medicamento: 'Medicamento', insumo: 'Insumo médico', equipo: 'Equipo y mobiliario' };
+const NIVELES = { 100: 'Lleno', 75: '¾', 50: '½', 25: '¼' };
+const nivelTxt = (n) => (n ? `abierto, queda ${NIVELES[n] === 'Lleno' ? 'lleno' : NIVELES[n]}` : '');
+const envase = (m) => m?.control === 'envase';
+
+// Captura de cantidad: por unidad mínima (tableta, cápsula…) o por empaque (caja, bote…),
+// indicando cuántas unidades trae cada empaque; el total se calcula en unidad mínima.
+function capturaHTML(id, m) {
+  if (!m) return '<span class="hint">Selecciona un artículo.</span>';
+  if (envase(m) || m.unidad === m.empaque) return `<span class="hint">Se captura por ${esc(m.unidad)}.</span>`;
+  const c = Number(m.contenido_empaque) || 1;
+  return `<div class="seg" role="radiogroup" aria-label="Capturar cantidad" id="${id}">
+      <button type="button" data-modo="unidad" class="active">Por ${esc(m.unidad)}</button>
+      <button type="button" data-modo="empaque">Por ${esc(m.empaque)}</button></div>
+    <div class="field hidden" data-cont style="margin:10px 0 0"><label for="${id}-cont">Cada ${esc(m.empaque)} contiene (${esc(plural(m.unidad, 2))}) <span class="req">*</span></label>
+      <input id="${id}-cont" type="number" inputmode="numeric" min="1" max="100000" step="1" value="${c > 1 ? c : ''}" placeholder="Ej. 10"></div>`;
 }
-function bindCaptura(form, segId, inputName, getMed, maxBase = null) {
-  const seg = form.querySelector(`#${segId}`);
+function bindCaptura(form, segId, inputName, getMed, getMax = () => null) {
   const input = form.elements[inputName];
   const out = form.querySelector(`[data-total="${inputName}"]`);
+  const label = form.querySelector(`label[for="${input.id}"]`);
   let modo = 'unidad';
-  const total = () => { const n = Number(input.value) || 0; const m = getMed(); return modo === 'empaque' ? n * (Number(m?.contenido_empaque) || 1) : n; };
+  const contIn = () => form.querySelector(`#${segId}-cont`);
+  const contenido = () => (modo === 'empaque' ? Number(contIn()?.value) || 0 : 1);
+  const total = () => (Number(input.value) || 0) * contenido();
   const paint = () => {
-    const m = getMed(); const t = total();
-    if (out) out.textContent = input.value && m ? `Total: ${cantUnidad(t, m.unidad)}${equivEmpaque(t, m) ? ` (≈ ${equivEmpaque(t, m)})` : ''}` : '';
-    if (maxBase != null) {
-      const c = modo === 'empaque' ? (Number(m?.contenido_empaque) || 1) : 1;
-      input.max = String(Math.floor(maxBase / c));
-    }
+    const m = getMed(); const t = total(); const max = getMax();
+    const nom = m ? (modo === 'empaque' ? m.empaque : m.unidad) : '';
+    if (label) label.innerHTML = `Cantidad${nom ? ` de ${esc(plural(nom, 2))}` : ''} <span class="req">*</span>`;
+    form.querySelector(`#${segId}`)?.querySelectorAll('[data-modo]').forEach((x) => x.classList.toggle('active', x.dataset.modo === modo));
+    const cw = form.querySelector('[data-cont]');
+    if (cw) { cw.classList.toggle('hidden', modo !== 'empaque'); contIn().required = modo === 'empaque'; }
+    if (out) out.textContent = input.value && m && t ? `Total: ${cantUnidad(t, m.unidad)}${max != null ? ` de ${cantUnidad(max, m.unidad)} disponibles` : ''}` : '';
+    input.max = max != null && modo === 'unidad' ? String(max) : '100000';
   };
-  seg?.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-modo]'); if (!b) return;
-    modo = b.dataset.modo;
-    seg.querySelectorAll('[data-modo]').forEach((x) => x.classList.toggle('active', x === b));
-    paint();
+  form.addEventListener('click', (e) => {
+    const b = e.target.closest(`#${segId} [data-modo]`); if (!b) return;
+    modo = b.dataset.modo; paint();
   });
-  input.addEventListener('input', paint);
+  form.addEventListener('input', (e) => { if (e.target === input || e.target === contIn()) paint(); });
   paint();
-  return { total, paint, reset: () => { modo = 'unidad'; } };
+  return { total, paint, contenido, modo: () => modo, reset: () => { modo = 'unidad'; paint(); } };
 }
 
 export default {
@@ -61,10 +72,10 @@ export default {
     tab = ['stock', 'lotes', 'movs', 'reabasto'].includes(params.tab) ? params.tab : 'stock';
     el.innerHTML = `
       <section class="page-intro">
-        <div><span class="eyebrow">Medicamentos</span><h1>Inventario</h1>
+        <div><span class="eyebrow">Medicamentos, insumos y equipo</span><h1>Inventario</h1>
           <p>Existencias por lote, caducidades y trazabilidad de movimientos.</p></div>
         <div class="page-actions">
-          <button class="btn secondary" data-i="nuevo-med">${icon('plus')} Nuevo medicamento</button>
+          <button class="btn secondary" data-i="nuevo-med">${icon('plus')} Nuevo artículo</button>
           <button class="btn secondary" data-i="salida">${icon('package-minus')} Registrar salida</button>
           <button class="btn primary" data-i="entrada">${icon('package-plus')} Registrar entrada</button>
         </div>
@@ -79,6 +90,7 @@ export default {
       <div class="card" data-pane="stock">
         <div class="toolbar">
           <div class="search">${icon('search')}<input type="search" id="s-q" placeholder="Buscar por clave o nombre" aria-label="Buscar"></div>
+          <select id="s-cat" aria-label="Categoría"><option value="">Todas las categorías</option>${Object.entries(CATEGORIAS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
           <select id="s-estado" aria-label="Estado de existencia"><option value="">Todas las existencias</option><option value="alerta">Con alerta (bajo mínimo o agotado)</option><option value="ok">Suficiente</option><option value="bajo">Bajo mínimo</option><option value="agotado">Agotado</option></select>
           <select id="s-activo" aria-label="Estado"><option value="true">Activos</option><option value="false">Inactivos</option><option value="">Todos</option></select>
         </div>
@@ -86,15 +98,15 @@ export default {
       </div>
       <div class="card hidden" data-pane="lotes">
         <div class="toolbar">
-          <div class="search">${icon('search')}<input type="search" id="l-q" placeholder="Buscar por medicamento o lote" aria-label="Buscar"></div>
-          <select id="l-estado" aria-label="Caducidad"><option value="">Todas las caducidades</option><option value="vigente">Vigentes</option><option value="por_caducar">Por caducar</option><option value="caducado">Caducados</option></select>
+          <div class="search">${icon('search')}<input type="search" id="l-q" placeholder="Buscar por artículo o lote" aria-label="Buscar"></div>
+          <select id="l-estado" aria-label="Caducidad"><option value="">Todas las caducidades</option><option value="vigente">Vigentes</option><option value="por_caducar">Por caducar</option><option value="caducado">Caducados</option><option value="sin_caducidad">Sin caducidad</option></select>
           <select id="l-exist" aria-label="Existencia"><option value="con">Con existencia</option><option value="">Todos</option><option value="sin">Sin existencia</option></select>
         </div>
         <div id="lotes-table"></div>
       </div>
       <div class="card hidden" data-pane="movs">
         <div class="toolbar">
-          <div class="search">${icon('search')}<input type="search" id="m-q" placeholder="Buscar medicamento, lote o folio de cita" aria-label="Buscar"></div>
+          <div class="search">${icon('search')}<input type="search" id="m-q" placeholder="Buscar artículo, lote o folio de cita" aria-label="Buscar"></div>
           <select id="m-tipo" aria-label="Tipo"><option value="">Todos los tipos</option>${Object.entries(TIPO_PILL).map(([k, [l]]) => `<option value="${k}">${l}</option>`).join('')}</select>
           <span class="date-range"><input type="date" id="m-desde" aria-label="Desde"> a <input type="date" id="m-hasta" aria-label="Hasta"></span>
         </div>
@@ -111,9 +123,9 @@ export default {
 
 function bindFilters() {
   const q = (s) => root.querySelector(s);
-  const applyStock = () => tStock?.setFilters({ q: q('#s-q').value, estado: q('#s-estado').value, activo: q('#s-activo').value });
+  const applyStock = () => tStock?.setFilters({ q: q('#s-q').value, cat: q('#s-cat').value, estado: q('#s-estado').value, activo: q('#s-activo').value });
   q('#s-q').addEventListener('input', debounce(applyStock, 350));
-  ['#s-estado', '#s-activo'].forEach((s) => q(s).addEventListener('change', applyStock));
+  ['#s-cat', '#s-estado', '#s-activo'].forEach((s) => q(s).addEventListener('change', applyStock));
   const applyLotes = () => tLotes?.setFilters({ q: q('#l-q').value, estado: q('#l-estado').value, exist: q('#l-exist').value });
   q('#l-q').addEventListener('input', debounce(applyLotes, 350));
   ['#l-estado', '#l-exist'].forEach((s) => q(s).addEventListener('change', applyLotes));
@@ -184,12 +196,12 @@ function stockTable() {
     sort: { key: 'nombre', asc: true },
     columns: [
       { label: 'Clave', sort: 'clave', render: (m) => `<span class="mono cell-main">${esc(m.clave)}</span>` },
-      { label: 'Medicamento', sort: 'nombre', render: (m) => `<div class="cell-main">${esc(m.nombre)}</div><div class="cell-sub">${esc(m.presentacion || '')}</div>` },
-      { label: 'Existencia vigente', cls: 'num', sort: 'existencia_vigente', render: (m) => `${existenciaHTML(m.existencia_vigente, m)}${m.existencia_caducada ? `<div class="cell-sub" style="color:var(--bad)">${esc(cantUnidad(m.existencia_caducada, m.unidad))} caducadas</div>` : ''}` },
-      { label: 'Empaque', render: (m) => (Number(m.contenido_empaque) > 1 ? `${esc(m.empaque)}<div class="cell-sub">${esc(cantUnidad(m.contenido_empaque, m.unidad))} c/u</div>` : `<span class="cell-sub">Por ${esc(m.unidad)}</span>`) },
-      { label: 'Mínimo', cls: 'num', sort: 'stock_minimo', render: (m) => esc(cantUnidad(m.stock_minimo, m.unidad)) },
-      { label: 'Próx. caducidad', sort: 'proxima_caducidad', render: (m) => fmtDate(m.proxima_caducidad) },
-      { label: 'Estado', render: (m) => (m.activo ? pill(...stockPill(m)) : pill('Inactivo', 'gray')) },
+      { label: 'Artículo', sort: 'nombre', render: (m) => `<div class="cell-main">${esc(m.nombre)}</div><div class="cell-sub">${esc([CATEGORIAS[m.categoria], m.presentacion].filter(Boolean).join(' · '))}</div>` },
+      { label: 'Existencia vigente', cls: 'num', sort: 'existencia_vigente', render: (m) => `${existenciaHTML(m.existencia_vigente, m)}${envase(m) && m.nivel_abierto ? `<div class="cell-sub">1 ${esc(m.unidad)} ${esc(nivelTxt(m.nivel_abierto))}</div>` : ''}${m.existencia_caducada ? `<div class="cell-sub" style="color:var(--bad)">${esc(cantUnidad(m.existencia_caducada, m.unidad))} caducadas</div>` : ''}` },
+      { label: 'Empaque', render: (m) => (envase(m) ? `<span class="cell-sub">Por envase (nivel de uso)</span>` : Number(m.contenido_empaque) > 1 ? `${esc(m.empaque)}<div class="cell-sub">${esc(cantUnidad(m.contenido_empaque, m.unidad))} c/u</div>` : `<span class="cell-sub">Por ${esc(m.unidad)}</span>`) },
+      { label: 'Mínimo', cls: 'num', sort: 'stock_minimo', render: (m) => (m.stock_minimo ? esc(cantUnidad(m.stock_minimo, m.unidad)) : '<span class="cell-sub">Sin alerta</span>') },
+      { label: 'Próx. caducidad', sort: 'proxima_caducidad', render: (m) => (m.proxima_caducidad ? fmtDate(m.proxima_caducidad) : '<span class="cell-sub">—</span>') },
+      { label: 'Estado', render: (m) => (!m.activo ? pill('Inactivo', 'gray') : m.categoria === 'equipo' ? pill('Equipo', 'gray') : pill(...stockPill(m))) },
       { label: 'Acciones', cls: 'actions', render: (m) => `<div class="row-actions">
         ${m.activo ? `<button class="icon-btn ok" data-ia="entrada" data-id="${esc(m.id)}" title="Registrar entrada" aria-label="Registrar entrada">${icon('package-plus')}</button>` : ''}
         <button class="icon-btn" data-ia="lotes" data-id="${esc(m.id)}" title="Ver lotes" aria-label="Ver lotes">${icon('layers')}</button>
@@ -206,6 +218,7 @@ function stockTable() {
       // "alerta" usa el mismo criterio que el KPI del panel (med_dashboard.bajo_minimo)
       if (f.estado === 'alerta') q = q.in('estado_stock', ['bajo', 'agotado']).gt('stock_minimo', 0);
       else if (f.estado) q = q.eq('estado_stock', f.estado);
+      if (f.cat) q = q.eq('categoria', f.cat);
       if (f.activo !== '' && f.activo !== undefined) q = q.eq('activo', f.activo === 'true');
       const { data, count } = must(await paged(q, { from, to, sort }, [['nombre', true]]));
       return { rows: data, count };
@@ -222,12 +235,13 @@ function lotesTable() {
   return new DataTable(root.querySelector('#lotes-table'), {
     sort: { key: 'caducidad', asc: true },
     columns: [
-      { label: 'Medicamento', sort: 'medicamento', render: (l) => `<div class="cell-main">${esc(l.medicamento)}</div><div class="cell-sub mono">${esc(l.clave)}</div>` },
+      { label: 'Artículo', sort: 'medicamento', render: (l) => `<div class="cell-main">${esc(l.medicamento)}</div><div class="cell-sub mono">${esc(l.clave)}</div>` },
       { label: 'Lote', sort: 'lote', render: (l) => `<span class="mono">${esc(l.lote)}</span>` },
-      { label: 'Caducidad', sort: 'caducidad', render: (l) => `${fmtDate(l.caducidad)}<div class="cell-sub">${l.dias_para_caducar < 0 ? `Hace ${fmtNum(-l.dias_para_caducar)} días` : `En ${fmtNum(l.dias_para_caducar)} días`}</div>` },
-      { label: 'Existencia', cls: 'num', sort: 'existencia', render: (l) => existenciaHTML(l.existencia, l) },
+      { label: 'Caducidad', sort: 'caducidad', render: (l) => (l.caducidad ? `${fmtDate(l.caducidad)}<div class="cell-sub">${l.dias_para_caducar < 0 ? `Hace ${fmtNum(-l.dias_para_caducar)} días` : `En ${fmtNum(l.dias_para_caducar)} días`}</div>` : '<span class="cell-sub">Sin caducidad</span>') },
+      { label: 'Existencia', cls: 'num', sort: 'existencia', render: (l) => `${existenciaHTML(l.existencia, l)}${envase(l) && l.nivel && l.existencia ? `<div class="cell-sub">1 ${esc(l.unidad)} ${esc(nivelTxt(l.nivel))}</div>` : ''}` },
       { label: 'Estado', render: (l) => pill(...CAD_PILL[l.estado_caducidad]) },
       { label: 'Acciones', cls: 'actions', render: (l) => `<div class="row-actions">
+        ${envase(l) ? `<button class="icon-btn ok" data-la="uso" data-id="${esc(l.id)}" title="Registrar uso del envase" aria-label="Registrar uso del envase" ${l.existencia > 0 && l.estado_caducidad !== 'caducado' ? '' : 'disabled'}>${icon('droplet')}</button>` : ''}
         <button class="icon-btn bad" data-la="salida" data-id="${esc(l.id)}" title="Registrar salida" aria-label="Registrar salida" ${l.existencia > 0 ? '' : 'disabled'}>${icon('package-minus')}</button>
         <button class="icon-btn" data-la="ajuste" data-id="${esc(l.id)}" title="Ajuste por conteo físico" aria-label="Ajuste por conteo físico">${icon('clipboard-check')}</button>
         <button class="icon-btn" data-la="historial" data-id="${esc(l.id)}" title="Ver movimientos" aria-label="Ver movimientos">${icon('history')}</button></div>` },
@@ -253,8 +267,8 @@ function movsTable() {
     columns: [
       { label: 'Fecha', sort: 'created_at', render: (m) => `<span class="mono">${fmtDateTime(m.created_at)}</span>` },
       { label: 'Tipo', sort: 'tipo', render: (m) => pill(...TIPO_PILL[m.tipo]) },
-      { label: 'Medicamento', sort: 'medicamento', render: (m) => `<div class="cell-main">${esc(m.medicamento)}</div><div class="cell-sub">Lote <span class="mono">${esc(m.lote)}</span> · cad. ${fmtDate(m.caducidad)}</div>` },
-      { label: 'Cantidad', cls: 'num', render: (m) => `<span class="${m.cantidad > 0 ? 'qty-pos' : 'qty-neg'}">${m.cantidad > 0 ? '+' : '−'}${esc(cantUnidad(Math.abs(m.cantidad), m.unidad))}</span>${Math.abs(m.cantidad) >= (Number(m.contenido_empaque) || 1) && equivEmpaque(m.cantidad, m) ? `<div class="cell-sub">≈ ${esc(equivEmpaque(m.cantidad, m))}</div>` : ''}` },
+      { label: 'Artículo', sort: 'medicamento', render: (m) => `<div class="cell-main">${esc(m.medicamento)}</div><div class="cell-sub">Lote <span class="mono">${esc(m.lote)}</span>${m.caducidad ? ` · cad. ${fmtDate(m.caducidad)}` : ''}</div>` },
+      { label: 'Cantidad', cls: 'num', render: (m) => (m.tipo === 'uso' ? '<span class="cell-sub">Sin descuento</span>' : `<span class="${m.cantidad > 0 ? 'qty-pos' : 'qty-neg'}">${m.cantidad > 0 ? '+' : '−'}${esc(cantUnidad(Math.abs(m.cantidad), m.unidad))}</span>${Math.abs(m.cantidad) >= (Number(m.contenido_empaque) || 1) && equivEmpaque(m.cantidad, m) ? `<div class="cell-sub">≈ ${esc(equivEmpaque(m.cantidad, m))}</div>` : ''}`) },
       { label: 'Existencia resultante', cls: 'num', render: (m) => existenciaHTML(m.existencia_resultante, m) },
       { label: 'Referencia', render: (m) => (m.cita_folio ? `<span class="mono">${esc(m.cita_folio)}</span>` : `<span class="cell-sub">${esc(m.motivo || '—')}</span>`) },
       { label: 'Usuario', render: (m) => `<span class="cell-sub">${esc(m.usuario)}</span>` },
@@ -283,10 +297,7 @@ async function onClick(e) {
     if (i.dataset.i === 'reabasto-retry') { renderReabasto(); return; }
     if (i.dataset.i === 'nuevo-med' && await openMedicamentoForm()) refresh();
     if (i.dataset.i === 'entrada' && await openEntrada()) refresh();
-    if (i.dataset.i === 'salida') {
-      const lote = await elegirLote();
-      if (lote && await openSalida(lote)) refresh();
-    }
+    if (i.dataset.i === 'salida' && await openSalida()) refresh();
     return;
   }
   const ia = e.target.closest('[data-ia]');
@@ -326,6 +337,7 @@ async function onClick(e) {
   if (la) {
     const l = tLotes.row(la.dataset.id);
     if (!l) return;
+    if (la.dataset.la === 'uso' && await openUso(l)) refresh();
     if (la.dataset.la === 'salida' && await openSalida(l)) refresh();
     if (la.dataset.la === 'ajuste' && await openAjuste(l)) refresh();
     if (la.dataset.la === 'historial') {
@@ -345,8 +357,18 @@ function refresh() {
 // ---------- Formularios ----------
 async function openMedicamentoForm(m = null) {
   return openModal({
-    title: m ? 'Editar medicamento' : 'Nuevo medicamento', submitText: m ? 'Guardar cambios' : 'Registrar', size: 'lg',
+    title: m ? 'Editar artículo' : 'Nuevo artículo', submitText: m ? 'Guardar cambios' : 'Registrar', size: 'lg',
     body: `
+      <div class="form-grid">
+        <div class="field"><label for="md-cat">Categoría <span class="req">*</span></label>
+          <select id="md-cat" name="categoria" required>${Object.entries(CATEGORIAS).map(([k, v]) => `<option value="${k}" ${(m?.categoria || 'medicamento') === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+          <small class="hint">El equipo no se entrega en consultas ni genera alertas.</small></div>
+        <div class="field"><label for="md-ctrl">Cómo se controla <span class="req">*</span></label>
+          <select id="md-ctrl" name="control" required>
+            <option value="pieza" ${m?.control !== 'envase' ? 'selected' : ''}>Por pieza (se cuenta: tabletas, jeringas…)</option>
+            <option value="envase" ${m?.control === 'envase' ? 'selected' : ''}>Por envase (gel, crema, frasco, aerosol, rollo…)</option></select>
+          <small class="hint">Por envase: se registra cuánto queda del envase abierto en cada uso y se descuenta al terminarse.</small></div>
+      </div>
       <div class="form-grid">
         <div class="field"><label for="md-clave">Clave <span class="req">*</span></label>
           <input id="md-clave" name="clave" required maxlength="30" autocomplete="off" value="${esc(m?.clave || '')}" placeholder="Ej. PARA-500">
@@ -390,10 +412,13 @@ async function openMedicamentoForm(m = null) {
       const payload = {
         clave: v.clave, nombre: v.nombre, unidad: v.unidad, empaque: v.empaque, contenido_empaque: Number(v.contenido_empaque),
         presentacion: nullIfEmpty(v.presentacion), stock_minimo: Number(v.stock_minimo),
+        categoria: v.categoria, control: v.control,
       };
+      // Por envase la unidad es el propio envase (tubo, frasco…)
+      if (v.control === 'envase') { payload.unidad = v.empaque; payload.contenido_empaque = 1; }
       if (m) must(await sb.from('medicamentos_med').update(payload).eq('id', m.id).select('id').single());
       else must(await sb.from('medicamentos_med').insert(payload).select('id').single());
-      toast(m ? 'Medicamento actualizado.' : 'Medicamento registrado.', 'success');
+      toast(m ? 'Artículo actualizado.' : 'Artículo registrado.', 'success');
     },
   });
 }
@@ -401,40 +426,47 @@ async function openMedicamentoForm(m = null) {
 export async function openEntrada(medId = null) {
   let meds;
   try {
-    meds = must(await sb.from('medicamentos_med').select('id, clave, nombre, unidad, empaque, contenido_empaque').eq('activo', true).order('nombre')).data;
+    meds = must(await sb.from('medicamentos_med').select('id, clave, nombre, unidad, empaque, contenido_empaque, categoria, control').eq('activo', true).order('nombre')).data;
   } catch (err) { toast(errMsg(err), 'error'); return false; }
-  if (!meds.length) { toast('Primero registra un medicamento activo en el catálogo.', 'warning'); return false; }
+  if (!meds.length) { toast('Primero registra un artículo activo en el catálogo.', 'warning'); return false; }
   const manana = addDays(todayISO(), 1);
   let lotes = [], cap = null;
   const medSel = (form) => meds.find((x) => x.id === form.elements.medicamento.value) || null;
   return openModal({
-    title: 'Registrar entrada', subtitle: 'Ingresa medicamento por lote. Si el lote ya existe, se suma a su existencia.',
+    title: 'Registrar entrada', subtitle: 'Ingresa existencias por lote. Si el lote ya existe, se suma a su existencia.',
     submitText: 'Registrar entrada', size: 'lg',
     body: `
       <div class="form-grid">
-        <div class="field full"><label for="en-med">Medicamento <span class="req">*</span></label>
+        <div class="field full"><label for="en-med">Artículo <span class="req">*</span></label>
           <select id="en-med" name="medicamento" required><option value="">Selecciona…</option>
             ${meds.map((m) => `<option value="${esc(m.id)}" ${m.id === medId ? 'selected' : ''}>${esc(m.nombre)} · ${esc(m.clave)}</option>`).join('')}</select></div>
-        <div class="field"><label for="en-lote">Lote <span class="req">*</span></label>
+        <div class="field"><label for="en-lote">Lote <span class="req" id="en-lote-req">*</span></label>
           <input id="en-lote" name="lote" required maxlength="40" autocomplete="off" list="en-lotes" placeholder="Número de lote del fabricante">
           <datalist id="en-lotes"></datalist>
           <small class="hint" id="en-lote-hint"></small></div>
-        <div class="field"><label for="en-cad">Caducidad <span class="req">*</span></label>
-          <input id="en-cad" name="caducidad" type="date" required min="${manana}"></div>
-        <div class="field full"><label>Capturar cantidad en</label><div id="en-modo-wrap"><span class="hint">Selecciona un medicamento.</span></div></div>
+        <div class="field"><label for="en-cad">Caducidad <span class="req" id="en-cad-req">*</span></label>
+          <input id="en-cad" name="caducidad" type="date" required min="${manana}">
+          <small class="hint" id="en-cad-hint"></small></div>
+        <div class="field full"><label>Capturar cantidad</label><div id="en-modo-wrap"><span class="hint">Selecciona un artículo.</span></div></div>
         <div class="field"><label for="en-cant">Cantidad <span class="req">*</span></label>
           <input id="en-cant" name="cantidad" type="number" inputmode="numeric" min="1" max="100000" step="1" required>
           <small class="hint" data-total="cantidad"></small></div>
-        <div class="field"><label for="en-nota">Referencia</label>
-          <input id="en-nota" name="motivo" maxlength="300" placeholder="Ej. factura, requisición o proveedor"></div>
       </div>`,
     onOpen: ({ form }) => {
       const sel = form.elements.medicamento, lote = form.elements.lote, cad = form.elements.caducidad;
       const hint = form.querySelector('#en-lote-hint');
       const setModo = () => {
         const m = medSel(form);
-        form.querySelector('#en-modo-wrap').innerHTML = m ? unidadCapturaHTML('en-modo', m) : '<span class="hint">Selecciona un medicamento.</span>';
-        cap = m ? bindCaptura(form, 'en-modo', 'cantidad', () => medSel(form)) : null;
+        const esMed = !m || m.categoria === 'medicamento';
+        // Insumos y equipo: lote y caducidad opcionales
+        lote.required = esMed; cad.required = esMed;
+        form.querySelector('#en-lote-req').hidden = !esMed;
+        form.querySelector('#en-cad-req').hidden = !esMed;
+        lote.placeholder = esMed ? 'Número de lote del fabricante' : 'Opcional (si no tiene, se registra S/N)';
+        form.querySelector('#en-cad-hint').textContent = esMed ? '' : 'Opcional: déjala vacía si no caduca.';
+        form.querySelector('#en-modo-wrap').innerHTML = capturaHTML('en-modo', m);
+        if (!cap) cap = bindCaptura(form, 'en-modo', 'cantidad', () => medSel(form));
+        else cap.reset();
       };
       const loadLotes = async () => {
         setModo();
@@ -443,91 +475,133 @@ export async function openEntrada(medId = null) {
         if (!sel.value) return;
         const { data } = await sb.from('lotes_med').select('lote, caducidad').eq('medicamento_id', sel.value).order('caducidad', { ascending: false }).limit(50);
         lotes = data || [];
-        form.querySelector('#en-lotes').innerHTML = lotes.map((l) => `<option value="${esc(l.lote)}">Cad. ${fmtDate(l.caducidad)}</option>`).join('');
+        form.querySelector('#en-lotes').innerHTML = lotes.map((l) => `<option value="${esc(l.lote)}">${l.caducidad ? `Cad. ${fmtDate(l.caducidad)}` : 'Sin caducidad'}</option>`).join('');
         checkLote();
       };
       const checkLote = () => {
         const ex = lotes.find((l) => l.lote.toLowerCase() === lote.value.trim().toLowerCase());
-        if (ex) { cad.value = ex.caducidad; cad.readOnly = true; hint.textContent = `Lote existente (cad. ${fmtDate(ex.caducidad)}): la cantidad se sumará.`; }
+        if (ex) { cad.value = ex.caducidad || ''; cad.readOnly = true; hint.textContent = `Lote existente (${ex.caducidad ? `cad. ${fmtDate(ex.caducidad)}` : 'sin caducidad'}): la cantidad se sumará.`; }
         else { if (cad.readOnly) cad.value = ''; cad.readOnly = false; hint.textContent = ''; }
       };
       sel.addEventListener('change', loadLotes);
       lote.addEventListener('input', checkLote);
       loadLotes();
     },
-    onSubmit: async ({ form }) => {
-      if (!checkForm(form, { caducidad: (v) => (v && v < manana ? 'La caducidad debe ser posterior a hoy.' : '') })) return false;
+    onSubmit: async ({ form, setError }) => {
+      if (!checkForm(form, { caducidad: (v) => (v && v < manana && !form.elements.caducidad.readOnly ? 'La caducidad debe ser posterior a hoy.' : '') })) return false;
       const v = formValues(form);
       const m = medSel(form);
-      const total = cap ? cap.total() : Number(v.cantidad);
-      if (total > 100000) { form.querySelector('.form-error').textContent = `El total (${cantUnidad(total, m.unidad)}) excede el máximo de 100,000 por movimiento.`; return false; }
-      must(await sb.rpc('med_registrar_entrada', {
-        p_medicamento: v.medicamento, p_lote: v.lote, p_caducidad: v.caducidad, p_cantidad: total, p_motivo: nullIfEmpty(v.motivo),
-      }));
-      toast(`Entrada registrada: ${cantUnidad(total, m.unidad)}${equivEmpaque(total, m) ? ` (≈ ${equivEmpaque(total, m)})` : ''} del lote ${v.lote.toUpperCase()}.`, 'success', 6000);
-    },
-  });
-}
-
-// Selección de medicamento y lote para una salida desde el encabezado
-async function elegirLote() {
-  let lotes;
-  try {
-    lotes = must(await sb.from('v_lotes_med').select('*').gt('existencia', 0).order('medicamento').order('caducidad')).data;
-  } catch (err) { toast(errMsg(err), 'error'); return null; }
-  if (!lotes.length) { toast('No hay lotes con existencia para registrar una salida.', 'warning'); return null; }
-  const meds = [...new Map(lotes.map((l) => [l.medicamento_id, l.medicamento])).entries()];
-  const r = await openModal({
-    title: 'Registrar salida', subtitle: 'Elige el medicamento y el lote del que saldrán las unidades.', submitText: 'Continuar', confirmDiscard: false,
-    body: `
-      <div class="field"><label for="es-med">Medicamento <span class="req">*</span></label>
-        <select id="es-med" name="med" required><option value="">Selecciona…</option>
-          ${meds.map(([id, n]) => `<option value="${esc(id)}">${esc(n)}</option>`).join('')}</select></div>
-      <div class="field"><label for="es-lote">Lote <span class="req">*</span></label>
-        <select id="es-lote" name="lote" required disabled><option value="">—</option></select>
-        <small class="hint">Se sugiere primero el lote que caduca antes.</small></div>`,
-    onOpen: ({ form }) => {
-      form.elements.med.addEventListener('change', () => {
-        const ls = lotes.filter((l) => l.medicamento_id === form.elements.med.value);
-        form.elements.lote.innerHTML = ls.map((l) => `<option value="${esc(l.id)}">${esc(l.lote)} · cad. ${fmtDate(l.caducidad)} · ${esc(cantUnidad(l.existencia, l.unidad))}${l.estado_caducidad === 'caducado' ? ' · CADUCADO' : ''}</option>`).join('');
-        form.elements.lote.disabled = !ls.length;
+      const total = cap.total();
+      if (!total) { setError('Indica cuántas unidades trae cada empaque.'); return false; }
+      if (total > 100000) { setError(`El total (${cantUnidad(total, m.unidad)}) excede el máximo de 100,000 por movimiento.`); return false; }
+      const lote = await sb.rpc('med_registrar_entrada', {
+        p_medicamento: v.medicamento, p_lote: v.lote, p_caducidad: v.caducidad || null, p_cantidad: total, p_motivo: null,
       });
-    },
-    onSubmit: ({ form }) => {
-      if (!checkForm(form)) return false;
-      return lotes.find((l) => l.id === form.elements.lote.value) || false;
+      must(lote);
+      // Se recuerda el contenido por empaque capturado para la próxima vez
+      if (cap.modo() === 'empaque' && cap.contenido() !== Number(m.contenido_empaque)) {
+        await sb.from('medicamentos_med').update({ contenido_empaque: cap.contenido() }).eq('id', m.id);
+      }
+      const det = cap.modo() === 'empaque' ? ` (${fmtNum(Number(v.cantidad))} ${plural(m.empaque, Number(v.cantidad))} de ${fmtNum(cap.contenido())})` : '';
+      toast(`Entrada registrada: ${cantUnidad(total, m.unidad)}${det}.`, 'success', 6000);
     },
   });
-  return r && r.id ? r : null;
 }
 
 const MOTIVOS_SALIDA = ['Merma o daño', 'Caducado / destrucción', 'Entrega sin cita', 'Devolución a proveedor', 'Otro'];
-async function openSalida(l) {
+// Salida: si no se recibe el lote, se elige artículo y lote en el mismo formulario
+async function openSalida(l0 = null) {
+  let lotes = l0 ? [l0] : null;
+  if (!lotes) {
+    try {
+      lotes = must(await sb.from('v_lotes_med').select('*').gt('existencia', 0).order('medicamento').order('caducidad', { nullsFirst: false })).data;
+    } catch (err) { toast(errMsg(err), 'error'); return false; }
+    if (!lotes.length) { toast('No hay lotes con existencia para registrar una salida.', 'warning'); return false; }
+  }
+  const meds = [...new Map(lotes.map((l) => [l.medicamento_id, l.medicamento])).entries()];
   let cap = null;
+  const loteSel = (form) => (l0 || lotes.find((l) => l.id === form.elements.lote.value) || null);
+  const loteTxt = (l) => `${l.lote} · ${l.caducidad ? `cad. ${fmtDate(l.caducidad)}` : 'sin caducidad'} · ${cantUnidad(l.existencia, l.unidad)} disponibles${l.estado_caducidad === 'caducado' ? ' · CADUCADO' : ''}`;
   return openModal({
-    title: 'Registrar salida', subtitle: `${l.medicamento} · Lote ${l.lote} · ${cantUnidad(l.existencia, l.unidad)} disponibles${equivEmpaque(l.existencia, l) ? ` (≈ ${equivEmpaque(l.existencia, l)})` : ''}`,
+    title: 'Registrar salida', subtitle: l0 ? `${l0.medicamento} · Lote ${l0.lote}` : 'Elige el artículo, el lote y la cantidad que sale.',
     submitText: 'Registrar salida', danger: true,
     body: `
-      ${l.estado_caducidad === 'caducado' ? `<div class="notice warn">${icon('alert-triangle')}<span>Este lote está caducado. Regístralo como “Caducado / destrucción”.</span></div>` : ''}
-      <div class="field"><label>Capturar cantidad en</label>${unidadCapturaHTML('sa-modo', l)}</div>
+      ${l0 ? '' : `<div class="form-grid">
+        <div class="field"><label for="sa-med">Artículo <span class="req">*</span></label>
+          <select id="sa-med" name="med" required><option value="">Selecciona…</option>
+            ${meds.map(([id, n]) => `<option value="${esc(id)}">${esc(n)}</option>`).join('')}</select></div>
+        <div class="field"><label for="sa-lote">Lote <span class="req">*</span></label>
+          <select id="sa-lote" name="lote" required disabled><option value="">—</option></select>
+          <small class="hint">Se propone primero el lote que caduca antes.</small></div>
+      </div>`}
+      <div class="notice" id="sa-disp" ${l0 ? '' : 'hidden'}>${l0 ? `${icon('package')}<span>Disponible: <b>${esc(loteTxt(l0))}</b></span>` : ''}</div>
+      <div class="notice warn" id="sa-cad" ${l0?.estado_caducidad === 'caducado' ? '' : 'hidden'}>${icon('alert-triangle')}<span>Este lote está caducado. Regístralo como “Caducado / destrucción”.</span></div>
+      <div class="field"><label>Capturar cantidad</label><div id="sa-modo-wrap">${capturaHTML('sa-modo', l0)}</div></div>
       <div class="form-grid">
         <div class="field"><label for="sa-cant">Cantidad <span class="req">*</span></label>
-          <input id="sa-cant" name="cantidad" type="number" inputmode="numeric" min="1" max="${l.existencia}" step="1" required>
+          <input id="sa-cant" name="cantidad" type="number" inputmode="numeric" min="1" step="1" required>
           <small class="hint" data-total="cantidad"></small></div>
         <div class="field"><label for="sa-tipo">Motivo <span class="req">*</span></label>
           <select id="sa-tipo" name="tipo" required><option value="">Selecciona…</option>
-            ${MOTIVOS_SALIDA.map((m) => `<option ${l.estado_caducidad === 'caducado' && m.startsWith('Caducado') ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+            ${MOTIVOS_SALIDA.map((m) => `<option ${l0?.estado_caducidad === 'caducado' && m.startsWith('Caducado') ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
         <div class="field full"><label for="sa-det">Detalle</label>
           <textarea id="sa-det" name="detalle" maxlength="250" data-counter placeholder="Describe brevemente la salida"></textarea></div>
       </div>`,
-    onOpen: ({ form }) => { bindCounters(form); cap = bindCaptura(form, 'sa-modo', 'cantidad', () => l, l.existencia); },
-    onSubmit: async ({ form }) => {
+    onOpen: ({ form }) => {
+      bindCounters(form);
+      cap = bindCaptura(form, 'sa-modo', 'cantidad', () => loteSel(form), () => loteSel(form)?.existencia ?? null);
+      if (l0) return;
+      const pintaLote = () => {
+        const l = loteSel(form);
+        const disp = form.querySelector('#sa-disp');
+        disp.hidden = !l;
+        disp.innerHTML = l ? `${icon('package')}<span>Disponible: <b>${esc(loteTxt(l))}</b></span>` : '';
+        form.querySelector('#sa-cad').hidden = l?.estado_caducidad !== 'caducado';
+        if (l?.estado_caducidad === 'caducado') form.elements.tipo.value = 'Caducado / destrucción';
+        form.querySelector('#sa-modo-wrap').innerHTML = capturaHTML('sa-modo', l);
+        cap.reset(); refreshIcons();
+      };
+      form.elements.med.addEventListener('change', () => {
+        const ls = lotes.filter((l) => l.medicamento_id === form.elements.med.value);
+        form.elements.lote.innerHTML = ls.map((l) => `<option value="${esc(l.id)}">${esc(loteTxt(l))}</option>`).join('') || '<option value="">—</option>';
+        form.elements.lote.disabled = !ls.length;
+        pintaLote();
+      });
+      form.elements.lote.addEventListener('change', pintaLote);
+    },
+    onSubmit: async ({ form, setError }) => {
       if (!checkForm(form, { detalle: (v, f) => (f.tipo.value === 'Otro' && !v ? 'Describe el motivo de la salida.' : '') })) return false;
       const v = formValues(form);
+      const l = loteSel(form);
       const total = cap.total();
-      if (total > l.existencia) { form.querySelector('.form-error').textContent = `Solo hay ${cantUnidad(l.existencia, l.unidad)} en este lote.`; return false; }
+      if (!total) { setError('Indica cuántas unidades trae cada empaque.'); return false; }
+      if (total > l.existencia) { setError(`Solo hay ${cantUnidad(l.existencia, l.unidad)} en este lote.`); return false; }
       must(await sb.rpc('med_registrar_salida', { p_lote: l.id, p_cantidad: total, p_motivo: v.detalle ? `${v.tipo}: ${v.detalle}` : v.tipo }));
-      toast(`Salida registrada: ${cantUnidad(total, l.unidad)}.`, 'success');
+      toast(`Salida registrada: ${cantUnidad(total, l.unidad)} de ${l.medicamento}.`, 'success');
+    },
+  });
+}
+
+// Uso de un envase (gel, crema, frasco…): se registra cuánto queda; al terminarse se descuenta
+export function nivelesHTML(name, actual = null) {
+  return `<div class="nivel-seg" role="radiogroup" aria-label="Cuánto queda del envase">
+    ${[100, 75, 50, 25].map((n) => `<label><input type="radio" name="${name}" value="${n}" required ${actual === n ? 'checked' : ''}><span>${NIVELES[n]}</span></label>`).join('')}
+    <label class="fin"><input type="radio" name="${name}" value="0" required><span>Se terminó</span></label></div>`;
+}
+async function openUso(l) {
+  return openModal({
+    title: 'Registrar uso del envase', subtitle: `${l.medicamento} · Lote ${l.lote} · ${cantUnidad(l.existencia, l.unidad)}`,
+    submitText: 'Registrar uso', size: 'sm',
+    body: `
+      <div class="notice">${icon('droplet')}<span>${l.nivel ? `El envase abierto tenía: <b>${esc(NIVELES[l.nivel])}</b>.` : 'Aún no hay un envase abierto en este lote.'} Marca cuánto queda después de usarlo. Si se terminó, se descuenta 1 ${esc(l.unidad)} del inventario.</span></div>
+      <div class="field"><label>¿Cuánto queda del envase? <span class="req">*</span></label>${nivelesHTML('nivel', l.nivel)}</div>
+      <div class="field"><label for="us-det">Detalle</label>
+        <input id="us-det" name="detalle" maxlength="250" placeholder="Opcional. Ej. curación en área de producción"></div>`,
+    onSubmit: async ({ form, setError }) => {
+      const n = form.querySelector('input[name="nivel"]:checked');
+      if (!n) { setError('Indica cuánto queda del envase.'); return false; }
+      must(await sb.rpc('med_registrar_uso', { p_lote: l.id, p_nivel: Number(n.value), p_motivo: nullIfEmpty(form.elements.detalle.value.trim()) }));
+      toast(n.value === '0' ? `Envase terminado: se descontó 1 ${l.unidad}.` : 'Uso registrado.', 'success');
     },
   });
 }

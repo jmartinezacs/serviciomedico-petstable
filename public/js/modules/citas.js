@@ -12,6 +12,7 @@ import {
   getBloqueos, bloqueoDe, bloqueoTxt, isoDow, ganchos,
 } from '../core.js';
 import { openColaboradorForm } from './colaboradores.js';
+import { nivelesHTML } from './inventario.js';
 
 let root, table, agendaDate, agendaToken = 0;
 
@@ -772,7 +773,7 @@ export async function openDetalle(id) {
     if (state.isAdmin) {
       reqs.push(
         sb.from('atenciones_med').select('sintomatologia, nota, atendido_at, atendido:usuarios_med!atenciones_med_atendido_por_fkey(nombre), padecimiento:padecimientos_med(nombre)').eq('cita_id', id).maybeSingle(),
-        sb.from('v_movimientos_med').select('medicamento, unidad, lote, caducidad, cantidad').eq('cita_id', id).order('created_at'),
+        sb.from('v_movimientos_med').select('medicamento, unidad, lote, caducidad, cantidad, tipo, motivo').eq('cita_id', id).order('created_at'),
       );
     }
     const res = await Promise.all(reqs);
@@ -803,9 +804,9 @@ export async function openDetalle(id) {
         ${box('Nota de atención', esc(at?.nota || 'Sin registro'), true)}
         ${box('Atendió', `${esc(at?.atendido?.nombre || '—')}<div class="cell-sub">${fmtDateTime(at?.atendido_at)}</div>`, true)}
       </div>
-      <div class="section-title">${icon('pill')} Medicamentos entregados</div>
+      <div class="section-title">${icon('pill')} Medicamentos e insumos entregados</div>
       ${meds.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Medicamento</th><th>Lote</th><th>Caducidad</th><th class="num">Cantidad</th></tr></thead><tbody>
-        ${meds.map((m) => `<tr><td>${esc(m.medicamento)}</td><td class="mono">${esc(m.lote)}</td><td>${fmtDate(m.caducidad)}</td><td class="num">${esc(cantUnidad(-m.cantidad, m.unidad))}</td></tr>`).join('')}
+        ${meds.map((m) => `<tr><td>${esc(m.medicamento)}</td><td class="mono">${esc(m.lote)}</td><td>${fmtDate(m.caducidad)}</td><td class="num">${esc(m.tipo === 'uso' ? m.motivo : cantUnidad(-m.cantidad, m.unidad))}</td></tr>`).join('')}
         </tbody></table></div>` : '<p class="hint">No se entregaron medicamentos.</p>'}` : ''}
     ${acts.length ? `<div class="section-title">Acciones</div><div class="page-actions">
       ${acts.map(([a, ic, t, cls]) => `<button type="button" class="btn ${a === 'cancelar' || a === 'no_asistio' ? 'secondary' : a === 'atender' || a === 'confirmar' ? 'primary' : 'secondary'}" data-detail-act="${a}">${icon(ic)} ${esc(t)}</button>`).join('')}
@@ -826,8 +827,9 @@ export async function openAtender(c) {
   let meds, padecimientos;
   try {
     if (!c.colaborador) c = must(await sb.from('v_citas_med').select('*').eq('id', c.id).single()).data;
-    meds = must(await sb.from('v_stock_med').select('id, clave, nombre, unidad, existencia_vigente, empaque, contenido_empaque')
-      .eq('activo', true).gt('existencia_vigente', 0).order('nombre')).data;
+    // Medicamentos e insumos con existencia (el equipo no se entrega en consulta)
+    meds = must(await sb.from('v_stock_med').select('id, clave, nombre, unidad, existencia_vigente, empaque, contenido_empaque, categoria, control, nivel_abierto')
+      .eq('activo', true).neq('categoria', 'equipo').gt('existencia_vigente', 0).order('categoria').order('nombre')).data;
     padecimientos = must(await sb.from('padecimientos_med').select('id, nombre').eq('activo', true).order('nombre')).data;
   } catch (err) { toast(errMsg(err), 'error'); return false; }
   const hoy = todayISO();
@@ -848,12 +850,12 @@ export async function openAtender(c) {
       <textarea id="at-sint" name="sintomatologia" maxlength="500" data-counter placeholder="Ej. cefalea leve desde la mañana"></textarea></div>
     <div class="field"><label for="at-nota">Nota de atención</label>
       <textarea id="at-nota" name="nota" maxlength="1000" data-counter placeholder="Indicaciones generales brindadas"></textarea></div>
-    <fieldset><legend>Medicamentos entregados</legend>
+    <fieldset><legend>Medicamentos e insumos utilizados</legend>
       <div class="med-rows" id="at-rows"></div>
       ${meds.length
-        ? `<button type="button" class="btn teal" id="at-add" style="margin-top:10px">${icon('plus')} Agregar medicamento</button>
-           <small class="hint">Se propone el lote con caducidad más próxima (primero en caducar, primero en salir). Los lotes caducados no se pueden entregar.</small>`
-        : '<p class="hint" style="margin:4px 0">No hay medicamentos con existencia vigente. Puedes registrar la atención sin entrega.</p>'}
+        ? `<button type="button" class="btn teal" id="at-add" style="margin-top:10px">${icon('plus')} Agregar medicamento o insumo</button>
+           <small class="hint">Se propone el lote con caducidad más próxima (primero en caducar, primero en salir). Los lotes caducados no se pueden entregar. En geles, cremas, frascos y rollos marca cuánto queda del envase; si se terminó, se descuenta.</small>`
+        : '<p class="hint" style="margin:4px 0">No hay medicamentos ni insumos con existencia vigente. Puedes registrar la atención sin entrega.</p>'}
     </fieldset>`;
 
   const addRow = (form) => {
@@ -861,16 +863,18 @@ export async function openAtender(c) {
     const div = document.createElement('div');
     div.className = 'med-row'; div.dataset.row = i;
     div.innerHTML = `
-      <div class="field f-med"><label for="m-${i}">Medicamento <span class="req">*</span></label>
+      <div class="field f-med"><label for="m-${i}">Medicamento o insumo <span class="req">*</span></label>
         <select id="m-${i}" name="med_${i}" required><option value="">Selecciona…</option>
-        ${meds.map((m) => `<option value="${esc(m.id)}">${esc(m.nombre)} (${esc(cantUnidad(m.existencia_vigente, m.unidad))})</option>`).join('')}</select></div>
+        ${meds.map((m) => `<option value="${esc(m.id)}">${esc(m.nombre)} (${esc(cantUnidad(m.existencia_vigente, m.unidad))}${m.categoria === 'insumo' ? ' · insumo' : ''})</option>`).join('')}</select></div>
       <div class="field"><label for="l-${i}">Lote <span class="req">*</span></label>
         <select id="l-${i}" name="lote_${i}" required disabled><option value="">—</option></select></div>
-      <div class="field"><label for="q-${i}">Cantidad <span class="req">*</span></label>
+      <div class="field" data-qty><label for="q-${i}">Cantidad <span class="req">*</span></label>
         <input id="q-${i}" name="cant_${i}" type="number" inputmode="numeric" min="1" step="1" required value="1">
         <small class="hint" id="qu-${i}"></small></div>
+      <div class="field full hidden" data-nivel><label>¿Cuánto queda del envase? <span class="req">*</span></label>${nivelesHTML(`niv_${i}`)}</div>
       <button type="button" class="icon-btn bad" data-remove aria-label="Quitar renglón" style="margin-bottom:4px">${icon('trash-2')}</button>`;
     form.querySelector('#at-rows').appendChild(div);
+    div.querySelectorAll('[data-nivel] input').forEach((r) => { r.disabled = true; });
     refreshIcons();
     const medSel = div.querySelector(`#m-${i}`), loteSel = div.querySelector(`#l-${i}`), qty = div.querySelector(`#q-${i}`);
     medSel.addEventListener('change', async () => {
@@ -878,14 +882,21 @@ export async function openAtender(c) {
       if (!medSel.value) { loteSel.innerHTML = '<option value="">—</option>'; return; }
       try {
         if (!lotesCache.has(medSel.value)) {
-          const { data } = must(await sb.from('v_lotes_med').select('id, lote, caducidad, existencia')
-            .eq('medicamento_id', medSel.value).gt('existencia', 0).gte('caducidad', hoy).order('caducidad'));
+          const { data } = must(await sb.from('v_lotes_med').select('id, lote, caducidad, existencia, nivel')
+            .eq('medicamento_id', medSel.value).gt('existencia', 0).or(`caducidad.is.null,caducidad.gte.${hoy}`)
+            .order('caducidad', { nullsFirst: false }));
           lotesCache.set(medSel.value, data);
         }
         const lotes = lotesCache.get(medSel.value);
         const med = meds.find((x) => x.id === medSel.value);
+        // Por envase: en lugar de cantidad se indica cuánto queda del envase
+        const env = med?.control === 'envase';
+        div.querySelector('[data-qty]').classList.toggle('hidden', env);
+        qty.disabled = env;
+        div.querySelector('[data-nivel]').classList.toggle('hidden', !env);
+        div.querySelectorAll(`input[name="niv_${i}"]`).forEach((r) => { r.disabled = !env; });
         div.querySelector(`#qu-${i}`).textContent = med ? `En ${plural(med.unidad, 2)} (pieza por pieza)` : '';
-        loteSel.innerHTML = lotes.map((l) => `<option value="${esc(l.id)}" data-max="${l.existencia}">${esc(l.lote)} · cad. ${fmtDate(l.caducidad)} · ${esc(cantUnidad(l.existencia, med?.unidad || 'unidad'))} disp.</option>`).join('')
+        loteSel.innerHTML = lotes.map((l) => `<option value="${esc(l.id)}" data-max="${l.existencia}">${esc(l.lote)} · ${l.caducidad ? `cad. ${fmtDate(l.caducidad)}` : 'sin caducidad'} · ${esc(cantUnidad(l.existencia, med?.unidad || 'unidad'))} disp.${env && l.nivel ? ` (abierto, queda ${({ 100: "lleno", 75: "¾", 50: "½", 25: "¼" })[l.nivel]})` : ''}</option>`).join('')
           || '<option value="">Sin lotes vigentes</option>';
         loteSel.disabled = !lotes.length;
         loteSel.dispatchEvent(new Event('change'));
@@ -912,7 +923,11 @@ export async function openAtender(c) {
         const cant = Number(form.elements[`cant_${i}`].value);
         if (seen.has(lote)) { fieldError(form.elements[`lote_${i}`], 'Lote repetido; ajusta la cantidad en un solo renglón.'); setError('Revisa los medicamentos.'); return false; }
         seen.add(lote);
-        items.push({ lote_id: lote, cantidad: cant });
+        const niv = row.querySelector(`input[name="niv_${i}"]:checked:not(:disabled)`);
+        if (!row.querySelector('[data-nivel]').classList.contains('hidden')) {
+          if (!niv) { setError('Indica cuánto queda de cada envase utilizado.'); return false; }
+          items.push({ lote_id: lote, nivel: Number(niv.value) });
+        } else items.push({ lote_id: lote, cantidad: cant });
       }
       const v = formValues(form);
       const ok = await confirmDialog({

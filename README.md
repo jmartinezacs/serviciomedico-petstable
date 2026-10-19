@@ -77,7 +77,18 @@ Todas las reglas se aplican **en la base de datos** (RLS, triggers y funciones).
 7. Todos los usuarios del sistema son también colaboradores de su área. Un usuario solicita citas para sí mismo o para colaboradores de su misma área; los administradores, para todos.
 8. Al registrar un colaborador o usuario, un administrador puede crear el área desde el mismo formulario.
 
-**Carga inicial (archivo del médico, 18/10/2026):** 71 colaboradores por área y 45 renglones de fármacos (44 medicamentos, 48 lotes). Criterios usados: caducidad con solo mes/año → último día del mes; sin número de lote → lote `S/N-AAAA-MM-DD`; tubos, botes, frascos y aerosoles se cuentan por pieza; contenido por empaque 1 y stock mínimo 0 hasta que el médico los defina. Los insumos médicos y el equipo de la segunda columna del archivo no se cargaron.
+**Carga inicial (archivo del médico, 18/10/2026):** 71 colaboradores por área y 45 renglones de fármacos (44 medicamentos, 48 lotes). Criterios usados: caducidad con solo mes/año → último día del mes; sin número de lote → lote `S/N-AAAA-MM-DD`; tubos, botes, frascos y aerosoles se cuentan por pieza; contenido por empaque 1 y stock mínimo 0 hasta que el médico los defina. 
+
+**Insumos y equipo (v1.8):** el inventario maneja tres categorías:
+- **Medicamento:** caducidad obligatoria.
+- **Insumo médico:** lote y caducidad opcionales. Se pueden entregar en consulta.
+- **Equipo y mobiliario:** sin alertas. No se entrega en consulta, pero sí admite salidas por baja.
+
+Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aerosoles, botes sin conteo, rollos, bolsas) se controlan **por envase**. La existencia es el número de envases y se registra cuánto queda del envase abierto (lleno, ¾, ½ o ¼). Ese registro de uso no descuenta nada; al marcar "Se terminó" se descuenta 1 envase.
+
+Las entradas y salidas se capturan por unidad o por empaque. Al capturar por empaque se indica cuántas unidades trae cada uno (por ejemplo, 3 cajas de 10 = 30 tabletas) y ese contenido se recuerda para la próxima vez.
+
+El stock mínimo de medicamentos e insumos es una propuesta inicial, ajustable en Inventario → Editar.
 
 **Supuestos documentados (ajustables)**
 

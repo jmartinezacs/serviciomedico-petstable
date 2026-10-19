@@ -29,7 +29,7 @@ export default {
         <button role="tab" data-tab="areas">${icon('building-2')} Áreas</button></div>` : ''}
       <div id="tab-col" class="card">
         <div class="toolbar">
-          <div class="search">${icon('search')}<input type="search" id="k-q" placeholder="Buscar por nombre o No. de empleado" aria-label="Buscar"></div>
+          <div class="search">${icon('search')}<input type="search" id="k-q" placeholder="Buscar por nombre" aria-label="Buscar"></div>
           <select id="k-area" aria-label="Área"><option value="">Todas las áreas</option></select>
           <select id="k-activo" aria-label="Estado"><option value="true">Activos</option><option value="false">Inactivos</option><option value="">Todos</option></select>
         </div>
@@ -40,7 +40,6 @@ export default {
     table = new DataTable(el.querySelector('#col-table'), {
       sort: { key: 'nombre', asc: true },
       columns: [
-        { label: 'No. empleado', sort: 'num_empleado', render: (c) => `<span class="mono">${esc(c.num_empleado || '—')}</span>` },
         { label: 'Nombre', sort: 'nombre', render: (c) => `<span class="cell-main">${esc(c.nombre)}</span>` },
         { label: 'Área', render: (c) => esc(c.area?.nombre || '—') },
         { label: 'Puesto', render: (c) => esc(c.puesto || '—') },
@@ -167,7 +166,7 @@ async function openHistorial(c) {
     const ids = citas.filter((x) => x.estado === 'atendida').map((x) => x.id);
     [atenciones, meds] = ids.length ? await Promise.all([
       sb.from('atenciones_med').select('cita_id, sintomatologia, nota, atendido_at, padecimiento:padecimientos_med(nombre)').in('cita_id', ids).then((r) => must(r).data),
-      sb.from('v_movimientos_med').select('cita_id, medicamento, unidad, cantidad').in('cita_id', ids).then((r) => must(r).data),
+      sb.from('v_movimientos_med').select('cita_id, medicamento, unidad, cantidad, tipo, motivo').in('cita_id', ids).then((r) => must(r).data),
     ]) : [[], []];
   } catch (err) { toast(errMsg(err), 'error'); return; }
   const at = new Map(atenciones.map((x) => [x.cita_id, x]));
@@ -185,7 +184,7 @@ async function openHistorial(c) {
       <div class="hist-body"><b>${esc(MOTIVOS[x.motivo] || x.motivo)}</b>${a?.padecimiento?.nombre ? ` · ${esc(a.padecimiento.nombre)}` : ''}
         ${a?.sintomatologia ? `<p><small>Sintomatología:</small> ${esc(a.sintomatologia)}</p>` : ''}
         ${a?.nota ? `<p><small>Nota:</small> ${esc(a.nota)}</p>` : ''}
-        ${m.length ? `<p><small>Medicamentos:</small> ${m.map((y) => `${esc(y.medicamento)} (${esc(cantUnidad(-y.cantidad, y.unidad))})`).join(', ')}</p>` : ''}</div></li>`;
+        ${m.length ? `<p><small>Medicamentos:</small> ${m.map((y) => `${esc(y.medicamento)} (${esc(y.tipo === 'uso' ? y.motivo : cantUnidad(-y.cantidad, y.unidad))})`).join(', ')}</p>` : ''}</div></li>`;
   }).join('');
   await openModal({
     title: `Historial · ${c.nombre}`, size: 'lg',
@@ -247,26 +246,22 @@ export async function openColaboradorForm({ colaborador = null, nombre = '', are
       <div class="form-grid">
         <div class="field full"><label for="k-nombre">Nombre completo <span class="req">*</span></label>
           <input id="k-nombre" name="nombre" required minlength="3" maxlength="120" autocomplete="off" value="${esc(c?.nombre || nombre)}"></div>
-        <div class="field"><label for="k-num">No. de empleado</label>
-          <input id="k-num" name="num_empleado" maxlength="30" autocomplete="off" value="${esc(c?.num_empleado || '')}">
-          <small class="hint">Opcional, pero no se puede repetir.</small></div>
-        <div class="field"><label for="k-area-sel">Área <span class="req">*</span></label>
+        <div class="field full"><label for="k-area-sel">Área <span class="req">*</span></label>
           <select id="k-area-sel" name="area_id" required><option value="">Selecciona…</option>
             ${areas.map((a) => `<option value="${esc(a.id)}" ${c?.area_id === a.id ? 'selected' : ''}>${esc(a.nombre)}</option>`).join('')}
             ${editando && !areas.some((a) => a.id === c.area_id) ? `<option value="${esc(c.area_id)}" selected>${esc(c.area?.nombre || 'Área inactiva')}</option>` : ''}
           </select>
           ${state.isAdmin ? '<small class="hint">¿No aparece? Elige “+ Registrar nueva área…”.</small>' : ''}</div>
         <div class="field full"><label for="k-puesto">Puesto</label>
-          <input id="k-puesto" name="puesto" maxlength="100" autocomplete="off" value="${esc(c?.puesto || '')}"></div>
+          <input id="k-puesto" name="puesto" maxlength="100" autocomplete="off" value="${esc(c?.puesto || (editando ? '' : 'Auxiliar'))}"></div>
       </div>`,
     onOpen: ({ form }) => permitirNuevaArea(form.elements.area_id),
     onSubmit: async ({ form }) => {
       if (!checkForm(form, {
-        num_empleado: (v) => (v && !/^[A-Za-z0-9 _/-]+$/.test(v.trim()) ? 'Usa solo letras, números, espacios y guiones.' : ''),
         nombre: (v) => (/[<>{}]/.test(v) ? 'El nombre contiene caracteres no permitidos.' : ''),
       })) return false;
       const v = formValues(form);
-      const payload = { nombre: v.nombre.replace(/\s+/g, ' '), num_empleado: nullIfEmpty(v.num_empleado), area_id: v.area_id, puesto: nullIfEmpty(v.puesto) };
+      const payload = { nombre: v.nombre.replace(/\s+/g, ' '), area_id: v.area_id, puesto: nullIfEmpty(v.puesto) };
       const sel = 'id, nombre, num_empleado, area_id, area:areas_med(nombre)';
       const { data } = editando
         ? must(await sb.from('colaboradores_med').update(payload).eq('id', c.id).select(sel).single())

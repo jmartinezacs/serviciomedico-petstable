@@ -1039,3 +1039,15 @@ body { transition: none; }
   #print-area .pc-firmas small { color: #666; }
   #print-area .pc-foot { margin-top: 40px; font-size: 9pt; color: #777; }
 }
+
+/* ===================== v1.8 ===================== */
+/* Nivel restante de un envase (gel, crema, frasco, rollo) */
+.nivel-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.nivel-seg label { position: relative; }
+.nivel-seg input { position: absolute; opacity: 0; pointer-events: none; }
+.nivel-seg span { display: inline-flex; align-items: center; min-height: 34px; padding: 6px 14px; border: 1px solid var(--input-line); border-radius: 999px; background: var(--input); color: var(--text); font-weight: 700; font-size: 13px; cursor: pointer; }
+.nivel-seg span:hover { border-color: var(--turq); }
+.nivel-seg input:checked + span { background: var(--turq-soft); border-color: var(--turq); color: var(--turq-strong); }
+.nivel-seg .fin input:checked + span { background: var(--bad-bg); border-color: var(--bad-line); color: var(--bad); }
+.nivel-seg input:focus-visible + span { outline: 2px solid var(--orange); outline-offset: 2px; }
+.nivel-seg input:disabled + span { opacity: .5; cursor: default; }
