@@ -1105,3 +1105,7 @@ body { transition: none; }
 .btn.btn-confirmar:hover { background: #15985C; border-color: #15985C; color: #fff; }
 .btn.btn-noasistio { background: #E0464E; border-color: #E0464E; color: #fff; }
 .btn.btn-noasistio:hover { background: #C53039; border-color: #C53039; color: #fff; }
+
+/* v1.14: hora libre del médico al agendar */
+.hora-libre { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.hora-libre input[type="time"] { max-width: 170px; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }

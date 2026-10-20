@@ -7,7 +7,7 @@ import {
   sb, state, esc, icon, refreshIcons, todayISO, addDays, fmtDate, fmtTime, fmtDateTime, fmtNum,
   MOTIVOS, ESTADOS, estadoPill, pill, makeChart, destroyCharts, emptyState, errorState, navigate,
   monthShort, prefs, must, avatarHTML, cantUnidad, nowHHMM, isWeekday, fmtLongDate, SLOTS, push, toast, errMsg,
-  getBloqueos, bloqueoDe, getAreas,
+  getBloqueos, bloqueoDe, getAreas, slotDe,
 } from '../core.js';
 import { openCitaForm, openDetalle } from './citas.js';
 import { openEntrada } from './inventario.js';
@@ -39,7 +39,7 @@ export default {
       <section class="page-intro">
         <div>
           <span class="eyebrow">Panel general</span>
-          <h1 class="hello">Hola, ${esc(p.nombre.split(' ')[0])} <span class="paws" aria-hidden="true">${icon('paw-print')}${icon('paw-print')}</span></h1>
+          <h1 class="hello">Hola, ${state.isMedico ? 'Dr. ' : ''}${esc(p.nombre.split(' ')[0])} <span class="paws" aria-hidden="true">${icon('paw-print')}${icon('paw-print')}</span></h1>
           <p>${state.isAdmin ? 'Resumen de citas e inventario del servicio médico.' : 'Resumen de las citas que has solicitado.'}</p>
         </div>
         <div class="toolbar" style="margin:0">
@@ -114,7 +114,7 @@ async function onClick(e) {
 async function libresDe(fecha, soloFuturos, bloqueos) {
   const { data, error } = await sb.rpc('med_horarios_ocupados', { p_fecha: fecha });
   if (error) throw error;
-  const oc = new Set((data || []).map(fmtTime));
+  const oc = new Set((data || []).map((h) => slotDe(fmtTime(h))));
   const now = nowHHMM();
   return SLOTS.filter((s) => !oc.has(s) && (!soloFuturos || s > now) && !bloqueoDe(bloqueos, fecha, s));
 }

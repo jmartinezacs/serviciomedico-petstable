@@ -115,7 +115,8 @@ Other frontend files:
 - **Citas.**
   - Who can book: a non-admin may only book a cita for themselves or for a colaborador of their own area, enforced by `med_puede_citar` in the trigger. Admins may book for anyone.
   - `tipo` is `normal` or `urgente`.
-  - Normal citas use 20-min slots on weekdays. A partial unique index on `(fecha, hora)` prevents double booking.
+  - Normal citas use 20-min slots on weekdays (`med_es_bloque`, checked in the trigger). The doctor may book or reschedule a normal cita at any time; the frontend maps such a time to its block with `slotDe` in `core.js`. A partial unique index on `(fecha, hora)` prevents double booking.
+  - Push payloads carry `foto`: the actor's photo, or the doctor's for automatic reminders. `sw.js` composites it with the app icon as a badge and falls back to `/notif-icon.png`.
   - `dias_sin_servicio_med` holds holidays and doctor absences, either a full day or an hour range. LFT holidays for 2026–2027 are preloaded. Blocks reject normal citas, through `med_motivo_bloqueo` in the trigger, but still allow urgent ones.
   - The pg_cron job `med_inasistencias` (19:05 MX, Mon–Fri) marks past confirmed citas as `no_asistio`. An admin can reopen a `no_asistio` cita back to `confirmada`.
   - An urgent cita has `hora` null until an admin assigns a time or rejects it.

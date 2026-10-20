@@ -9,7 +9,7 @@ import {
   nullIfEmpty, bindCounters, todayISO, nowHHMM, addDays, isWeekday, fmtDate, fmtTime, fmtDateTime,
   fmtLongDate, fmtNum, SLOTS, MOTIVOS, ESTADOS, estadoPill, pill, DataTable, paged, sanitizeSearch,
   debounce, emptyState, errorState, getAreas, must, fieldError, cantUnidad, plural, avisar,
-  getBloqueos, bloqueoDe, bloqueoTxt, isoDow, ganchos,
+  getBloqueos, bloqueoDe, bloqueoTxt, isoDow, ganchos, slotDe,
 } from '../core.js';
 import { openColaboradorForm } from './colaboradores.js';
 import { nivelesHTML } from './inventario.js';
@@ -320,10 +320,11 @@ async function renderAgenda() {
         text: state.isAdmin ? 'Puedes quitar o cambiar este bloqueo con el botón Días sin servicio.' : 'Este día no hay consulta. Elige otro día o usa Cita de urgencia.' });
       refreshIcons(); return;
     }
-    const ocupados = new Set((ocupRes.data || []).map((h) => fmtTime(h)));
+    // Las horas libres del médico (p. ej. 10:05) ocupan el bloque en el que caen
+    const ocupados = new Set((ocupRes.data || []).map((h) => slotDe(fmtTime(h))));
     const now = nowHHMM();
     const rows = SLOTS.map((slot) => {
-      const here = agendaRows.filter((c) => c.tipo !== 'urgente' && fmtTime(c.hora) === slot);
+      const here = agendaRows.filter((c) => c.tipo !== 'urgente' && slotDe(fmtTime(c.hora)) === slot);
       const pasada = agendaDate < hoy || (agendaDate === hoy && slot <= now);
       const libre = !ocupados.has(slot);
       const bloq = bloqueoDe(bloqueos, agendaDate, slot);
@@ -334,7 +335,7 @@ async function renderAgenda() {
       const puedeAgendar = libre && (state.isMedico ? agendaDate >= hoy : !pasada);
       const citasHTML = here.map((c) => `
         <div class="agenda-slot ${pasada ? 'past' : ''}">
-          <span class="hora">${slot}</span>
+          <span class="hora">${esc(fmtTime(c.hora))}</span>
           <div class="who"><b>${esc(c.colaborador)} ${estadoPill(c.estado)}</b>
             <span>${esc(c.folio_txt)} · ${esc(MOTIVOS[c.motivo] || c.motivo)} · ${esc(c.area)}${state.isAdmin ? ` · Solicitó ${esc(c.solicitante)}` : ''}</span></div>
           ${actionsHTML(c)}
@@ -350,11 +351,12 @@ async function renderAgenda() {
         ${puedeAgendar ? `<button class="btn teal" data-c="agendar" data-hora="${slot}">${icon('plus')} Agendar</button>` : '<span></span>'}</div>`;
     });
     const total = agendaRows.filter((c) => c.estado !== 'no_asistio').length;
-    const urgentes = agendaRows.filter((c) => c.tipo === 'urgente');
+    // Urgencias y citas que el médico agendó fuera de los bloques de la agenda
+    const urgentes = agendaRows.filter((c) => c.tipo === 'urgente' || !SLOTS.includes(slotDe(fmtTime(c.hora))));
     const urgHTML = urgentes.length ? `<div class="section-title" style="margin-top:0">${icon('siren')} Citas de urgencia / extraordinarias</div>
       <div class="agenda" style="margin-bottom:14px">${urgentes.map((c) => `<div class="agenda-slot urg">
         <span class="hora">${c.hora ? fmtTime(c.hora) : '—'}</span>
-        <div class="who"><b>${esc(c.colaborador)} ${estadoPill(c.estado)} ${pill('Urgente', 'bad')}</b>
+        <div class="who"><b>${esc(c.colaborador)} ${estadoPill(c.estado)} ${c.tipo === 'urgente' ? pill('Urgente', 'bad') : ''}</b>
           <span>${esc(c.folio_txt)} · ${esc(c.hora ? 'Horario especial' : 'Horario por asignar')} · ${esc(c.area)}${state.isAdmin ? ` · Solicitó ${esc(c.solicitante)}` : ''}</span></div>
         ${actionsHTML(c)}</div>`).join('')}</div>` : '';
     const bloqHTML = bloqueos.length ? `<div class="notice warn">${icon('calendar-off')}<span><b>Sin servicio:</b> ${bloqueos.map((b) => `${esc(bloqueoTxt(b))} · ${esc(b.motivo)}`).join('; ')}</span></div>` : '';
@@ -401,20 +403,21 @@ async function renderSemana() {
     must(citasRes); ocup.forEach(must);
     if (t !== semanaToken) return;
     semanaRows = citasRes.data;
-    const ocupados = dias.map((_, i) => new Set((ocup[i].data || []).map(fmtTime)));
+    const ocupados = dias.map((_, i) => new Set((ocup[i].data || []).map((h) => slotDe(fmtTime(h)))));
+    const especial = (c) => c.tipo === 'urgente' || !SLOTS.includes(slotDe(fmtTime(c.hora)));
     const now = nowHHMM();
     const chip = (c) => `<button type="button" class="wk-chip st-${esc(c.estado)} ${c.tipo === 'urgente' ? 'urg' : ''}" data-act="ver" data-id="${esc(c.id)}" title="${esc(`${c.folio_txt} · ${c.colaborador} · ${ESTADOS[c.estado]?.label || c.estado}`)}">
-        ${c.tipo === 'urgente' ? `<b>${esc(fmtTime(c.hora))}</b> ` : ''}${esc(c.colaborador)}</button>`;
+        ${c.tipo === 'urgente' || (c.hora && !SLOTS.includes(fmtTime(c.hora))) ? `<b>${esc(fmtTime(c.hora))}</b> ` : ''}${esc(c.colaborador)}</button>`;
     const head = dias.map((d, i) => {
       const b = bloqueoDe(bloqueos, d);
       return `<div class="wk-head ${d === hoy ? 'today' : ''}"><button type="button" class="link-btn" data-c="ver-dia" data-fecha="${d}">${DIAS[i]} ${esc(d.slice(8, 10))}/${esc(d.slice(5, 7))}</button>
         ${b ? `<small class="wk-off">${esc(b.motivo)}</small>` : ''}</div>`;
     }).join('');
-    const urgentes = dias.map((d) => semanaRows.filter((c) => c.fecha === d && c.tipo === 'urgente'));
+    const urgentes = dias.map((d) => semanaRows.filter((c) => c.fecha === d && especial(c)));
     const urgRow = urgentes.some((u) => u.length)
       ? `<div class="wk-hora">${icon('siren')}</div>${urgentes.map((u) => `<div class="wk-cell">${u.map(chip).join('')}</div>`).join('')}` : '';
     const filas = SLOTS.map((s) => `<div class="wk-hora mono">${s}</div>${dias.map((d, i) => {
-      const here = semanaRows.filter((c) => c.fecha === d && c.tipo !== 'urgente' && fmtTime(c.hora) === s);
+      const here = semanaRows.filter((c) => c.fecha === d && !especial(c) && slotDe(fmtTime(c.hora)) === s);
       if (here.length) return `<div class="wk-cell">${here.map(chip).join('')}</div>`;
       const pasada = d < hoy || (d === hoy && s <= now);
       if (bloqueoDe(bloqueos, d, s)) return '<div class="wk-cell off" title="Sin servicio"></div>';
@@ -581,8 +584,10 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
     </div>
     <div class="field" id="cf-horario">
       <label>Horario <span class="req">*</span></label>
-      <div id="cf-slots" class="slots" role="radiogroup" aria-label="Horarios disponibles"></div>
-      <small class="hint">Lunes a viernes de 9:00 a 17:30, bloques de 20 minutos. Los horarios tachados no están disponibles.</small>
+      <div id="cf-slots" class="slots" ${state.isMedico ? '' : 'role="radiogroup" aria-label="Horarios disponibles"'}></div>
+      <small class="hint">${state.isMedico
+        ? 'Como Servicio Médico puedes escribir la hora que quieras, aunque no coincida con los bloques de la agenda.'
+        : 'Lunes a viernes de 9:00 a 17:30, bloques de 20 minutos. Los horarios tachados no están disponibles.'}</small>
     </div>
     ${state.isMedico && !editing ? `<div class="field hidden" id="cf-hora-esp"><label for="cf-hora-urg">Horario especial (opcional)</label>
       <input type="time" id="cf-hora-urg" name="hora_urg" step="60"><small class="hint">Si lo dejas vacío, podrás asignarlo después.</small></div>` : ''}
@@ -612,7 +617,7 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
         const t = ++slotToken;
         const cont = form.querySelector('#cf-slots');
         const fecha = form.elements.fecha.value;
-        const prev = keep || form.querySelector('input[name="hora"]:checked')?.value;
+        const prev = keep || form.querySelector('input[name="hora"]:checked, input[name="hora"][type="time"]')?.value;
         if (form.elements.urgente?.checked) { cont.innerHTML = ''; return; }
         if (!fecha) { cont.innerHTML = '<span class="hint">Selecciona una fecha.</span>'; return; }
         if (!isWeekday(fecha)) { cont.innerHTML = '<span class="hint" style="color:var(--bad)">Sin servicio en fin de semana. Elige un día de lunes a viernes.</span>'; return; }
@@ -628,10 +633,19 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
         }
         if (t !== slotToken) return;
         const dia = bloqueoDe(bloqueos, fecha);
+        if (state.isMedico) {
+          // El médico escribe la hora libremente; solo se le informa lo que ya está ocupado
+          const horas = [...new Set((data || []).map(fmtTime))].filter((h) => !(editing && fecha === cita.fecha && h === fmtTime(cita.hora)));
+          cont.innerHTML = `<div class="hora-libre" style="grid-column:1/-1">
+              <input type="time" id="cf-hora" name="hora" required step="60" value="${esc(prev || '')}" aria-label="Hora de la cita">
+              <span class="hint" style="margin:0">${horas.length ? `Ya ocupadas ese día: ${esc(horas.join(', '))}.` : 'No hay otras citas ese día.'}</span></div>
+            ${bloqueos.length ? `<span class="hint" style="grid-column:1/-1;color:var(--warn)">Marcado sin servicio: ${bloqueos.map((b) => `${esc(bloqueoTxt(b))} (${esc(b.motivo)})`).join(', ')}.</span>` : ''}`;
+          return;
+        }
         if (dia) { cont.innerHTML = `<span class="hint" style="color:var(--bad)">Sin servicio ese día: ${esc(dia.motivo)}. Elige otra fecha o usa Cita de urgencia.</span>`; return; }
-        const ocup = new Set((data || []).map(fmtTime));
+        const ocup = new Set((data || []).map((h) => slotDe(fmtTime(h))));
         const now = nowHHMM();
-        const own = editing && fecha === cita.fecha ? fmtTime(cita.hora) : null;
+        const own = editing && fecha === cita.fecha ? slotDe(fmtTime(cita.hora)) : null;
         cont.innerHTML = SLOTS.map((s) => {
           const past = fecha === hoy && s <= now && !state.isMedico;
           const bloq = bloqueoDe(bloqueos, fecha, s);
@@ -672,7 +686,7 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
         toast(`Solicitud urgente CM-${String(data.folio).padStart(5, '0')} enviada a Servicio Médico.`, 'success', 6000);
         return true;
       }
-      if (!v.hora) { setError('Selecciona un horario disponible o marca Cita de urgencia.'); return false; }
+      if (!v.hora) { setError(state.isMedico ? 'Escribe la hora de la cita.' : 'Selecciona un horario disponible o marca Cita de urgencia.'); return false; }
       // Citas normales: sin descripción (al editar se conserva la que tuviera)
       const payload = { fecha: v.fecha, hora: v.hora, motivo: v.motivo };
       try {
@@ -687,7 +701,7 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
         }
       } catch (err) {
         if (err.code === '23505' || /bloque_uk/.test(err.message || '')) {
-          setError('Ese horario acaba de ocuparse. Elige otro.');
+          setError(state.isMedico ? 'Ya hay otra cita exactamente a esa hora. Escribe otra hora.' : 'Ese horario acaba de ocuparse. Elige otro.');
           await form._loadSlots();
           return false;
         }

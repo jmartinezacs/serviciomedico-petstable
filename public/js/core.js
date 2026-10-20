@@ -97,6 +97,16 @@ export const SLOTS = (() => {
   for (let m = 9 * 60; m <= 17 * 60 + 10; m += 20) out.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
   return out;
 })();
+// Bloque de la agenda al que pertenece una hora libre del médico (10:05 → 10:00).
+// Fuera de 09:00–17:19 devuelve la misma hora (no corresponde a ningún bloque).
+export function slotDe(hhmm) {
+  if (!hhmm) return hhmm;
+  const [h, m] = String(hhmm).slice(0, 5).split(':').map(Number);
+  const t = h * 60 + m;
+  if (t < 9 * 60 || t >= 17 * 60 + 20) return String(hhmm).slice(0, 5);
+  const s = 9 * 60 + Math.floor((t - 9 * 60) / 20) * 20;
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
 export const MOTIVOS = {
   consulta_general: 'Consulta general', malestar: 'Malestar', curacion: 'Curación',
   seguimiento: 'Seguimiento', toma_signos: 'Toma de signos vitales', otro: 'Otro',

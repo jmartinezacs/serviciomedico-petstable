@@ -31,6 +31,11 @@ async function pintarNotificaciones(box) {
     // Aviso local con las mismas opciones que los avisos reales (vibración, permanece en pantalla)
     try {
       const reg = await navigator.serviceWorker.ready;
+      // El service worker arma el ícono con tu foto y la insignia de la app, como en los avisos reales
+      if (reg.active) {
+        reg.active.postMessage({ tipo: 'aviso-prueba', title: 'Aviso de prueba · Servicio Médico', body: 'Así se verán los avisos de citas en este dispositivo.', foto: state.profile.foto_url || null });
+        return;
+      }
       await reg.showNotification('Aviso de prueba · Servicio Médico', {
         body: 'Así se verán los avisos de citas en este dispositivo.', icon: '/notif-icon.png', badge: '/notif-badge.png', actions: [{ action: 'ver', title: 'Ver ahora' }],
         tag: `prueba-${Date.now()}`, renotify: true, requireInteraction: true, silent: false, vibrate: [300, 120, 300, 120, 500], data: { url: '/#/perfil' },

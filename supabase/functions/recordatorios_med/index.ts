@@ -169,11 +169,16 @@ Deno.serve(async (req) => {
       ? await admin.from('push_subs_med').select('id, usuario_id, endpoint, p256dh, auth').in('usuario_id', ids)
       : { data: [] };
 
+    // Los recordatorios los "envía" Servicio Médico: llevan la foto del médico
+    const base = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/`;
+    const { data: med } = await admin.from('usuarios_med').select('foto_url').eq('activo', true).eq('es_medico', true).limit(1).maybeSingle();
+    const foto = typeof med?.foto_url === 'string' && med.foto_url.startsWith(base) ? med.foto_url : null;
+
     let enviados = 0;
     for (const s of subs || []) {
       for (const a of destinos.get(s.usuario_id) || []) {
         try {
-          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(a), { TTL: 60 * 50, urgency: 'high' });
+          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify({ ...a, foto }), { TTL: 60 * 50, urgency: 'high' });
           enviados++;
         } catch (e) {
           const code = (e as { statusCode?: number }).statusCode;

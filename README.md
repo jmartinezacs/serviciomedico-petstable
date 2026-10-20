@@ -90,6 +90,10 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v1.14:**
+  - **Hora libre del médico:** cuando el médico agenda o reprograma una cita normal escribe cualquier hora (p. ej. 10:05 o 18:30). Una cita a las 10:05 ocupa el bloque de 10:00 para los demás; las que quedan fuera de 9:00–17:20 aparecen junto a las urgencias. Los demás usuarios siguen con los bloques de 20 minutos (validado en `med_validar_cita` con `med_es_bloque`).
+  - **"Dr.":** el saludo del Panel y la firma de la constancia ("Atendió") llevan "Dr." para el médico.
+  - **Foto en los avisos:** el aviso push lleva la foto de quien lo genera (solicitante o médico) con el ícono de la app en pequeño. Los recordatorios automáticos (citas pendientes, inventario, recordatorios de cita) llevan la foto del médico. La arma el service worker; si falla, usa el ícono normal. En iPhone, iOS siempre muestra el ícono de la app.
 - **v1.11:**
   - **Quién gestiona las citas:** solo el médico (servicio.medico@petstable.mx) confirma, reprograma, cancela, registra la atención o marca "No asistió" (desde el día de la cita). El padecimiento y las notas solo los ve él.
   - **Formulario de cita:** quien solicita aparece de inicio como colaborador, la búsqueda no distingue acentos y la descripción solo se pide en urgencias.

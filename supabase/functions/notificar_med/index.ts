@@ -114,6 +114,9 @@ Deno.serve(async (req) => {
     };
     const [title, msg] = txt[evento];
     const site = (Deno.env.get('MED_SITE_URL') || '').replace(/\/$/, '');
+    // Foto de quien genera el aviso (solo fotos públicas del Storage de este proyecto);
+    // el service worker la muestra como ícono con la insignia de la app
+    const foto = typeof yo.foto_url === 'string' && yo.foto_url.startsWith(`${url}/storage/v1/object/public/`) ? yo.foto_url : null;
 
     // ---- Push ----
     let push = 0;
@@ -124,7 +127,7 @@ Deno.serve(async (req) => {
       try {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          JSON.stringify({ title, body: msg, url: '/#/citas', tag: `${c.id}-${evento}` }),
+          JSON.stringify({ title, body: msg, url: '/#/citas', tag: `${c.id}-${evento}`, foto }),
           { TTL: 60 * 60 * 24, urgency: 'high' },
         );
         push++;
