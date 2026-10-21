@@ -821,20 +821,25 @@ export const push = {
     if (push.esIOS() && !push.instalada()) return 'instalar';
     if (!push.soportado()) return 'no-soportado';
     if (Notification.permission === 'denied') return 'bloqueado';
+    await push._sync; // espera la reactivación automática al iniciar sesión
     return (await push.suscripcion()) && Notification.permission === 'granted' ? 'activo' : 'inactivo';
   },
+  // Vincula la suscripción del dispositivo a la cuenta con sesión (si era de otra cuenta, pasa a ésta)
   async guardar(sub) {
     const j = sub.toJSON();
-    const { error } = await sb.from('push_subs_med').insert({
-      usuario_id: state.profile.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth,
-      dispositivo: navigator.userAgent.slice(0, 200),
-    });
-    if (error && error.code !== '23505') throw error;
+    must(await sb.rpc('med_vincular_push', {
+      p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_dispositivo: navigator.userAgent.slice(0, 200),
+    }));
   },
   async activar() {
     if (!push.soportado()) throw new Error('Este navegador no admite notificaciones.');
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') throw new Error('No se concedió el permiso de notificaciones.');
+    prefs.del('med.push.off');
+    await push.suscribir();
+  },
+  // Suscribe el dispositivo (sin volver a pedir permiso si ya se concedió)
+  async suscribir() {
     const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
     await navigator.serviceWorker.ready;
     let { data: pub } = await sb.rpc('med_vapid_publica');
@@ -847,20 +852,28 @@ export const push = {
     if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToUint8(pub) });
     await push.guardar(sub);
   },
+  // Solo desde "Desactivar en este dispositivo" (Mi perfil); cerrar sesión ya no desactiva
   async desactivar() {
+    prefs.set('med.push.off', '1');
     const sub = await push.suscripcion();
     if (sub) {
       await sb.from('push_subs_med').delete().eq('endpoint', sub.endpoint);
       await sub.unsubscribe().catch(() => {});
     }
   },
-  // Al iniciar sesión: si el dispositivo ya tenía permiso, re-vincula la suscripción a este usuario
-  async sincronizar() {
-    try {
-      if (!push.soportado() || Notification.permission !== 'granted') return;
-      const sub = await push.suscripcion();
-      if (sub) await push.guardar(sub);
-    } catch { /* silencioso */ }
+  // Al iniciar sesión: las notificaciones son del dispositivo, no de la cuenta. Si ya
+  // se concedió el permiso, la suscripción se vincula (o se recrea) para quien entra,
+  // sin volver a preguntar. No aplica si se desactivaron a propósito en este dispositivo.
+  sincronizar() {
+    push._sync = (async () => {
+      try {
+        if (!push.soportado() || Notification.permission !== 'granted' || prefs.get('med.push.off') === '1') return;
+        if (push.esIOS() && !push.instalada()) return;
+        const sub = await push.suscripcion();
+        if (sub) await push.guardar(sub); else await push.suscribir();
+      } catch { /* silencioso */ }
+    })();
+    return push._sync;
   },
 };
 

@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
       try {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          JSON.stringify({ title, body: msg, url: '/#/citas', tag: `${c.id}-${evento}`, foto }),
+          JSON.stringify({ title, body: msg, url: `/#/citas?cita=${c.id}`, tag: `${c.id}-${evento}`, foto }),
           { TTL: 60 * 60 * 24, urgency: 'high' },
         );
         push++;

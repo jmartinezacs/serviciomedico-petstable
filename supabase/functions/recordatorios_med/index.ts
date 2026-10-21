@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
         porSolicitante.push({ usuario: c.solicitado_por, cita: c, evento: 'recordatorio_dia', aviso: {
           title: `Recordatorio: cita el ${fechaLarga(c.fecha)} a las ${hhmm(c.hora)} h`,
           body: `${c.colaborador?.nombre || 'Colaborador'} · ${folio(c.folio)}. Si ya no la necesita, cancélala para liberar el horario.`,
-          url: '/#/citas', tag: `recordatorio-${c.id}`,
+          url: `/#/citas?cita=${c.id}`, tag: `recordatorio-${c.id}`,
         } });
       }
     }
@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
           porSolicitante.push({ usuario: c.solicitado_por, cita: c, evento: 'recordatorio_hora', aviso: {
             title: `En una hora: cita a las ${hhmm(c.hora)} h`,
             body: `${c.colaborador?.nombre || 'Colaborador'} · ${folio(c.folio)}. Acude puntualmente a Servicio Médico.`,
-            url: '/#/citas', tag: `recordatorio-${c.id}`,
+            url: `/#/citas?cita=${c.id}`, tag: `recordatorio-${c.id}`,
           } });
         }
       }

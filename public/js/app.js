@@ -140,8 +140,8 @@ function startApp() {
     document.addEventListener('visibilitychange', revisarVersion);
   }
   closeMenu();
-  route();
   push.sincronizar();
+  route();
 }
 
 // ---------------- Navegación ----------------
@@ -335,8 +335,7 @@ async function login(e) {
 }
 
 async function logout() {
-  // Deja de recibir avisos en este dispositivo (podría usarlo otra persona)
-  await push.desactivar().catch(() => {});
+  // Las notificaciones siguen activas en el dispositivo: la próxima cuenta que entre las recibe
   // scope "local": cierra solo esta sesión (otras apps de Pet's Table comparten la cuenta)
   await sb.auth.signOut({ scope: 'local' });
   state.profile = null; state.session = null;

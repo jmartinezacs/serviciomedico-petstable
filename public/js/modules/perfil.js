@@ -13,7 +13,7 @@ async function pintarNotificaciones(box) {
     ? (state.profile.recibe_avisos !== false ? 'Recibirás avisos de nuevas citas si tu usuario tiene activada la opción “Recibe avisos”, y de los cambios en las citas que solicites.' : 'Recibirás avisos de los cambios en las citas que solicites.')
     : 'Recibirás un aviso cuando Servicio Médico confirme, cancele o reprograme tus citas.';
   const txt = {
-    activo: [pill('Activadas', 'ok'), quien, `<div class="page-actions" style="justify-content:flex-start">
+    activo: [pill('Activadas', 'ok'), `${quien} Quedan activas en este dispositivo aunque cierres sesión o entres con otra cuenta; los avisos llegan a la última cuenta que inició sesión aquí.`, `<div class="page-actions" style="justify-content:flex-start">
         <button class="btn primary" data-n="test">${icon('bell-ring')} Enviar aviso de prueba</button>
         <button class="btn secondary" data-n="off">${icon('bell-off')} Desactivar en este dispositivo</button></div>
       <details class="notif-ajustes"><summary>${icon('smartphone')} ¿No suena o no aparece en la pantalla bloqueada?</summary>

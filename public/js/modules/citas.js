@@ -79,6 +79,11 @@ export default {
     el.addEventListener('click', onClick);
     agendaDate = params.fecha && /^\d{4}-\d{2}-\d{2}$/.test(params.fecha) ? params.fecha : todayISO();
     if (vista === 'agenda') await renderAgenda(); else if (vista === 'semana') await renderSemana(); else await apply();
+    // Desde un aviso: abre directamente el detalle de la cita
+    if (/^[0-9a-f-]{36}$/i.test(params.cita || '')) {
+      history.replaceState(null, '', '#/citas');
+      if (await openDetalle(params.cita) && root) table?.load();
+    }
   },
   destroy() { agendaToken++; semanaToken++; root = null; table = null; },
 };

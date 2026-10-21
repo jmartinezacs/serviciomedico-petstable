@@ -90,6 +90,9 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v1.15:**
+  - **Notificaciones por dispositivo:** se activan una sola vez por dispositivo. Cerrar sesión ya no las desactiva, y al iniciar sesión (con la misma u otra cuenta) el dispositivo se vincula a esa cuenta sin volver a preguntar (`med_vincular_push`). Solo se apagan con "Desactivar en este dispositivo" en Mi perfil. Un dispositivo recibe los avisos de la última cuenta que inició sesión en él.
+  - **Aviso → detalle:** al tocar un aviso de una cita se abre directamente su detalle (`#/citas?cita=<id>`).
 - **v1.14:**
   - **Hora libre del médico:** cuando el médico agenda o reprograma una cita normal escribe cualquier hora (p. ej. 10:05 o 18:30). Una cita a las 10:05 ocupa el bloque de 10:00 para los demás; las que quedan fuera de 9:00–17:20 aparecen junto a las urgencias. Los demás usuarios siguen con los bloques de 20 minutos (validado en `med_validar_cita` con `med_es_bloque`).
   - **"Dr.":** el saludo del Panel y la firma de la constancia ("Atendió") llevan "Dr." para el médico.
