@@ -810,7 +810,8 @@ function b64uToUint8(s) {
 export const push = {
   soportado: () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && window.isSecureContext,
   esIOS: () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
-  instalada: () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true,
+  // App instalada: ventana propia o pantalla completa
+  instalada: () => window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || window.navigator.standalone === true,
   async suscripcion() {
     if (!push.soportado()) return null;
     const reg = await navigator.serviceWorker.getRegistration('/');

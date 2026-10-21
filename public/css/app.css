@@ -1109,3 +1109,12 @@ body { transition: none; }
 /* v1.14: hora libre del médico al agendar */
 .hora-libre { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .hora-libre input[type="time"] { max-width: 170px; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* v1.16 · App instalada en pantalla completa
+   - Android: display fullscreen; el encabezado incluye la zona segura superior (muesca).
+   - Computadora: pantalla completa con la API Fullscreen (ver app.js). */
+:root { --header-h: calc(72px + env(safe-area-inset-top, 0px)); }
+@media (max-width: 720px) { :root { --header-h: calc(64px + env(safe-area-inset-top, 0px)); } }
+.top { padding-top: env(safe-area-inset-top, 0px); }
+@media (max-width: 760px) { .update-bar { top: calc(var(--header-h, 64px) + 8px); } }
+.fs-btn { padding: 0; width: 40px; }

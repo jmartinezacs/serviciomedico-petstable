@@ -121,6 +121,48 @@ async function revisarVersion() {
   } catch { /* sin conexión o archivo no disponible */ }
 }
 
+// ---------------- Pantalla completa (app instalada en computadora) ----------------
+// En Android el manifiesto ya abre en pantalla completa. En computadora Chrome/Edge no la
+// admiten desde el manifiesto: se pide con la API Fullscreen al primer clic o tecla
+// (el navegador exige una acción del usuario). Esc la quita; el botón la alterna.
+const PC_INSTALADA = matchMedia('(display-mode: standalone)').matches && matchMedia('(pointer: fine)').matches
+  && !!document.documentElement.requestFullscreen;
+let fsMontada = false;
+
+function entrarPantallaCompleta() {
+  if (document.fullscreenElement) return;
+  document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+}
+
+function alternarPantallaCompleta() {
+  if (document.fullscreenElement) { prefs.set('med.pantalla', 'no'); document.exitFullscreen().catch(() => {}); }
+  else { prefs.set('med.pantalla', 'si'); entrarPantallaCompleta(); }
+}
+
+function montarPantallaCompleta() {
+  if (!PC_INSTALADA || fsMontada) return;
+  fsMontada = true;
+  const btn = $('.fs-btn');
+  btn.classList.remove('hidden');
+  const pintar = () => {
+    const en = !!document.fullscreenElement;
+    btn.innerHTML = icon(en ? 'minimize' : 'maximize');
+    btn.title = en ? 'Salir de pantalla completa' : 'Pantalla completa';
+    btn.setAttribute('aria-label', btn.title);
+    refreshIcons();
+  };
+  document.addEventListener('fullscreenchange', pintar);
+  pintar();
+  const auto = (e) => {
+    document.removeEventListener('pointerdown', auto, true);
+    document.removeEventListener('keydown', auto, true);
+    if (prefs.get('med.pantalla') === 'no' || e.target.closest?.('.fs-btn')) return;
+    entrarPantallaCompleta();
+  };
+  document.addEventListener('pointerdown', auto, true);
+  document.addEventListener('keydown', auto, true);
+}
+
 function startApp() {
   hideSplash();
   $('#login').classList.add('hidden');
@@ -140,6 +182,7 @@ function startApp() {
     document.addEventListener('visibilitychange', revisarVersion);
   }
   closeMenu();
+  montarPantallaCompleta();
   push.sincronizar();
   route();
 }
@@ -217,6 +260,7 @@ function bindGlobalEvents() {
         if (await openCitaForm() && ['panel', 'citas'].includes(parseHash().name)) route();
         break;
       }
+      case 'toggle-fs': alternarPantallaCompleta(); break;
       case 'logout': await logout(); break;
       case 'reload-app': location.reload(); break;
       case 'update-later': $('#update-bar').classList.add('hidden'); break;

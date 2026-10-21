@@ -60,7 +60,7 @@ export default {
     const p = state.profile;
     const user = state.session?.user;
     const theme = prefs.get('med.theme') || 'system';
-    const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    const standalone = push.instalada();
     el.innerHTML = `
       <section class="page-intro"><div><span class="eyebrow">Cuenta</span><h1>Mi perfil</h1><p>Tus datos de acceso y preferencias.</p></div></section>
       <section class="profile-hero">
