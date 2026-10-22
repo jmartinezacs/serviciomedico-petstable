@@ -58,7 +58,7 @@ export default {
       columns: columns(),
       sort: { key: 'fecha', asc: false },
       empty: { ico: 'calendar', title: admin ? 'Aún no hay citas' : 'Aún no has solicitado citas',
-        text: 'Las citas se agendan de lunes a viernes de 9:00 a 17:30 en bloques de 20 minutos. Para urgencias usa la opción Cita de urgencia.',
+        text: 'Las citas se agendan de lunes a viernes de 9:00 a 17:40 en bloques de 20 minutos. Para urgencias usa la opción Cita de urgencia.',
         action: `<button class="btn primary" data-c="nueva">${icon('calendar-plus')} ${admin ? 'Nueva cita' : 'Solicitar cita'}</button>` },
       fetch: fetchCitas,
     });
@@ -306,7 +306,7 @@ async function renderAgenda() {
   refreshIcons();
   const body = card.querySelector('#agenda-body');
   if (!isWeekday(agendaDate)) {
-    body.innerHTML = emptyState({ ico: 'calendar-off', title: 'Sin servicio en fin de semana', text: 'El servicio médico atiende de lunes a viernes de 9:00 a 17:30.' });
+    body.innerHTML = emptyState({ ico: 'calendar-off', title: 'Sin servicio en fin de semana', text: 'El servicio médico atiende de lunes a viernes de 9:00 a 18:00.' });
     refreshIcons(); return;
   }
   try {
@@ -447,7 +447,7 @@ async function openBloqueos() {
   const lista = async (cont) => {
     cont.innerHTML = '<div class="skeleton" style="height:60px"></div>';
     try {
-      const rows = await getBloqueos(hoy, addDays(hoy, 730));
+      const rows = await getBloqueos(hoy, addDays(hoy, 730), { comida: false });
       cont.innerHTML = rows.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Horario</th><th>Motivo</th><th class="actions"></th></tr></thead><tbody>
         ${rows.map((b) => `<tr><td>${esc(fmtDate(b.fecha))}<div class="cell-sub">${esc(fmtLongDate(b.fecha).split(',')[0])}</div></td>
           <td>${esc(bloqueoTxt(b))}</td><td>${esc(b.motivo)} ${b.tipo === 'festivo' ? pill('Festivo', 'info') : ''}</td>
@@ -469,7 +469,7 @@ async function openBloqueos() {
       <label class="switch-row" for="bq-todo"><span><b>Todo el día</b></span><input type="checkbox" id="bq-todo" name="todo" checked></label>
       <div class="form-grid hidden" id="bq-horas">
         <div class="field"><label for="bq-ini">Desde</label><select id="bq-ini" name="ini">${SLOTS.map((s) => `<option>${s}</option>`).join('')}</select></div>
-        <div class="field"><label for="bq-fin">Hasta</label><select id="bq-fin" name="fin">${[...SLOTS.slice(1), '17:20'].map((s) => `<option ${s === '17:20' ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+        <div class="field"><label for="bq-fin">Hasta</label><select id="bq-fin" name="fin">${[...SLOTS.slice(1), '18:00'].map((s) => `<option ${s === '18:00' ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
       </div>
       <div class="form-grid">
         <div class="field"><label for="bq-tipo">Tipo</label><select id="bq-tipo" name="tipo">
@@ -551,7 +551,7 @@ export async function imprimirConstancia(id) {
 // ---------- Formulario de solicitud / reprogramación ----------
 function defaultFecha() {
   const hoy = todayISO();
-  if (isWeekday(hoy) && nowHHMM() < '17:00') return hoy;
+  if (isWeekday(hoy) && nowHHMM() < '17:40') return hoy;
   return stepWeekday(hoy, 1);
 }
 
@@ -592,7 +592,7 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
       <div id="cf-slots" class="slots" ${state.isMedico ? '' : 'role="radiogroup" aria-label="Horarios disponibles"'}></div>
       <small class="hint">${state.isMedico
         ? 'Como Servicio Médico puedes escribir la hora que quieras, aunque no coincida con los bloques de la agenda.'
-        : 'Lunes a viernes de 9:00 a 17:30, bloques de 20 minutos. Los horarios tachados no están disponibles.'}</small>
+        : 'Lunes a viernes de 9:00 a 17:40 (última cita), bloques de 20 minutos. Los horarios tachados no están disponibles.'}</small>
     </div>
     ${state.isMedico && !editing ? `<div class="field hidden" id="cf-hora-esp"><label for="cf-hora-urg">Horario especial (opcional)</label>
       <input type="time" id="cf-hora-urg" name="hora_urg" step="60"><small class="hint">Si lo dejas vacío, podrás asignarlo después.</small></div>` : ''}

@@ -94,16 +94,16 @@ export const dayEndTs = (iso) => `${addDays(iso, 1)}T00:00:00-06:00`;
 // ---------- Catálogos de negocio ----------
 export const SLOTS = (() => {
   const out = [];
-  for (let m = 9 * 60; m <= 17 * 60 + 10; m += 20) out.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
+  for (let m = 9 * 60; m <= 17 * 60 + 40; m += 20) out.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
   return out;
 })();
 // Bloque de la agenda al que pertenece una hora libre del médico (10:05 → 10:00).
-// Fuera de 09:00–17:19 devuelve la misma hora (no corresponde a ningún bloque).
+// Fuera de 09:00–17:59 devuelve la misma hora (no corresponde a ningún bloque).
 export function slotDe(hhmm) {
   if (!hhmm) return hhmm;
   const [h, m] = String(hhmm).slice(0, 5).split(':').map(Number);
   const t = h * 60 + m;
-  if (t < 9 * 60 || t >= 17 * 60 + 20) return String(hhmm).slice(0, 5);
+  if (t < 9 * 60 || t >= 18 * 60) return String(hhmm).slice(0, 5);
   const s = 9 * 60 + Math.floor((t - 9 * 60) / 20) * 20;
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
@@ -130,7 +130,7 @@ export function debounce(fn, ms = 300) { let t; return (...a) => { clearTimeout(
 const CONSTRAINT_MSG = {
   citas_med_bloque_uk: 'Ese horario ya está ocupado. Elija otro.',
   citas_med_dia_habil_ck: 'Las citas solo pueden agendarse de lunes a viernes.',
-  citas_med_horario_ck: 'El horario debe estar entre 09:00 y 17:00 en bloques de 20 minutos (último bloque 17:00 a 17:20).',
+  citas_med_horario_ck: 'El horario debe estar entre 09:00 y 17:40 en bloques de 20 minutos.',
   colaboradores_med_num_uk: 'Ya existe un colaborador con ese número de empleado.',
   medicamentos_med_clave_uk: 'Ya existe un medicamento con esa clave.',
   areas_med_nombre_uk: 'Ya existe un área con ese nombre.',
@@ -558,11 +558,29 @@ export function permitirNuevaArea(select) {
 }
 
 // ---------- Días u horarios sin servicio (festivos, ausencias del médico) ----------
-export async function getBloqueos(desde, hasta = desde) {
-  const { data, error } = await sb.from('dias_sin_servicio_med').select('id, fecha, hora_inicio, hora_fin, tipo, motivo')
-    .gte('fecha', desde).lte('fecha', hasta).order('fecha').order('hora_inicio', { nullsFirst: true });
+// Hora de comida del médico (Usuarios → Configuración); se lee una vez por sesión
+let comidaP = null;
+export function getComida() {
+  comidaP ||= sb.from('config_med').select('comida_inicio, comida_fin').eq('id', 1).maybeSingle()
+    .then(({ data }) => (data?.comida_inicio ? { inicio: fmtTime(data.comida_inicio), fin: fmtTime(data.comida_fin) } : null))
+    .catch(() => { comidaP = null; return null; });
+  return comidaP;
+}
+export function olvidarComida() { comidaP = null; }
+// Incluye la hora de comida de cada día hábil como un bloqueo más (comida: false la omite)
+export async function getBloqueos(desde, hasta = desde, { comida = true } = {}) {
+  const [{ data, error }, com] = await Promise.all([
+    sb.from('dias_sin_servicio_med').select('id, fecha, hora_inicio, hora_fin, tipo, motivo')
+      .gte('fecha', desde).lte('fecha', hasta).order('fecha').order('hora_inicio', { nullsFirst: true }),
+    comida ? getComida() : null,
+  ]);
   if (error) throw error;
-  return data;
+  if (!com) return data;
+  const out = [...data];
+  for (let d = desde; d <= hasta; d = addDays(d, 1)) {
+    if (isWeekday(d)) out.push({ id: `comida-${d}`, fecha: d, hora_inicio: com.inicio, hora_fin: com.fin, tipo: 'comida', motivo: 'Hora de comida' });
+  }
+  return out;
 }
 // Bloqueo que afecta a un horario (o al día completo si hora es null)
 export function bloqueoDe(bloqueos, fecha, hora = null) {

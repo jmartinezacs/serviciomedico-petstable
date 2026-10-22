@@ -8,7 +8,7 @@
 import {
   sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, DataTable, paged,
   sanitizeSearch, debounce, getAreas, pill, must, fmtDateTime, avatarHTML, prepararFoto, subirFoto,
-  borrarFotoPropia, refreshIcons, fieldError, permitirNuevaArea,
+  borrarFotoPropia, refreshIcons, fieldError, permitirNuevaArea, olvidarComida, fmtTime,
 } from '../core.js';
 
 let root, table, cuentas = new Map();
@@ -418,15 +418,21 @@ async function renderPadecimientos(box) {
 async function renderConfig() {
   const card = root.querySelector('#cfg-card');
   card.innerHTML = '<div class="skeleton" style="height:40px"></div>';
-  const { data, error } = await sb.from('config_med').select('dias_alerta_caducidad, dias_cobertura, aviso_privacidad_url, updated_at').eq('id', 1).single();
+  const { data, error } = await sb.from('config_med').select('dias_alerta_caducidad, dias_cobertura, aviso_privacidad_url, comida_inicio, comida_fin, updated_at').eq('id', 1).single();
   if (error) {
     card.innerHTML = `<div class="empty error"><b>No se pudo cargar la configuración</b><p>${esc(errMsg(error))}</p>
       <button class="btn secondary" data-cfg="retry">${icon('refresh-cw')} Reintentar</button></div>`;
     refreshIcons(); return;
   }
   card.innerHTML = `
-    <div class="card-head"><div><h3>Inventario y privacidad</h3><p>Última modificación: ${fmtDateTime(data.updated_at)}</p></div></div>
+    <div class="card-head"><div><h3>Servicio, inventario y privacidad</h3><p>Última modificación: ${fmtDateTime(data.updated_at)}</p></div></div>
     <form id="cfg-form" novalidate style="max-width:520px">
+      <fieldset class="field" style="border:0;padding:0;margin:0 0 14px"><legend style="font-weight:700;margin-bottom:6px">${icon('utensils')} Hora de comida del médico <span class="req">*</span></legend>
+        <div class="form-grid">
+          <div class="field" style="margin:0"><label for="cfg-com-ini">Desde</label><input id="cfg-com-ini" name="comida_inicio" type="time" step="300" required value="${esc(fmtTime(data.comida_inicio))}"></div>
+          <div class="field" style="margin:0"><label for="cfg-com-fin">Hasta</label><input id="cfg-com-fin" name="comida_fin" type="time" step="300" required value="${esc(fmtTime(data.comida_fin))}"></div>
+        </div>
+        <small class="hint">De lunes a viernes nadie puede agendar citas en ese horario (el médico sí puede escribir cualquier hora). Al iniciar, todos los usuarios con notificaciones activas reciben un aviso.</small></fieldset>
       <div class="field"><label for="cfg-dias">Días de anticipación para alertar caducidad <span class="req">*</span></label>
         <input id="cfg-dias" name="dias" type="number" inputmode="numeric" min="1" max="365" step="1" required value="${data.dias_alerta_caducidad}">
         <small class="hint">Un lote se marca “Por caducar” cuando le quedan este número de días o menos. Valor inicial asumido: 60 días.</small></div>
@@ -440,7 +446,7 @@ async function renderConfig() {
       <button type="submit" class="btn primary">${icon('save')} Guardar</button>
     </form>
     <div class="section-title" style="margin-top:22px">${icon('clock')} Horario de citas</div>
-    <p class="hint" style="margin:0">Lunes a viernes de 09:00 a 17:30, en bloques de 20 minutos (último bloque a las 17:00); las citas de urgencia no usan bloques; un horario solo puede tener una cita activa. Los festivos y ausencias se registran en Citas → Días sin servicio. Las citas confirmadas que no se atendieron se marcan como inasistencia a las 19:05 (se pueden reabrir). Estas reglas se validan en la base de datos.</p>
+    <p class="hint" style="margin:0">Lunes a viernes de 09:00 a 18:00, en bloques de 20 minutos (última cita a las 17:40), sin citas durante la hora de comida; el médico puede agendar a cualquier hora; las citas de urgencia no usan bloques; un horario solo puede tener una cita activa. Los festivos y ausencias se registran en Citas → Días sin servicio. Las citas confirmadas que no se atendieron se marcan como inasistencia a las 19:05 (se pueden reabrir). Estas reglas se validan en la base de datos.</p>
     <div class="section-title" style="margin-top:22px">${icon('stethoscope')} Catálogo de padecimientos</div>
     <div id="pad-box"><div class="skeleton" style="height:36px"></div></div>`;
   refreshIcons();
@@ -449,14 +455,18 @@ async function renderConfig() {
   let busy = false;
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (busy || !checkForm(form)) return;
+    if (busy || !checkForm(form, {
+      comida_fin: (v) => (v && form.comida_inicio.value && v <= form.comida_inicio.value ? 'Debe ser posterior a la hora de inicio.' : ''),
+    })) return;
     busy = true;
     const btn = form.querySelector('button[type=submit]'); btn.disabled = true;
     try {
       must(await sb.from('config_med').update({
         dias_alerta_caducidad: Number(form.dias.value), dias_cobertura: Number(form.cobertura.value),
         aviso_privacidad_url: form.aviso.value.trim() || null,
+        comida_inicio: form.comida_inicio.value, comida_fin: form.comida_fin.value,
       }).eq('id', 1).select('id').single());
+      olvidarComida();
       toast('Configuración guardada.', 'success');
     } catch (err) { form.querySelector('.form-error').textContent = errMsg(err); }
     busy = false; btn.disabled = false;

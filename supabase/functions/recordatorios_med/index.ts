@@ -8,6 +8,7 @@
 //   3) 18:00: a quien solicitó cada cita confirmada del siguiente día hábil.
 //   4) Cada ejecución: a quien solicitó cada cita confirmada que empieza en
 //      unos 40-60 minutos.
+//   5) Al iniciar la hora de comida del médico (config_med): a todos los usuarios.
 // Los recordatorios de cita se registran en avisos_med para no repetirse.
 // Protegida con un secreto que vive en la base de datos (med_private.cron).
 import webpush from 'npm:web-push@3.6.7';
@@ -149,7 +150,33 @@ Deno.serve(async (req) => {
     }
     resumen.recordatorios_cita = pendientesEnvio.length;
 
-    if (!alMedico.length && !pendientesEnvio.length) return json(200, { ok: true, ...resumen, enviados: 0 });
+    // 5) Hora de comida del médico: aviso a todos los usuarios al iniciar (una vez al día,
+    //    en la ejecución que cae dentro de los primeros 20 minutos; no en días sin servicio)
+    let comida: Aviso | null = null;
+    {
+      const { data: cfg } = await admin.from('config_med').select('comida_inicio, comida_fin').eq('id', 1).maybeSingle();
+      if (cfg?.comida_inicio && cfg?.comida_fin) {
+        const [hi, mi] = String(cfg.comida_inicio).split(':').map(Number);
+        const ini = hi * 60 + mi;
+        if (minutosHoy >= ini && minutosHoy < ini + 20) {
+          const { data: diaSinServicio, error: bErr } = await admin.rpc('med_motivo_bloqueo', { p_fecha: hoy, p_hora: null });
+          if (!bErr && !diaSinServicio) {
+            const { data: reg } = await admin.from('avisos_comida_med')
+              .upsert({ fecha: hoy }, { onConflict: 'fecha', ignoreDuplicates: true }).select('fecha');
+            if (reg?.length) {
+              comida = {
+                title: 'Servicio Médico: hora de comida',
+                body: `El doctor está en su hora de comida de ${hhmm(cfg.comida_inicio)} a ${hhmm(cfg.comida_fin)} h. Las consultas se reanudan a las ${hhmm(cfg.comida_fin)} h.`,
+                url: '/', tag: `comida-${hoy}`,
+              };
+            }
+          }
+        }
+      }
+    }
+    resumen.comida = comida ? 1 : 0;
+
+    if (!alMedico.length && !pendientesEnvio.length && !comida) return json(200, { ok: true, ...resumen, enviados: 0 });
 
     const { data: k } = await admin.rpc('med_vapid_claves');
     if (!k?.[0]) return json(200, { ok: true, ...resumen, enviados: 0, motivo: 'Sin claves de notificación aún.' });
@@ -161,6 +188,10 @@ Deno.serve(async (req) => {
     const destinos = new Map<string, Aviso[]>();
     for (const m of medicos || []) destinos.set(m.id, [...alMedico]);
     for (const r of pendientesEnvio) destinos.set(r.usuario, [...(destinos.get(r.usuario) || []), r.aviso]);
+    if (comida) {
+      const { data: todos } = await admin.from('usuarios_med').select('id').eq('activo', true);
+      for (const u of todos || []) destinos.set(u.id, [...(destinos.get(u.id) || []), comida]);
+    }
     if (!destinos.size) return json(200, { ok: true, ...resumen, enviados: 0, motivo: 'Sin destinatarios.' });
 
     const { data: activos } = await admin.from('usuarios_med').select('id').eq('activo', true).in('id', [...destinos.keys()]);
@@ -187,6 +218,7 @@ Deno.serve(async (req) => {
         }
       }
     }
+    if (comida) await admin.from('avisos_comida_med').update({ enviados }).eq('fecha', hoy);
     return json(200, { ok: true, ...resumen, enviados });
   } catch (e) {
     console.error('recordatorios_med', e);

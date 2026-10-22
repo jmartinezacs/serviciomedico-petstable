@@ -153,7 +153,7 @@ function availHTML(d) {
   }[d.tipo];
   return `<section class="avail ${t[0]}" aria-label="Disponibilidad de citas">
     <div class="avail-ring" style="--p:${pct}"><b>${n}<small>libres</small></b></div>
-    <div class="avail-txt"><span class="avail-tag">${esc(t[1])}</span><h3>${esc(t[2])}</h3><p>${esc(t[3])} Atención de lunes a viernes de 9:00 a 17:30.</p>
+    <div class="avail-txt"><span class="avail-tag">${esc(t[1])}</span><h3>${esc(t[2])}</h3><p>${esc(t[3])} Atención de lunes a viernes de 9:00 a 18:00.</p>
       ${n ? `<div class="avail-slots">${chips}</div>` : ''}</div>
     <div class="avail-cta">
       <button class="btn primary lg" data-dash="nueva-cita">${icon('calendar-plus')} ${state.isAdmin ? 'Nueva cita' : 'Solicitar cita'}</button>
