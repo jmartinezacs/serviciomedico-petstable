@@ -1124,3 +1124,109 @@ body { transition: none; }
 .cs-buscar input { width: 100%; min-height: 38px; padding: 0 12px; border-radius: 10px; font-size: 16px; }
 .cs-vacio { padding: 9px 11px; color: var(--muted); font-size: 13px; }
 .at-med-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+/* =====================================================================
+   v1.19 · Exámenes médicos de ingreso y egreso
+   ===================================================================== */
+.ex-btn { color: #fff; border: 0; font-weight: 800; }
+.ex-btn svg { width: 19px; height: 19px; }
+.ex-btn.ex-ingreso { background: linear-gradient(135deg, #0E9F9F, #1BC7C7); box-shadow: 0 7px 16px rgba(14, 159, 159, .25); }
+.ex-btn.ex-egreso { background: linear-gradient(135deg, #4338CA, #7C6CF6); box-shadow: 0 7px 16px rgba(67, 56, 202, .25); }
+.ex-btn:hover:not(:disabled) { color: #fff; filter: brightness(1.06); transform: translateY(-1px); }
+.avail-cta.con-examenes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto auto; grid-auto-flow: column; gap: 8px; }
+.avail-cta.con-examenes .btn { margin-top: 0; min-height: 48px; justify-content: center; white-space: nowrap; }
+@media (max-width: 1100px) { .avail { grid-template-columns: auto minmax(0, 1fr); } .avail-cta.con-examenes { grid-column: 1 / -1; } }
+@media (max-width: 560px) { .avail-cta.con-examenes { grid-template-columns: minmax(0, 1fr); grid-auto-flow: row; grid-template-rows: none; } }
+.ex-acts .ex-btn { min-height: 42px; }
+
+/* Encabezado del formulario */
+.ex-form-head { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; margin-bottom: 14px; color: #fff; }
+.ex-form-head svg { width: 28px; height: 28px; flex: 0 0 auto; }
+.ex-form-head b { display: block; font-size: 15px; }
+.ex-form-head small { opacity: .9; }
+.ex-form-head.ex-ingreso { background: linear-gradient(135deg, #0E9F9F, #1BC7C7); }
+.ex-form-head.ex-egreso { background: linear-gradient(135deg, #4338CA, #7C6CF6); }
+
+/* Resultado en grande */
+.ex-res { display: flex; gap: 14px; align-items: center; padding: 14px 16px; border-radius: 16px; border: 2px solid; margin-bottom: 14px; }
+.ex-res svg { width: 34px; height: 34px; flex: 0 0 auto; }
+.ex-res small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
+.ex-res b { display: block; font-size: 20px; line-height: 1.15; }
+.ex-res span { font-size: 13px; }
+.ex-res.lg { padding: 20px 22px; }
+.ex-res.lg svg { width: 48px; height: 48px; }
+.ex-res.lg b { font-size: clamp(22px, 4vw, 30px); font-weight: 900; letter-spacing: -.01em; }
+.ex-res.ok { background: rgba(22, 163, 74, .1); border-color: rgba(22, 163, 74, .45); color: #15803D; }
+.ex-res.bad { background: rgba(224, 70, 78, .1); border-color: rgba(224, 70, 78, .5); color: #C53039; }
+.ex-res.warn { background: rgba(245, 158, 11, .12); border-color: rgba(245, 158, 11, .5); color: #A45B00; }
+.ex-res.info { background: rgba(27, 199, 199, .12); border-color: rgba(27, 199, 199, .5); color: #0B7F7F; }
+:root[data-theme="dark"] .ex-res.ok { color: #4ADE80; }
+:root[data-theme="dark"] .ex-res.bad { color: #FF8A8F; }
+:root[data-theme="dark"] .ex-res.warn { color: #FFC163; }
+:root[data-theme="dark"] .ex-res.info { color: #5EE6E6; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ex-res.ok { color: #4ADE80; }
+  :root:not([data-theme="light"]) .ex-res.bad { color: #FF8A8F; }
+  :root:not([data-theme="light"]) .ex-res.warn { color: #FFC163; }
+  :root:not([data-theme="light"]) .ex-res.info { color: #5EE6E6; }
+}
+.ex-obs { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; background: var(--soft); }
+.ex-obs small { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.ex-obs p { margin: 4px 0 0; white-space: pre-wrap; }
+
+/* Opciones de resultado */
+.ex-lead { font-weight: 700; margin: 0 0 10px; }
+.ex-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+@media (max-width: 640px) { .ex-opts { grid-template-columns: minmax(0, 1fr); } }
+.ex-opt { position: relative; cursor: pointer; }
+.ex-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.ex-opt-card { display: flex; gap: 10px; align-items: flex-start; height: 100%; padding: 12px 14px; border: 2px solid var(--line); border-radius: 14px; background: var(--card); transition: border-color .15s, box-shadow .15s, background .15s; }
+.ex-opt-card svg { width: 26px; height: 26px; flex: 0 0 auto; }
+.ex-opt-card b { display: block; font-size: 14.5px; }
+.ex-opt-card small { color: var(--muted); }
+.ex-opt.ok svg { color: #16A34A; }
+.ex-opt.bad svg { color: #E0464E; }
+.ex-opt.warn svg { color: #D97706; }
+.ex-opt.info svg { color: #0E9F9F; }
+.ex-opt input:focus-visible + .ex-opt-card { box-shadow: 0 0 0 3px rgba(27, 199, 199, .25); }
+.ex-opt.ok input:checked + .ex-opt-card { border-color: #16A34A; background: rgba(22, 163, 74, .08); }
+.ex-opt.bad input:checked + .ex-opt-card { border-color: #E0464E; background: rgba(224, 70, 78, .08); }
+.ex-opt.warn input:checked + .ex-opt-card { border-color: #D97706; background: rgba(245, 158, 11, .1); }
+.ex-opt.info input:checked + .ex-opt-card { border-color: #0E9F9F; background: rgba(27, 199, 199, .1); }
+
+/* Constancia de examen (impresión / PDF) */
+@media print {
+  @page { size: letter; margin: 12mm 14mm; }
+  #print-area.exd { padding: 0; font-size: 10.5pt; color: #1a1f24; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .exd-head { display: grid; grid-template-columns: 120px 1fr auto; gap: 16px; align-items: center; padding-bottom: 12px; border-bottom: 4px solid #F58020; }
+  .exd-logo { width: 120px; height: 86px; }
+  .exd-titulo small { display: block; color: #0E9F9F; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; font-size: 8.5pt; }
+  .exd-titulo h1 { margin: 2px 0; font-size: 17pt; line-height: 1.15; color: #0B1E2D; }
+  .exd-titulo p { margin: 0; color: #5b6670; }
+  .exd-folio { text-align: center; border: 1.5px solid #0B1E2D; border-radius: 10px; padding: 8px 14px; min-width: 110px; }
+  .exd-folio small { display: block; font-size: 7.5pt; letter-spacing: .1em; text-transform: uppercase; color: #5b6670; }
+  .exd-folio b { display: block; font-size: 14pt; color: #0B1E2D; }
+  .exd-folio span { font-size: 8.5pt; color: #5b6670; }
+  .exd-sec { margin-top: 16px; }
+  .exd-sec h2 { margin: 0 0 8px; padding: 5px 10px; background: #0B1E2D; color: #fff; font-size: 9.5pt; letter-spacing: .1em; text-transform: uppercase; border-radius: 4px; }
+  .exd-tabla { width: 100%; border-collapse: collapse; }
+  .exd-tabla th, .exd-tabla td { border: 1px solid #c9d1d8; padding: 6px 9px; text-align: left; vertical-align: top; }
+  .exd-tabla th { width: 20%; background: #f1f4f6; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .04em; color: #44505a; }
+  .exd-lead { margin: 4px 0 10px; line-height: 1.5; }
+  .exd-res { border: 3px solid; border-radius: 12px; padding: 14px 18px; text-align: center; }
+  .exd-res b { display: block; font-size: 22pt; font-weight: 900; letter-spacing: .02em; text-transform: uppercase; line-height: 1.1; }
+  .exd-res span { display: block; margin-top: 4px; font-size: 11pt; }
+  .exd-res.ok { border-color: #16A34A; color: #12692F; background: #ECFDF3; }
+  .exd-res.bad { border-color: #DC2626; color: #A61B1B; background: #FEF2F2; }
+  .exd-res.warn { border-color: #D97706; color: #8A4B00; background: #FFF8EB; }
+  .exd-res.info { border-color: #0E9F9F; color: #0A6B6B; background: #ECFEFE; }
+  .exd-obs { margin-top: 12px; border: 1px solid #c9d1d8; border-left: 5px solid #F58020; border-radius: 6px; padding: 8px 12px; }
+  .exd-obs h3 { margin: 0 0 4px; font-size: 9pt; text-transform: uppercase; letter-spacing: .06em; color: #44505a; }
+  .exd-obs p { margin: 0; white-space: pre-wrap; line-height: 1.45; }
+  .exd-firmas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 64px; text-align: center; }
+  .exd-firmas div { display: flex; flex-direction: column; gap: 2px; }
+  .exd-firmas span { border-top: 1.5px solid #1a1f24; margin-bottom: 6px; }
+  .exd-firmas b { font-size: 10pt; min-height: 1.2em; }
+  .exd-firmas small { color: #5b6670; font-size: 8.5pt; }
+  .exd-pie { display: flex; flex-direction: column; gap: 2px; margin-top: 34px; padding-top: 8px; border-top: 1px solid #c9d1d8; font-size: 7.8pt; color: #6b7680; }
+}

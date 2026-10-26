@@ -12,7 +12,7 @@ $utf8 = New-Object Text.UTF8Encoding($false)
 function Read-Text($rel) { ([IO.File]::ReadAllText((Join-Path $Src $rel), [Text.Encoding]::UTF8)).Replace("`r`n", "`n") }
 
 # ---------- 1. Empaquetar módulos ES en un script clásico ----------
-$order = @('core', 'modules/colaboradores', 'modules/inventario', 'modules/citas', 'modules/dashboard',
+$order = @('core', 'modules/colaboradores', 'modules/inventario', 'modules/citas', 'modules/examenes', 'modules/dashboard',
            'modules/usuarios', 'modules/bitacora', 'modules/perfil', 'modules/reportes', 'app')
 function Resolve-Key([string]$from, [string]$spec) {
   $s = $spec -replace '\.js$', ''

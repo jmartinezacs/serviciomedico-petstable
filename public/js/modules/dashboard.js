@@ -12,6 +12,7 @@ import {
 import { openCitaForm, openDetalle } from './citas.js';
 import { openEntrada } from './inventario.js';
 import { openColaboradorForm } from './colaboradores.js';
+import { openExamenForm } from './examenes.js';
 
 let root, token = 0;
 
@@ -99,6 +100,7 @@ async function onClick(e) {
   if (act === 'colaborador') { await openColaboradorForm(); return; }
   if (act === 'cita') { await openDetalle(a.dataset.id); load(); return; }
   if (act === 'urgente') { if (await openCitaForm({ urgente: true })) load(); return; }
+  if (act === 'examen-ingreso' || act === 'examen-egreso') { await openExamenForm({ tipo: act.slice(7) }); return; }
   if (act === 'agendar') { if (await openCitaForm({ fecha: a.dataset.fecha, hora: a.dataset.hora })) load(); return; }
   if (act === 'notif-on') {
     a.disabled = true;
@@ -155,9 +157,11 @@ function availHTML(d) {
     <div class="avail-ring" style="--p:${pct}"><b>${n}<small>libres</small></b></div>
     <div class="avail-txt"><span class="avail-tag">${esc(t[1])}</span><h3>${esc(t[2])}</h3><p>${esc(t[3])} Atención de lunes a viernes de 9:00 a 18:00.</p>
       ${n ? `<div class="avail-slots">${chips}</div>` : ''}</div>
-    <div class="avail-cta">
+    <div class="avail-cta ${state.puedeExamenes ? 'con-examenes' : ''}">
       <button class="btn primary lg" data-dash="nueva-cita">${icon('calendar-plus')} ${state.isAdmin ? 'Nueva cita' : 'Solicitar cita'}</button>
       <button class="btn urg-btn" data-dash="urgente">${icon('siren')} Cita de urgencia</button>
+      ${state.puedeExamenes ? `<button class="btn ex-btn ex-ingreso" data-dash="examen-ingreso">${icon('user-round-plus')} Examen de ingreso</button>
+      <button class="btn ex-btn ex-egreso" data-dash="examen-egreso">${icon('user-round-minus')} Examen de egreso</button>` : ''}
     </div>
   </section>`;
 }

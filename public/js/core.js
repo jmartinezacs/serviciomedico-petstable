@@ -867,6 +867,9 @@ document.addEventListener('click', (e) => {
 export function avisar(evento, citaId) {
   try { sb.functions.invoke('notificar_med', { body: { accion: 'aviso', evento, cita_id: citaId } }).catch(() => {}); } catch { /* sin conexión */ }
 }
+export function avisarExamen(evento, examenId) {
+  try { sb.functions.invoke('notificar_med', { body: { accion: 'examen', evento, examen_id: examenId } }).catch(() => {}); } catch { /* sin conexión */ }
+}
 function b64uToUint8(s) {
   const pad = '='.repeat((4 - (s.length % 4)) % 4);
   const raw = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/'));

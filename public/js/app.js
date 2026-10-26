@@ -14,12 +14,14 @@ import usuarios from './modules/usuarios.js';
 import bitacora from './modules/bitacora.js';
 import perfil from './modules/perfil.js';
 import reportes from './modules/reportes.js';
+import examenes from './modules/examenes.js';
 
 const ROUTES = {
   panel:          { mod: dashboard,     icon: 'layout-dashboard', label: 'Panel',          roles: ['admin', 'usuario'], mobile: true },
   citas:          { mod: citas,         icon: 'calendar-days',    label: 'Citas',          labelUser: 'Mis citas', roles: ['admin', 'usuario'], mobile: true },
   colaboradores:  { mod: colaboradores, icon: 'users',            label: 'Colaboradores',  roles: ['admin', 'usuario'], mobile: true },
   inventario:     { mod: inventario,    icon: 'pill',             label: 'Inventario',     roles: ['admin'], mobile: true },
+  examenes:       { mod: examenes,      icon: 'clipboard-check',  label: 'Exámenes médicos', roles: ['admin', 'usuario'], puede: () => state.puedeExamenes },
   reportes:       { mod: reportes,      icon: 'file-spreadsheet', label: 'Reportes',       roles: ['admin'] },
   usuarios:       { mod: usuarios,      icon: 'user-cog',         label: 'Usuarios',       roles: ['admin'] },
   bitacora:       { mod: bitacora,      icon: 'history',          label: 'Bitácora',       roles: ['admin'] },
@@ -68,6 +70,8 @@ async function loadProfileAndStart() {
     state.profile = p;
     state.isAdmin = p.rol === 'admin';
     state.isMedico = state.isAdmin && !!p.es_medico;
+    // Exámenes de ingreso/egreso: médico, Servicio Médico, Procesos y Mejora continua y Recursos Humanos
+    state.puedeExamenes = (await sb.rpc('med_puede_examenes')).data === true;
     startApp();
   } catch (err) {
     console.error(err);
@@ -188,7 +192,7 @@ function startApp() {
 }
 
 // ---------------- Navegación ----------------
-function allowed(name) { const r = ROUTES[name]; return r && r.roles.includes(state.isAdmin ? 'admin' : 'usuario'); }
+function allowed(name) { const r = ROUTES[name]; return !!r && r.roles.includes(state.isAdmin ? 'admin' : 'usuario') && (!r.puede || r.puede()); }
 function label(r) { return !state.isAdmin && r.labelUser ? r.labelUser : r.label; }
 
 function buildNav() {

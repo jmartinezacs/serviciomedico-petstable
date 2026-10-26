@@ -122,6 +122,7 @@ Other frontend files:
   - The pg_cron job `med_inasistencias` (19:05 MX, Mon–Fri) marks past confirmed citas as `no_asistio`. An admin can reopen a `no_asistio` cita back to `confirmada`.
   - An urgent cita has `hora` null until an admin assigns a time or rejects it.
   - States go pendiente → confirmada → atendida, plus cancelada and no asistió. Citas are cancelled, never deleted.
+- **Medical exams (`examenes_med`, module `examenes.js`).** Intake (ingreso) and exit (egreso) exams, visible only to `med_puede_examenes()` (doctor, or user area Servicio Médico / Procesos y Mejora continua / Recursos Humanos; route `puede` predicate in `app.js`). The trigger `med_validar_examen` enforces the rules; only the doctor confirms and records results through `med_registrar_examen`, which creates or reactivates the colaborador on any APTO intake and deactivates the colaborador on exit. Notifications go through `notificar_med` with `accion: 'examen'` (`avisarExamen` in core). The constancia prints from `#print-area.exd`.
 - **Inventory.** `medicamentos_med` holds every inventory item, distinguished by two fields:
   - `categoria` is `medicamento`, `insumo` or `equipo`. Equipment cannot be dispensed.
   - `control` is `pieza` or `envase`.

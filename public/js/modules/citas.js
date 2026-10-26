@@ -717,7 +717,9 @@ export async function openCitaForm({ cita = null, fecha = null, hora = null, urg
 }
 
 // Selector de colaborador con búsqueda en servidor
-function colaboradorPicker(container, hidden) {
+// opts.todos: busca entre todos los colaboradores; opts.nuevo: permite registrar uno nuevo
+export function colaboradorPicker(container, hidden, opts = {}) {
+  const { todos = false, nuevo = true } = opts;
   container.innerHTML = `<div class="combo">
       <input type="text" id="cf-col-search" autocomplete="off" placeholder="Busca por nombre o No. de empleado" role="combobox" aria-expanded="false" aria-autocomplete="list">
       <div class="combo-list hidden" role="listbox"></div></div>`;
@@ -734,24 +736,24 @@ function colaboradorPicker(container, hidden) {
     container.innerHTML = `<div class="chip-selected"><div><b>${esc(c.nombre)}</b><br><span>${esc([c.num_empleado, c.area?.nombre].filter(Boolean).join(' · '))}</span></div>
       <button type="button" class="btn ghost" data-change>${icon('repeat')} Cambiar</button></div>`;
     refreshIcons();
-    container.querySelector('[data-change]').addEventListener('click', () => { hidden.value = ''; colaboradorPicker(container, hidden); container.querySelector('input').focus(); });
+    container.querySelector('[data-change]').addEventListener('click', () => { hidden.value = ''; hidden.dispatchEvent(new Event('input', { bubbles: true })); colaboradorPicker(container, hidden, opts); container.querySelector('input').focus(); });
   };
   const draw = (q) => {
     list.innerHTML = results.map((c, i) => `<button type="button" role="option" data-i="${i}" class="${i === hl ? 'hl' : ''}">
         <b>${esc(c.nombre)}</b>${c.usuario_id && c.usuario_id === state.profile.id ? ' (tú)' : ''}<br><span class="muted">${esc([c.num_empleado, c.area?.nombre].filter(Boolean).join(' · '))}</span></button>`).join('')
       + (results.length ? '' : `<div class="muted" style="padding:9px 10px">${q ? 'Sin coincidencias.' : 'Escribe para buscar.'}</div>`)
-      + `<button type="button" class="combo-new" data-new>${icon('user-plus')} Registrar nuevo colaborador${q ? `: “${esc(q)}”` : ''}</button>`;
+      + (nuevo ? `<button type="button" class="combo-new" data-new>${icon('user-plus')} Registrar nuevo colaborador${q ? `: “${esc(q)}”` : ''}</button>` : '');
     list.classList.remove('hidden'); input.setAttribute('aria-expanded', 'true');
     refreshIcons();
   };
   const search = debounce(async () => {
     const t = ++tok; const q = sanitizeSearch(input.value);
-    let qb = sb.from('colaboradores_med').select('id, nombre, num_empleado, usuario_id, area:areas_med(nombre)').eq('activo', true).order('nombre').limit(8);
+    let qb = sb.from('colaboradores_med').select('id, nombre, num_empleado, usuario_id, puesto, area:areas_med(nombre)').eq('activo', true).order('nombre').limit(8);
     // Sin importar acentos ni mayúsculas, y cada palabra en cualquier orden ("julian" encuentra "Julián")
     const palabras = q.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(' ').filter(Boolean);
     for (const w of palabras) qb = qb.ilike('nombre_norm', `%${w}%`);
     // Usuarios: solo para sí mismos o para colaboradores de su área (también se valida en la base de datos)
-    if (!state.isAdmin) {
+    if (!state.isAdmin && !todos) {
       const { id, area_id: area } = state.profile;
       qb = area ? qb.or(`area_id.eq.${area},usuario_id.eq.${id}`) : qb.eq('usuario_id', id);
     }
