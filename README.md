@@ -90,6 +90,10 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v1.18:**
+  - **Atención:** buscador dentro del menú de medicamentos (`data-buscar` en un `<select>` activa el buscador del menú propio; en celular no se enfoca solo, para que el teclado no se abra al tocar la flecha) y botón "Nuevo medicamento" que abre el mismo alta de Inventario y, si se registra con existencia, lo deja seleccionado.
+  - **Edad:** el médico captura la edad al registrar la atención (`med_atender_cita(..., p_edad)`); se guarda en la atención y actualiza `colaboradores_med.edad`, visible y editable en Colaboradores (solo administradores). Rango aceptado: 14 a 100 años (supuesto ajustable).
+  - **Datos:** CM-00006 reasignada a "Sergio Acosta" (Logística); se eliminaron "Sergio Acosta Santiago" y el área "Congelados".
 - **v1.17:** hora de comida del médico (por defecto 15:00 a 16:00) editable en Usuarios → Configuración (`config_med.comida_inicio/fin`). De lunes a viernes bloquea esos horarios para citas normales (`med_motivo_bloqueo` devuelve "Hora de comida"; el médico sí puede agendar). Al iniciar, `recordatorios_med` avisa a todos los usuarios activos (una vez al día, registrado en `avisos_comida_med`; no en días sin servicio). La última cita de la agenda pasa a las 17:40.
 - **v1.16:** app instalada en pantalla completa (igual que Pruebas industriales). El manifiesto usa `display: fullscreen` con `display_override` [fullscreen, standalone]: Android abre sin barra de estado ni de navegación. En computadora (Chrome/Edge instalada) se pide la API Fullscreen al primer clic o tecla; un botón del encabezado la alterna y Esc la quita. iOS no permite ocultar la barra de estado.
 - **v1.15:**

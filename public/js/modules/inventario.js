@@ -361,7 +361,7 @@ function refresh() {
 // Alta / edición de artículo. El inventario siempre se lleva en una sola unidad (tableta, cápsula,
 // pieza…), salvo los artículos "por envase" (gel, crema, frasco gotero…). La clave se genera sola.
 const PREFIJO = { medicamento: 'MED', insumo: 'INS', equipo: 'EQ' };
-async function openMedicamentoForm(m = null) {
+export async function openMedicamentoForm(m = null) {
   const manana = addDays(todayISO(), 1);
   let claves = [];
   if (!m) {
@@ -479,10 +479,10 @@ async function openMedicamentoForm(m = null) {
       const { data } = must(await sb.from('medicamentos_med').insert(payload).select('id, clave').single());
       if (total) {
         const { error } = await sb.rpc('med_registrar_entrada', { p_medicamento: data.id, p_lote: v.lote, p_caducidad: v.caducidad || null, p_cantidad: total, p_motivo: 'Existencia inicial' });
-        if (error) { toast(`Artículo ${data.clave} registrado, pero no se pudo registrar la existencia: ${errMsg(error)}`, 'warning', 8000); return true; }
+        if (error) { toast(`Artículo ${data.clave} registrado, pero no se pudo registrar la existencia: ${errMsg(error)}`, 'warning', 8000); return { id: data.id, existencia: 0 }; }
       }
       toast(`Artículo ${data.clave} registrado${total ? ` con ${cantUnidad(total, payload.unidad)}` : ''}.`, 'success', 6000);
-      return true;
+      return { id: data.id, existencia: total };
     },
   });
 }

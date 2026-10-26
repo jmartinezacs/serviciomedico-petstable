@@ -1118,3 +1118,9 @@ body { transition: none; }
 .top { padding-top: env(safe-area-inset-top, 0px); }
 @media (max-width: 760px) { .update-bar { top: calc(var(--header-h, 64px) + 8px); } }
 .fs-btn { padding: 0; width: 40px; }
+
+/* v1.18 · Buscador dentro del menú desplegable (data-buscar) */
+.cs-buscar { position: sticky; top: -6px; z-index: 1; margin: -6px -6px 6px; padding: 8px; background: var(--card); border-bottom: 1px solid var(--line); }
+.cs-buscar input { width: 100%; min-height: 38px; padding: 0 12px; border-radius: 10px; font-size: 16px; }
+.cs-vacio { padding: 9px 11px; color: var(--muted); font-size: 13px; }
+.at-med-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }

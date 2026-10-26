@@ -684,35 +684,75 @@ function csUbicar(panel, anchor) {
   if (abajo < alto + 12 && r.top > abajo) { panel.style.top = ''; panel.style.bottom = `${innerHeight - r.top + 6}px`; }
   else { panel.style.bottom = ''; panel.style.top = `${r.bottom + 6}px`; }
 }
-// items: [{ value, label, disabled, selected }]; onPick(value)
-function csAbrir(anchor, items, onPick) {
+const sinAcentos = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+// Mientras se escribe en el buscador del menú, el teclado del celular cambia el tamaño
+// de la ventana y desplaza la página: en ese caso el menú se reacomoda en lugar de cerrarse
+// (cerrarlo provocaba un ciclo abrir/cerrar con el teclado).
+const csEscribiendo = () => !!csAbierto?.buscador && document.activeElement === csAbierto.buscador;
+// items: [{ value, label, disabled, selected }]; onPick(value); buscar: muestra un buscador arriba
+function csAbrir(anchor, items, onPick, { buscar = false } = {}) {
   csCerrar();
   if (!items.length) return;
   const panel = document.createElement('div');
-  panel.className = 'cs-panel'; panel.setAttribute('role', 'listbox');
-  panel.innerHTML = items.map((it, i) => `<div class="cs-opt ${it.selected ? 'sel' : ''} ${it.disabled ? 'dis' : ''} ${it.ph ? 'ph' : ''}" role="option" data-i="${i}" aria-selected="${it.selected ? 'true' : 'false'}" ${it.disabled ? 'aria-disabled="true"' : ''}>
-      <span>${esc(it.label)}</span>${it.selected ? CHECK : ''}</div>`).join('');
+  panel.className = `cs-panel${buscar ? ' cs-con-buscador' : ''}`; panel.setAttribute('role', 'listbox');
+  panel.innerHTML = (buscar ? `<div class="cs-buscar"><input type="search" placeholder="Buscar…" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="Buscar en la lista"></div>` : '')
+    + items.map((it, i) => `<div class="cs-opt ${it.selected ? 'sel' : ''} ${it.disabled ? 'dis' : ''} ${it.ph ? 'ph' : ''}" role="option" data-i="${i}" aria-selected="${it.selected ? 'true' : 'false'}" ${it.disabled ? 'aria-disabled="true"' : ''}>
+      <span>${esc(it.label)}</span>${it.selected ? CHECK : ''}</div>`).join('')
+    + (buscar ? '<div class="cs-vacio hidden">Sin coincidencias.</div>' : '');
   document.body.appendChild(panel);
   csUbicar(panel, anchor);
   anchor.setAttribute('aria-expanded', 'true');
+  const opts = [...panel.querySelectorAll('.cs-opt')];
+  let visibles = items.map((_, i) => i);
   let hl = Math.max(0, items.findIndex((x) => x.selected));
-  const pintar = () => {
-    panel.querySelectorAll('.cs-opt').forEach((o, i) => o.classList.toggle('hl', i === hl));
-    panel.querySelector('.cs-opt.hl')?.scrollIntoView({ block: 'nearest' });
+  const pintar = (desplazar = true) => {
+    opts.forEach((o, i) => o.classList.toggle('hl', i === hl));
+    if (desplazar) opts[hl]?.scrollIntoView({ block: 'nearest' });
   };
   pintar();
   const elegir = (i) => { const it = items[i]; if (!it || it.disabled) return; csCerrar(true); onPick(it.value); };
-  panel.addEventListener('mousedown', (e) => e.preventDefault());
+  const mover = (d) => {
+    const pos = visibles.indexOf(hl);
+    let p = pos < 0 ? (d > 0 ? -1 : visibles.length) : pos;
+    do { p += d; } while (p >= 0 && p < visibles.length && items[visibles[p]].disabled);
+    if (p >= 0 && p < visibles.length) { hl = visibles[p]; pintar(); }
+  };
+  let buscador = null;
+  if (buscar) {
+    buscador = panel.querySelector('.cs-buscar input');
+    buscador.addEventListener('input', () => {
+      const q = sinAcentos(buscador.value.trim());
+      const palabras = q.split(/\s+/).filter(Boolean);
+      visibles = [];
+      items.forEach((it, i) => {
+        const ok = !it.ph && palabras.every((w) => sinAcentos(it.label).includes(w));
+        const mostrar = !q || ok;
+        opts[i].classList.toggle('hidden', !mostrar);
+        if (mostrar) visibles.push(i);
+      });
+      panel.querySelector('.cs-vacio').classList.toggle('hidden', visibles.length > 0);
+      if (!visibles.includes(hl)) hl = visibles.find((i) => !items[i].disabled) ?? -1;
+      pintar(false);
+      panel.scrollTop = 0;
+    });
+    // Solo en computadora se enfoca el buscador al abrir; en celular/tableta el teclado
+    // aparece únicamente si la persona toca el buscador.
+    if (matchMedia('(pointer: fine)').matches) buscador.focus({ preventScroll: true });
+  }
+  // Evita que el botón pierda el foco al tocar una opción (pero sí deja enfocar el buscador)
+  panel.addEventListener('mousedown', (e) => { if (e.target !== buscador) e.preventDefault(); });
   panel.addEventListener('click', (e) => { const o = e.target.closest('.cs-opt'); if (o) elegir(Number(o.dataset.i)); });
   csAbierto = {
-    panel, anchor,
+    panel, anchor, buscador,
     key: (e) => {
-      if (e.key === 'ArrowDown') { e.preventDefault(); do { hl = Math.min(items.length - 1, hl + 1); } while (items[hl]?.disabled && hl < items.length - 1); pintar(); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); do { hl = Math.max(0, hl - 1); } while (items[hl]?.disabled && hl > 0); pintar(); }
+      const enBuscador = e.target === buscador;
+      if (e.key === 'ArrowDown') { e.preventDefault(); mover(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); mover(-1); }
       else if (e.key === 'Enter') { e.preventDefault(); elegir(hl); }
       else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); csCerrar(true); }
       else if (e.key === 'Tab') csCerrar();
-      else if (e.key.length === 1 && /\S/.test(e.key) && anchor.tagName !== 'INPUT') {
+      else if (!enBuscador && e.key.length === 1 && /\S/.test(e.key) && anchor.tagName !== 'INPUT') {
+        if (buscador) { buscador.focus({ preventScroll: true }); return; }
         const k = e.key.toLowerCase();
         const j = items.findIndex((it, i) => i > hl && !it.disabled && it.label.toLowerCase().startsWith(k));
         const j2 = j >= 0 ? j : items.findIndex((it) => !it.disabled && it.label.toLowerCase().startsWith(k));
@@ -724,9 +764,16 @@ function csAbrir(anchor, items, onPick) {
 document.addEventListener('mousedown', (e) => {
   if (csAbierto && !csAbierto.panel.contains(e.target) && !csAbierto.anchor.contains(e.target)) csCerrar();
 }, true);
-document.addEventListener('scroll', (e) => { if (csAbierto && !csAbierto.panel.contains(e.target)) csCerrar(); }, true);
-window.addEventListener('resize', () => csCerrar());
-document.addEventListener('keydown', (e) => { if (csAbierto && (e.target === csAbierto.anchor)) csAbierto.key(e); }, true);
+document.addEventListener('scroll', (e) => {
+  if (!csAbierto || csAbierto.panel.contains(e.target)) return;
+  if (csEscribiendo()) csUbicar(csAbierto.panel, csAbierto.anchor); else csCerrar();
+}, true);
+window.addEventListener('resize', () => {
+  if (csEscribiendo()) csUbicar(csAbierto.panel, csAbierto.anchor); else csCerrar();
+});
+document.addEventListener('keydown', (e) => {
+  if (csAbierto && (e.target === csAbierto.anchor || (csAbierto.buscador && e.target === csAbierto.buscador))) csAbierto.key(e);
+}, true);
 
 const valueDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
 const indexDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'selectedIndex');
@@ -763,7 +810,7 @@ function mejorarSelect(sel) {
       valueDesc.set.call(sel, v); sync();
       sel.dispatchEvent(new Event('input', { bubbles: true }));
       sel.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    }, { buscar: 'buscar' in sel.dataset });
   });
   btn.addEventListener('keydown', (e) => {
     if (!csAbierto && ['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); btn.click(); }

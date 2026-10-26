@@ -43,6 +43,7 @@ export default {
         { label: 'Nombre', sort: 'nombre', render: (c) => `<span class="cell-main">${esc(c.nombre)}</span>` },
         { label: 'Área', render: (c) => esc(c.area?.nombre || '—') },
         { label: 'Puesto', render: (c) => esc(c.puesto || '—') },
+        ...(admin ? [{ label: 'Edad', cls: 'num', sort: 'edad', render: (c) => (c.edad != null ? `${esc(c.edad)} años` : '<span class="muted">—</span>') }] : []),
         { label: 'Estado', render: (c) => (c.activo ? pill('Activo', 'ok') : pill('Inactivo', 'gray')) },
         ...(admin ? [{ label: 'Acciones', cls: 'actions', render: (c) => `<div class="row-actions">
           ${state.isMedico ? `<button class="icon-btn ok" data-ka="historial" data-id="${esc(c.id)}" title="Historial de atención" aria-label="Historial de atención">${icon('clipboard-list')}</button>` : ''}
@@ -53,7 +54,7 @@ export default {
       empty: { ico: 'users', title: 'Sin colaboradores registrados', text: 'Registra a los colaboradores para poder agendarles citas.',
         action: `<button class="btn primary" data-k="nuevo">${icon('user-plus')} Nuevo colaborador</button>` },
       fetch: async ({ from, to, sort, filters: f }) => {
-        let q = sb.from('colaboradores_med').select('id, num_empleado, nombre, puesto, activo, area_id, area:areas_med(nombre)', { count: 'exact' });
+        let q = sb.from('colaboradores_med').select('id, num_empleado, nombre, puesto, edad, activo, area_id, area:areas_med(nombre)', { count: 'exact' });
         const s = sanitizeSearch(f.q);
         if (s) q = q.or(`nombre.ilike.*${s}*,num_empleado.ilike.*${s}*`);
         if (f.area) q = q.eq('area_id', f.area);
@@ -254,14 +255,19 @@ export async function openColaboradorForm({ colaborador = null, nombre = '', are
           ${state.isAdmin ? '<small class="hint">¿No aparece? Elige “+ Registrar nueva área…”.</small>' : ''}</div>
         <div class="field full"><label for="k-puesto">Puesto</label>
           <input id="k-puesto" name="puesto" maxlength="100" autocomplete="off" value="${esc(c?.puesto || (editando ? '' : 'Auxiliar'))}"></div>
+        ${state.isAdmin ? `<div class="field"><label for="k-edad">Edad (años)</label>
+          <input id="k-edad" name="edad" type="number" inputmode="numeric" min="14" max="100" step="1" value="${esc(c?.edad ?? '')}">
+          <small class="hint">Opcional. El médico la actualiza al registrar una atención.</small></div>` : ''}
       </div>`,
     onOpen: ({ form }) => permitirNuevaArea(form.elements.area_id),
     onSubmit: async ({ form }) => {
       if (!checkForm(form, {
         nombre: (v) => (/[<>{}]/.test(v) ? 'El nombre contiene caracteres no permitidos.' : ''),
+        edad: (v) => (v !== '' && (!Number.isInteger(Number(v)) || Number(v) < 14 || Number(v) > 100) ? 'Edad entre 14 y 100 años.' : ''),
       })) return false;
       const v = formValues(form);
       const payload = { nombre: v.nombre.replace(/\s+/g, ' '), area_id: v.area_id, puesto: nullIfEmpty(v.puesto) };
+      if (state.isAdmin) payload.edad = v.edad === '' || v.edad == null ? null : Number(v.edad);
       const sel = 'id, nombre, num_empleado, area_id, area:areas_med(nombre)';
       const { data } = editando
         ? must(await sb.from('colaboradores_med').update(payload).eq('id', c.id).select(sel).single())
