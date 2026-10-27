@@ -23,7 +23,7 @@ const ROUTES = {
   inventario:     { mod: inventario,    icon: 'pill',             label: 'Inventario',     roles: ['admin'], mobile: true },
   examenes:       { mod: examenes,      icon: 'clipboard-check',  label: 'Exámenes médicos', roles: ['admin', 'usuario'], puede: () => state.puedeExamenes },
   reportes:       { mod: reportes,      icon: 'file-spreadsheet', label: 'Reportes',       roles: ['admin'] },
-  usuarios:       { mod: usuarios,      icon: 'user-cog',         label: 'Usuarios',       roles: ['admin'] },
+  usuarios:       { mod: usuarios,      icon: 'user-cog',         label: 'Usuarios',       roles: ['admin', 'usuario'] },
   bitacora:       { mod: bitacora,      icon: 'history',          label: 'Bitácora',       roles: ['admin'] },
   perfil:         { mod: perfil,        icon: 'circle-user',      label: 'Mi perfil',      roles: ['admin', 'usuario'], mobile: true },
 };

@@ -34,6 +34,8 @@ const TIPO = { ingreso: 'Examen de ingreso', egreso: 'Examen de egreso' };
 const estadoPill = (e) => pill(ESTADOS[e]?.[0] || e, ESTADOS[e]?.[1] || 'gray');
 const resultadoPill = (r) => (r ? pill(RESULTADOS[r].titulo, RESULTADOS[r].tono) : '<span class="muted">—</span>');
 const cuando = (x) => `${fmtDate(x.fecha)} · ${fmtTime(x.hora)} h`;
+// Folio por tipo: EX-IN-001 (ingreso) y EX-EG-001 (egreso), igual que v_examenes_med
+const folioTxt = (tipo, folio) => `EX-${tipo === 'egreso' ? 'EG' : 'IN'}-${String(folio).padStart(3, '0')}`;
 
 let root, table, tipoActual = 'ingreso';
 
@@ -74,6 +76,7 @@ export default {
         { label: 'Solicitó', render: (x) => `<span class="cell-sub">${esc(x.solicitante)}</span>` },
         { label: 'Acciones', cls: 'actions', render: (x) => accionesHTML(x) },
       ],
+      onRowClick: async (x) => { if (await openExamen(x.id) && root) table?.load(); },
       empty: { ico: 'clipboard-check', title: 'Aún no hay exámenes', text: 'Solicita un examen de ingreso para un candidato o de egreso para un colaborador.' },
       fetch: async ({ from, to, sort, filters: f }) => {
         let q = sb.from('v_examenes_med').select('*', { count: 'exact' }).eq('tipo', tipoActual);
@@ -145,14 +148,7 @@ async function accion(act, x) {
       case 'editar': return await openExamenForm({ examen: x });
       case 'registrar': return await openRegistrar(x);
       case 'constancia': await imprimirExamen(x.id); return false;
-      case 'confirmar': {
-        const ok = await confirmDialog({ title: 'Confirmar examen', confirmText: 'Confirmar',
-          message: `Se confirmará el ${TIPO[x.tipo].toLowerCase()} ${x.folio_txt} de ${x.persona} para el ${fmtLongDate(x.fecha)} a las ${fmtTime(x.hora)} h. Se avisará a quien lo solicitó.` });
-        if (!ok) return false;
-        must(await sb.from('examenes_med').update({ estado: 'confirmado' }).eq('id', x.id).select('id').single());
-        avisarExamen('examen_confirmado', x.id);
-        toast('Examen confirmado.', 'success'); return true;
-      }
+      case 'confirmar': return await openConfirmar(x);
       case 'cancelar': {
         const r = await confirmDialog({ title: 'Cancelar examen', danger: true, confirmText: 'Cancelar examen',
           message: `Se cancelará el ${TIPO[x.tipo].toLowerCase()} ${x.folio_txt} de ${x.persona}.`,
@@ -165,6 +161,34 @@ async function accion(act, x) {
       default: return false;
     }
   } catch (err) { console.error(err); toast(errMsg(err), 'error'); return false; }
+}
+
+// ---------- Confirmación (médico): puede ajustar la fecha y la hora solicitadas ----------
+function openConfirmar(x) {
+  const hoy = todayISO();
+  return openModal({
+    title: `Confirmar ${TIPO[x.tipo].toLowerCase()} ${x.folio_txt}`,
+    subtitle: `${x.persona} · ${[x.area, x.puesto].filter(Boolean).join(' · ')}`,
+    submitText: 'Confirmar examen',
+    body: `
+      <p class="hint">Horario solicitado: <b>${esc(fmtLongDate(x.fecha))} · ${esc(fmtTime(x.hora))} h</b>. Si no te es posible atenderlo a esa hora, cámbiala antes de confirmar.</p>
+      <div class="form-grid">
+        <div class="field"><label for="exc-fecha">Fecha <span class="req">*</span></label>
+          <input id="exc-fecha" name="fecha" type="date" required min="${hoy}" value="${esc(x.fecha < hoy ? hoy : x.fecha)}"></div>
+        <div class="field"><label for="exc-hora">Hora <span class="req">*</span></label>
+          <input id="exc-hora" name="hora" type="time" required step="60" value="${esc(fmtTime(x.hora))}"></div>
+      </div>
+      <p class="hint">Se avisará a ${esc(x.solicitante)} con el horario confirmado.</p>`,
+    onSubmit: async ({ form }) => {
+      if (!checkForm(form, { fecha: (v) => (v && v < hoy ? 'La fecha no puede ser pasada.' : '') })) return false;
+      const v = formValues(form);
+      const cambio = v.fecha !== x.fecha || v.hora !== fmtTime(x.hora);
+      must(await sb.from('examenes_med').update({ estado: 'confirmado', fecha: v.fecha, hora: v.hora }).eq('id', x.id).select('id').single());
+      avisarExamen('examen_confirmado', x.id);
+      toast(cambio ? `Examen confirmado con nuevo horario: ${fmtDate(v.fecha)} · ${v.hora} h.` : 'Examen confirmado.', 'success', 6000);
+      return true;
+    },
+  });
 }
 
 // ---------- Solicitud / edición ----------
@@ -232,7 +256,7 @@ export async function openExamenForm({ tipo = 'ingreso', examen = null } = {}) {
       const { data } = must(await sb.from('examenes_med').insert({ ...datos, tipo, ...(ing ? {} : { colaborador_id: v.colaborador_id }) })
         .select('id, folio, estado').single());
       avisarExamen('examen_nuevo', data.id);
-      toast(`${TIPO[tipo]} EX-${String(data.folio).padStart(5, '0')} ${data.estado === 'confirmado' ? 'programado' : 'solicitado a Servicio Médico'}.`, 'success', 6000);
+      toast(`${TIPO[tipo]} ${folioTxt(tipo, data.folio)} ${data.estado === 'confirmado' ? 'programado' : 'solicitado a Servicio Médico'}.`, 'success', 6000);
       return true;
     },
   });
@@ -328,6 +352,17 @@ async function openRegistrar(x) {
 }
 
 // ---------- Constancia (PDF desde el diálogo de impresión) ----------
+// Firma de la Jefatura de RH: el usuario activo de Recursos Humanos cuyo puesto
+// es de líder o jefe (hoy "Líder de RR.HH."); se toma de Usuarios para que se
+// actualice solo si cambia la persona.
+async function jefaturaRH() {
+  const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  try {
+    const { data } = await sb.from('usuarios_med').select('nombre, puesto, area:areas_med(nombre)').eq('activo', true);
+    const rh = (data || []).filter((u) => norm(u.area?.nombre) === 'recursos humanos');
+    return rh.find((u) => /^lider/.test(norm(u.puesto))) || rh.find((u) => /^(jef|gerente|coordinador)/.test(norm(u.puesto))) || null;
+  } catch { return null; }
+}
 export async function imprimirExamen(id) {
   let x;
   try { x = must(await sb.from('v_examenes_med').select('*').eq('id', id).single()).data; } catch (err) { toast(errMsg(err), 'error'); return; }
@@ -335,6 +370,7 @@ export async function imprimirExamen(id) {
   const ing = x.tipo === 'ingreso';
   const r = RESULTADOS[x.resultado];
   const persona = ing ? 'Candidato' : 'Colaborador';
+  const rh = await jefaturaRH();
   document.getElementById('print-area')?.remove();
   const el = document.createElement('div');
   el.id = 'print-area';
@@ -363,7 +399,7 @@ export async function imprimirExamen(id) {
     </section>
     <div class="exd-firmas">
       <div><span></span><b>${esc(x.atendio || 'Servicio Médico')}</b><small>Médico responsable · Servicio Médico</small></div>
-      <div><span></span><b>&nbsp;</b><small>Jefatura de Recursos Humanos</small></div>
+      <div><span></span><b>${rh ? esc(rh.nombre) : '&nbsp;'}</b><small>${rh?.puesto ? `${esc(rh.puesto)} · ` : ''}Jefatura de Recursos Humanos</small></div>
       <div><span></span><b>${esc(x.persona)}</b><small>${persona}</small></div>
     </div>
     <footer class="exd-pie">

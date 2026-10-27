@@ -90,13 +90,19 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v1.20:**
+  - **Exámenes:** folios por tipo `EX-IN-001` (ingreso) y `EX-EG-001` (egreso), con secuencias `examenes_med_ingreso_seq` / `examenes_med_egreso_seq` y folio único por tipo. Al confirmar, el médico puede ajustar la fecha y la hora solicitadas. Toda la fila de la tabla abre el detalle (`onRowClick` de `DataTable`). La constancia muestra en la firma de la Jefatura de RH al usuario activo de Recursos Humanos cuyo puesto empieza con "Líder" (hoy Fabiola Ramos, Líder de RR.HH.). Botones con colores corporativos (azul marino y gris pizarra).
+  - **Usuarios:** todos los usuarios ven la lista en solo lectura; alta, edición, activación y Configuración siguen siendo solo de administradores.
+  - **Bitácora:** foto y nombre de quien hizo la acción y una descripción breve ("Dr. Baraq Sánchez confirmó la cita de…") en lugar de la columna Campos (vista `v_bitacora_med`).
+  - **Gráficas:** al tocar o hacer clic en una gráfica del Panel se abre en grande sobre fondo limpio, con "Guardar imagen" (PNG; en celular abre el menú de compartir).
+  - **Datos:** se eliminó el examen de prueba del médico y se restauró el puesto de la colaboradora que había modificado.
 - **v1.19 · Exámenes médicos de ingreso y egreso** (vista "Exámenes médicos" y botones en el Panel):
   - **Acceso:** el médico y los usuarios de las áreas Servicio Médico, Procesos y Mejora continua y Recursos Humanos (`med_puede_examenes`, por nombre de área normalizado).
   - **Ingreso:** se solicita con candidato, área, puesto, fecha y hora. El médico confirma, reprograma o cancela, y registra el dictamen (APTO, NO APTO, APTO con restricciones, APTO con restricciones que no interfieren) con condiciones y restricciones. Si es APTO (cualquier variante), el candidato queda registrado como colaborador del área (reutiliza o reactiva uno con el mismo nombre en la misma área).
   - **Egreso:** se elige cualquier colaborador activo. Al registrar el resultado (sin hallazgos / con hallazgos), el colaborador queda desactivado.
   - **Constancia:** formato carta con logo, datos, dictamen en grande, condiciones y firmas (médico, Jefatura de RH y candidato/colaborador). Se genera con el diálogo de impresión ("Guardar como PDF").
   - **Avisos:** solicitud → médico; confirmación, reprogramación o cancelación → la contraparte; resultado → Recursos Humanos y quien lo solicitó (`notificar_med`, acción `examen`, registro en `avisos_examen_med`).
-  - Tabla `examenes_med` (folio EX-00001), trigger `med_validar_examen`, RPC `med_registrar_examen`, vista `v_examenes_med`. La bitácora no copia las condiciones/restricciones.
+  - Tabla `examenes_med` (folio EX-IN-001 / EX-EG-001 desde v1.20), trigger `med_validar_examen`, RPC `med_registrar_examen`, vista `v_examenes_med`. La bitácora no copia las condiciones/restricciones.
 - **v1.18:**
   - **Atención:** buscador dentro del menú de medicamentos (`data-buscar` en un `<select>` activa el buscador del menú propio; en celular no se enfoca solo, para que el teclado no se abra al tocar la flecha) y botón "Nuevo medicamento" que abre el mismo alta de Inventario y, si se registra con existencia, lo deja seleccionado.
   - **Edad:** el médico captura la edad al registrar la atención (`med_atender_cita(..., p_edad)`); se guarda en la atención y actualiza `colaboradores_med.edad`, visible y editable en Colaboradores (solo administradores). Rango aceptado: 14 a 100 años (supuesto ajustable).

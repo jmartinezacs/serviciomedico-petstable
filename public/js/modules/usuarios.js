@@ -1,5 +1,7 @@
 // =====================================================================
-// Administración de usuarios (solo administradores) y configuración.
+// Usuarios y configuración. Todos los usuarios ven la lista (solo lectura);
+// solo los administradores dan de alta, editan, activan o desactivan y
+// cambian la configuración (también lo valida RLS en usuarios_med).
 // Alta completa desde el sitio: nombre, correo, puesto, área, rol y foto.
 // Si el correo no tiene cuenta de acceso, se crea con una contraseña
 // temporal mediante la Edge Function "gestionar_usuarios_med" (la llave
@@ -17,13 +19,14 @@ const EMAIL_RE = /^[a-z0-9._%+-]+@petstable\.mx$/i;
 export default {
   async render(el) {
     root = el;
+    const adm = state.isAdmin;
     el.innerHTML = `
       <section class="page-intro">
-        <div><span class="eyebrow">Administración</span><h1>Usuarios</h1>
-          <p>Personas autorizadas para usar Servicio Médico: rol, puesto, foto y cuenta de acceso.</p></div>
-        <div class="page-actions"><button class="btn primary" data-u="nuevo">${icon('user-plus')} Nuevo usuario</button></div>
+        <div><span class="eyebrow">${adm ? 'Administración' : 'Equipo'}</span><h1>Usuarios</h1>
+          <p>${adm ? 'Personas autorizadas para usar Servicio Médico: rol, puesto, foto y cuenta de acceso.' : 'Personas que usan Servicio Médico. Solo los administradores pueden modificar esta lista.'}</p></div>
+        ${adm ? `<div class="page-actions"><button class="btn primary" data-u="nuevo">${icon('user-plus')} Nuevo usuario</button></div>` : ''}
       </section>
-      <div class="tabs" role="tablist">
+      <div class="tabs ${adm ? '' : 'hidden'}" role="tablist">
         <button role="tab" class="active" data-tab="usuarios">${icon('users')} Usuarios</button>
         <button role="tab" data-tab="config">${icon('settings')} Configuración</button>
       </div>
@@ -48,16 +51,16 @@ export default {
             <div class="cell-sub">${esc(u.email)}</div></div></div>` },
         { label: 'Puesto', sort: 'puesto', render: (u) => `<div class="puesto-txt">${esc(u.puesto || '—')}</div><div class="cell-sub">${esc(u.area?.nombre || '')}</div>` },
         { label: 'Rol', sort: 'rol', render: (u) => (u.rol === 'admin' ? pill('Administrador', 'orange') : pill('Usuario', 'info')) },
-        { label: 'Último acceso', render: (u) => cuentaHTML(u.email) },
+        ...(adm ? [{ label: 'Último acceso', render: (u) => cuentaHTML(u.email) }] : []),
         { label: 'Estado', sort: 'activo', render: (u) => (u.activo ? pill('Activo', 'ok') : pill('Inactivo', 'gray')) },
-        { label: 'Acciones', cls: 'actions', render: (u) => {
+        ...(!adm ? [] : [{ label: 'Acciones', cls: 'actions', render: (u) => {
           const sinCuenta = cuentas.get(u.email.toLowerCase())?.tiene_cuenta === false;
           return `<div class="row-actions">
             ${sinCuenta && u.activo ? `<button class="icon-btn ok" data-ua="cuenta" data-id="${esc(u.id)}" title="Crear cuenta de acceso" aria-label="Crear cuenta de acceso">${icon('key-round')}</button>` : ''}
             <button class="icon-btn" data-ua="editar" data-id="${esc(u.id)}" title="Editar" aria-label="Editar">${icon('pencil')}</button>
             ${u.id === state.profile.id ? '' : `<button class="icon-btn ${u.activo ? 'warn' : 'ok'}" data-ua="toggle" data-id="${esc(u.id)}" title="${u.activo ? 'Desactivar' : 'Activar'}" aria-label="${u.activo ? 'Desactivar' : 'Activar'}">${icon(u.activo ? 'user-x' : 'user-check')}</button>`}
           </div>`;
-        } },
+        } }]),
       ],
       empty: { ico: 'user-cog', title: 'Sin usuarios', text: 'Registra a las personas autorizadas.' },
       fetch: async ({ from, to, sort, filters: f }) => {
@@ -66,7 +69,7 @@ export default {
         if (s) q = q.or(`nombre.ilike.*${s}*,email.ilike.*${s}*,puesto.ilike.*${s}*`);
         if (f.rol) q = q.eq('rol', f.rol);
         if (f.activo) q = q.eq('activo', f.activo === 'true');
-        const [res, cu] = await Promise.all([paged(q, { from, to, sort }, [['nombre', true]]), sb.rpc('med_estado_cuentas')]);
+        const [res, cu] = await Promise.all([paged(q, { from, to, sort }, [['nombre', true]]), adm ? sb.rpc('med_estado_cuentas') : { error: true }]);
         must(res);
         if (!cu.error) cuentas = new Map((cu.data || []).map((c) => [c.email.toLowerCase(), c]));
         return { rows: res.data, count: res.count };
@@ -97,6 +100,7 @@ function cuentaHTML(email) {
 }
 
 async function onClick(e) {
+  if (!state.isAdmin) return;
   const t = e.target.closest('[data-tab]');
   if (t) {
     root.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('active', b === t));

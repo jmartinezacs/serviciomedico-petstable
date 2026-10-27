@@ -333,7 +333,7 @@ export function errorState(err, retryAction = 'retry') {
 export class DataTable {
   /**
    * @param {HTMLElement} el contenedor
-   * @param {{columns: Array, fetch: Function, pageSize?: number, sort?: {key:string, asc:boolean}, empty?: object, rowKey?: string}} opts
+   * @param {{columns: Array, fetch: Function, pageSize?: number, sort?: {key:string, asc:boolean}, empty?: object, rowKey?: string, onRowClick?: Function}} opts
    * columns: [{ key, label, sort?: 'columna', cls?, render(row) }]
    * fetch({ from, to, sort, filters }) => Promise<{ rows, count }>
    */
@@ -358,7 +358,13 @@ export class DataTable {
     }
     const pg = e.target.closest('[data-page]');
     if (pg && !pg.disabled) { this.page = Number(pg.dataset.page); this.load(); return; }
-    if (e.target.closest('[data-action="retry"]')) this.load();
+    if (e.target.closest('[data-action="retry"]')) { this.load(); return; }
+    // Fila completa clicable (opcional): abre el detalle salvo que se pulse un botón o control
+    const tr = this.o.onRowClick && e.target.closest('tbody tr[data-id]');
+    if (tr && !e.target.closest('button, a, input, select, textarea, label')) {
+      const r = this.row(tr.dataset.id);
+      if (r && !String(window.getSelection?.() || '')) this.o.onRowClick(r);
+    }
   }
   async load() {
     const t = ++this.token;
@@ -397,7 +403,7 @@ export class DataTable {
       const ind = c.sort ? `<span class="sort-ind">${sorted ? (this.sort.asc ? '▲' : '▼') : '↕'}</span>` : '';
       return `<th class="${c.cls || ''} ${c.sort ? 'sortable' : ''} ${sorted ? 'sorted' : ''}" ${c.sort ? `data-sort="${c.sort}" aria-sort="${sorted ? (this.sort.asc ? 'ascending' : 'descending') : 'none'}"` : ''}>${esc(c.label)}${ind}</th>`;
     }).join('');
-    const body = this.rows.map((r) => `<tr data-id="${esc(r[this.o.rowKey || 'id'])}">${columns.map((c) =>
+    const body = this.rows.map((r) => `<tr data-id="${esc(r[this.o.rowKey || 'id'])}"${this.o.onRowClick ? ' class="row-click" title="Ver detalle"' : ''}>${columns.map((c) =>
       `<td class="${c.cls || ''}" data-label="${esc(c.label)}"><div class="td-in">${c.render ? c.render(r) : esc(r[c.key])}</div></td>`).join('')}</tr>`).join('');
     const pages = Math.max(1, Math.ceil(this.count / this.size));
     const from = (this.page - 1) * this.size + 1, to = Math.min(this.count, this.page * this.size);
@@ -430,6 +436,7 @@ export function paged(q, { from, to, sort }, extraOrder = []) {
 
 // ---------- Gráficas ----------
 const charts = new Set();
+const chartConfigs = new WeakMap();
 export function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 export const PALETTE = ['#F58020', '#1BC7C7', '#0B2235', '#1BB56F', '#7A5BE6', '#E0464E', '#FFB020', '#5B8DEF'];
 // Etiqueta de datos: el valor centrado dentro de cada barra o segmento de pastel
@@ -442,7 +449,7 @@ const etiquetasDatos = {
     const { ctx } = chart;
     const horiz = chart.options.indexAxis === 'y';
     ctx.save();
-    ctx.font = '800 11px Inter, Segoe UI, system-ui, sans-serif';
+    ctx.font = `800 ${chart.canvas.dataset.zoom ? 15 : 11}px Inter, Segoe UI, system-ui, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     chart.data.datasets.forEach((ds, di) => {
       const meta = chart.getDatasetMeta(di);
@@ -497,6 +504,7 @@ export function makeChart(canvas, config) {
     },
   });
   charts.add(c);
+  chartConfigs.set(c, config);
   return c;
 }
 // Cambio de tema inmediato: re-colorea las gráficas sin volver a consultar datos
@@ -515,6 +523,110 @@ export function restyleCharts() {
   });
 }
 export function destroyCharts() { charts.forEach((c) => { try { c.destroy(); } catch { /* ya destruida */ } }); charts.clear(); }
+
+// ---------- Gráfica ampliada ----------
+// Al tocar o hacer clic en una gráfica se abre sola, en grande, sobre un fondo
+// limpio (útil para tomar captura) y con la opción de guardarla como imagen.
+let zoomAbierto = null;
+export function ampliarGrafica(canvas) {
+  const orig = window.Chart?.getChart(canvas);
+  const config = orig && chartConfigs.get(orig);
+  if (!config || zoomAbierto) return;
+  const card = canvas.closest('.card');
+  const titulo = card?.querySelector('.card-head h3')?.textContent.trim() || canvas.getAttribute('aria-label') || 'Gráfica';
+  const sub = card?.querySelector('.card-head p')?.textContent.trim() || '';
+  const total = card?.querySelector('.card-head .total-badge')?.textContent.trim() || '';
+  const ov = document.createElement('div');
+  ov.className = 'chart-zoom';
+  ov.setAttribute('role', 'dialog');
+  ov.setAttribute('aria-modal', 'true');
+  ov.setAttribute('aria-label', titulo);
+  ov.innerHTML = `
+    <div class="cz-card">
+      <div class="cz-head">
+        <div class="cz-tit"><h2>${esc(titulo)}</h2>${sub ? `<p>${esc(sub)}</p>` : ''}${total ? `<span class="total-badge">${esc(total)}</span>` : ''}</div>
+        <div class="cz-acts">
+          <button type="button" class="btn secondary" data-cz="png">${icon('image-down')} <span>Guardar imagen</span></button>
+          <button type="button" class="icon-btn" data-cz="cerrar" aria-label="Cerrar" title="Cerrar (Esc)">${icon('x')}</button>
+        </div>
+      </div>
+      <div class="cz-body"><canvas data-zoom="1" role="img" aria-label="${esc(titulo)}"></canvas></div>
+      <div class="cz-pie"><span>Servicio Médico · Pet's Table</span><span class="cz-girar">${icon('smartphone')} Gira el teléfono para verla más grande</span></div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.body.classList.add('modal-open');
+  refreshIcons();
+  const cfg = { ...config, data: JSON.parse(JSON.stringify(config.data)) };
+  cfg.data.datasets?.forEach((d) => { if (d.maxBarThickness) d.maxBarThickness = Math.round(d.maxBarThickness * 1.8); });
+  const zc = makeChart(ov.querySelector('canvas'), cfg);
+  charts.delete(zc);
+  // Letras más grandes en la vista ampliada
+  try {
+    for (const s of Object.values(zc.options.scales || {})) if (s.ticks) s.ticks.font = { size: 14, weight: '600' };
+    if (zc.options.plugins?.legend?.labels) zc.options.plugins.legend.labels.font = { size: 14 };
+    zc.update('none');
+  } catch { /* opciones no disponibles */ }
+  const cerrar = () => {
+    document.removeEventListener('keydown', onKey);
+    try { zc.destroy(); } catch { /* ya destruida */ }
+    ov.remove();
+    if (!document.querySelector('.modal')) document.body.classList.remove('modal-open');
+    zoomAbierto = null;
+    canvas.focus?.();
+  };
+  const onKey = (e) => { if (e.key === 'Escape') cerrar(); };
+  document.addEventListener('keydown', onKey);
+  ov.addEventListener('click', (e) => {
+    if (e.target === ov || e.target.closest('[data-cz="cerrar"]')) cerrar();
+    else if (e.target.closest('[data-cz="png"]')) guardarGrafica(zc, titulo, [sub, total].filter(Boolean).join(' · '));
+  });
+  zoomAbierto = cerrar;
+  ov.querySelector('[data-cz="cerrar"]').focus();
+}
+export function cerrarGraficaAmpliada() { zoomAbierto?.(); }
+window.addEventListener('hashchange', () => zoomAbierto?.());
+
+// Imagen PNG con título, subtítulo y la gráfica sobre fondo sólido
+async function guardarGrafica(chart, titulo, sub) {
+  const src = chart.canvas, esc2 = 2;
+  const w = src.width, h = src.height, pad = 24 * esc2, top = (sub ? 78 : 56) * esc2;
+  const c = document.createElement('canvas');
+  c.width = w + pad * 2; c.height = h + top + pad;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = cssVar('--card') || '#FFFFFF';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.fillStyle = cssVar('--text') || '#172431';
+  ctx.font = `800 ${22 * esc2}px Inter, Segoe UI, system-ui, sans-serif`;
+  ctx.textBaseline = 'top';
+  ctx.fillText(titulo, pad, pad);
+  if (sub) {
+    ctx.fillStyle = cssVar('--muted') || '#687B8C';
+    ctx.font = `500 ${14 * esc2}px Inter, Segoe UI, system-ui, sans-serif`;
+    ctx.fillText(sub, pad, pad + 32 * esc2);
+  }
+  ctx.drawImage(src, pad, top);
+  const nombre = `${titulo.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'grafica'}.png`;
+  const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+  if (!blob) { toast('No se pudo generar la imagen.', 'error'); return; }
+  const file = new File([blob], nombre, { type: 'image/png' });
+  // En celulares: compartir / guardar en fotos; en computadora: descarga directa
+  if (matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: titulo }); return; } catch (err) { if (err?.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: nombre });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  toast('Imagen de la gráfica guardada.', 'success');
+}
+document.addEventListener('click', (e) => {
+  const box = e.target.closest('.chart-box');
+  const cv = box?.querySelector('canvas');
+  if (cv && !e.target.closest('.chart-zoom')) ampliarGrafica(cv);
+});
+document.addEventListener('keydown', (e) => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.chart-box')) { e.preventDefault(); const cv = e.target.querySelector('canvas'); if (cv) ampliarGrafica(cv); }
+});
 
 // ---------- Catálogos en caché ligera ----------
 let areasCache = null;

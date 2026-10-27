@@ -257,7 +257,7 @@ function proximasHTML(prox) {
 function chartCard(id, title, sub, cls = '', total = null, label = 'Total de consultas') {
   const tb = total === null ? '' : `<span class="total-badge">${esc(label)}: <b>${fmtNum(total)}</b></span>`;
   return `<div class="card"><div class="card-head center"><div><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}${tb}</div></div>
-    <div class="chart-box ${cls}"><canvas id="${id}" role="img" aria-label="${esc(title)}"></canvas></div></div>`;
+    <div tabindex="0" title="Ampliar gráfica" class="chart-box ${cls}"><canvas id="${id}" role="img" aria-label="${esc(title)}"></canvas></div></div>`;
 }
 
 // Gráficas de consultas atendidas por padecimiento: toda la empresa y una por departamento
@@ -271,11 +271,11 @@ function padecimientosHTML(pad) {
   return `${head}
     <div class="card"><div class="card-head center"><div><h3>Toda la empresa</h3><p>Consultas atendidas en el periodo, por padecimiento</p>
       <span class="total-badge">Total de consultas: <b>${fmtNum(pad.total)}</b></span></div></div>
-      <div class="chart-box" ${alto(pad.general.length)}><canvas id="ch-pad-gen" role="img" aria-label="Consultas por padecimiento en toda la empresa"></canvas></div></div>
+      <div tabindex="0" title="Ampliar gráfica" class="chart-box" ${alto(pad.general.length)}><canvas id="ch-pad-gen" role="img" aria-label="Consultas por padecimiento en toda la empresa"></canvas></div></div>
     <div class="section-label">Por departamento</div>
     <div class="dept-grid">${pad.por_area.map((a, i) => `<div class="card"><div class="card-head center"><div><h3>${esc(a.area)}</h3>
       <span class="total-badge">Total de consultas: <b>${fmtNum(a.total)}</b></span></div></div>
-      <div class="chart-box" ${alto(a.items.length)}><canvas id="ch-pad-a${i}" role="img" aria-label="Consultas por padecimiento en ${esc(a.area)}"></canvas></div></div>`).join('')}</div>`;
+      <div tabindex="0" title="Ampliar gráfica" class="chart-box" ${alto(a.items.length)}><canvas id="ch-pad-a${i}" role="img" aria-label="Consultas por padecimiento en ${esc(a.area)}"></canvas></div></div>`).join('')}</div>`;
 }
 
 function adminHTML(k, prox, lotes, stock, act, pad) {
