@@ -7,6 +7,7 @@ import {
   sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, nullIfEmpty,
   DataTable, paged, sanitizeSearch, debounce, getAreas, invalidateAreas, pill, must, fmtNum,
   fmtDate, fmtTime, estadoPill, MOTIVOS, cantUnidad, refreshIcons, ganchos, permitirNuevaArea,
+  getPuestos, puestoOptionsHTML, permitirNuevoPuesto, invalidatePuestos,
 } from '../core.js';
 
 let root, table, areasTable;
@@ -235,7 +236,8 @@ function initAreas() {
 // ---------- Formularios ----------
 export async function openColaboradorForm({ colaborador = null, nombre = '', areaId = '' } = {}) {
   let areas;
-  try { areas = await getAreas({ soloActivas: true }); } catch (err) { toast(errMsg(err), 'error'); return false; }
+  let puestos;
+  try { [areas, puestos] = await Promise.all([getAreas({ soloActivas: true }), getPuestos()]); } catch (err) { toast(errMsg(err), 'error'); return false; }
   if (!areas.length && !state.isAdmin) { toast('Primero un administrador debe registrar al menos un área activa.', 'warning'); return false; }
   const c = colaborador || (areaId ? { area_id: areaId } : null);
   const editando = !!colaborador;
@@ -254,12 +256,17 @@ export async function openColaboradorForm({ colaborador = null, nombre = '', are
           </select>
           ${state.isAdmin ? '<small class="hint">¿No aparece? Elige “+ Registrar nueva área…”.</small>' : ''}</div>
         <div class="field full"><label for="k-puesto">Puesto</label>
-          <input id="k-puesto" name="puesto" maxlength="100" autocomplete="off" value="${esc(c?.puesto || (editando ? '' : 'Auxiliar'))}"></div>
+          <select id="k-puesto" name="puesto" data-buscar>${puestoOptionsHTML(puestos, c?.puesto || '')}</select>
+          <small class="hint">Al elegir el área se sugiere su puesto de auxiliar. ¿No aparece? Elige “+ Otro puesto…”.</small></div>
         ${state.isAdmin ? `<div class="field"><label for="k-edad">Edad (años)</label>
           <input id="k-edad" name="edad" type="number" inputmode="numeric" min="14" max="100" step="1" value="${esc(c?.edad ?? '')}">
           <small class="hint">Opcional. El médico la actualiza al registrar una atención.</small></div>` : ''}
       </div>`,
-    onOpen: ({ form }) => permitirNuevaArea(form.elements.area_id),
+    onOpen: ({ form }) => {
+      permitirNuevaArea(form.elements.area_id);
+      permitirNuevoPuesto(form.elements.puesto, form.elements.area_id);
+      if (!editando && form.elements.area_id.value) form.elements.area_id.dispatchEvent(new Event('change'));
+    },
     onSubmit: async ({ form }) => {
       if (!checkForm(form, {
         nombre: (v) => (/[<>{}]/.test(v) ? 'El nombre contiene caracteres no permitidos.' : ''),
@@ -272,6 +279,7 @@ export async function openColaboradorForm({ colaborador = null, nombre = '', are
       const { data } = editando
         ? must(await sb.from('colaboradores_med').update(payload).eq('id', c.id).select(sel).single())
         : must(await sb.from('colaboradores_med').insert(payload).select(sel).single());
+      invalidatePuestos();
       toast(editando ? 'Colaborador actualizado.' : `${data.nombre} registrado.`, 'success');
       return data;
     },

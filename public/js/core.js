@@ -641,6 +641,56 @@ export async function getAreas({ force = false, soloActivas = false } = {}) {
 export function invalidateAreas() { areasCache = null; }
 // Agrega a un <select> de áreas la opción "+ Registrar nueva área…" (solo administradores
 // pueden crear áreas); la nueva área queda seleccionada sin salir del formulario.
+// ---------- Puestos ----------
+// No hay tabla de puestos: el catálogo son los puestos de los colaboradores
+// activos (Auxiliar de producción, Auxiliar de logística, Inspector de calidad…).
+let puestosCache = null;
+export async function getPuestos() {
+  if (!puestosCache) {
+    const { data } = must(await sb.from('colaboradores_med').select('puesto').eq('activo', true).not('puesto', 'is', null).limit(5000));
+    puestosCache = [...new Set((data || []).map((r) => r.puesto.trim().replace(/\s+/g, ' ')).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+  }
+  return puestosCache;
+}
+export function invalidatePuestos() { puestosCache = null; }
+export function puestoOptionsHTML(puestos, actual = '') {
+  const lista = actual && !puestos.includes(actual) ? [...puestos, actual].sort((a, b) => a.localeCompare(b, 'es')) : puestos;
+  return `<option value="">Selecciona…</option>${lista.map((p) => `<option value="${esc(p)}" ${p === actual ? 'selected' : ''}>${esc(p)}</option>`).join('')}`;
+}
+// Opción "+ Otro puesto…" (escribe uno nuevo) y sugerencia "Auxiliar de <área>"
+// al elegir el área cuando aún no hay puesto.
+export function permitirNuevoPuesto(select, areaSelect = null) {
+  if (!select) return;
+  select.insertAdjacentHTML('beforeend', '<option value="__nuevo">+ Otro puesto…</option>');
+  let prev = select.value;
+  select.addEventListener('change', async () => {
+    if (select.value !== '__nuevo') { prev = select.value; return; }
+    const nuevo = await openModal({
+      title: 'Otro puesto', size: 'sm', submitText: 'Usar este puesto', confirmDiscard: false,
+      body: `<div class="field"><label for="np-nombre">Nombre del puesto <span class="req">*</span></label>
+        <input id="np-nombre" name="nombre" required minlength="2" maxlength="100" autocomplete="off" placeholder="Ej. Auxiliar de mantenimiento"></div>`,
+      onSubmit: async ({ form }) => {
+        if (!checkForm(form, { nombre: (v) => (/[<>{}]/.test(v) ? 'El puesto contiene caracteres no permitidos.' : '') })) return false;
+        const n = form.elements.nombre.value.trim().replace(/\s+/g, ' ');
+        return n.charAt(0).toUpperCase() + n.slice(1);
+      },
+    });
+    if (typeof nuevo === 'string' && nuevo) {
+      let o = [...select.options].find((x) => x.value.toLowerCase() === nuevo.toLowerCase());
+      if (!o) { o = new Option(nuevo, nuevo); select.insertBefore(o, select.querySelector('option[value="__nuevo"]')); }
+      prev = o.value;
+    }
+    select.value = prev;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  areaSelect?.addEventListener('change', () => {
+    if (select.value || !areaSelect.value || areaSelect.value.startsWith('__')) return;
+    const area = areaSelect.options[areaSelect.selectedIndex]?.textContent.trim().toLowerCase();
+    const o = [...select.options].find((x) => x.value.toLowerCase() === `auxiliar de ${area}`);
+    if (o) { select.value = o.value; prev = o.value; }
+  });
+}
+
 export function permitirNuevaArea(select) {
   if (!state.isAdmin || !select) return;
   select.insertAdjacentHTML('beforeend', '<option value="__nueva">+ Registrar nueva área…</option>');

@@ -1130,7 +1130,7 @@ body { transition: none; }
    ===================================================================== */
 .ex-btn { color: #fff; border: 0; font-weight: 800; }
 .ex-btn svg { width: 19px; height: 19px; }
-.ex-btn.ex-ingreso { background: linear-gradient(135deg, #0B2235, #1E4A70); box-shadow: 0 7px 16px rgba(11, 34, 53, .28); }
+.ex-btn.ex-ingreso { background: linear-gradient(135deg, #15803D, #22A355); box-shadow: 0 7px 16px rgba(21, 128, 61, .26); }
 .ex-btn.ex-egreso { background: linear-gradient(135deg, #3F4E5F, #6B7D91); box-shadow: 0 7px 16px rgba(63, 78, 95, .25); }
 .ex-btn:hover:not(:disabled) { color: #fff; filter: brightness(1.06); transform: translateY(-1px); }
 .avail-cta.con-examenes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto auto; grid-auto-flow: column; gap: 8px; }
@@ -1144,7 +1144,7 @@ body { transition: none; }
 .ex-form-head svg { width: 28px; height: 28px; flex: 0 0 auto; }
 .ex-form-head b { display: block; font-size: 15px; }
 .ex-form-head small { opacity: .9; }
-.ex-form-head.ex-ingreso { background: linear-gradient(135deg, #0B2235, #1E4A70); }
+.ex-form-head.ex-ingreso { background: linear-gradient(135deg, #15803D, #22A355); }
 .ex-form-head.ex-egreso { background: linear-gradient(135deg, #3F4E5F, #6B7D91); }
 
 /* Resultado en grande */
@@ -1282,3 +1282,10 @@ body { transition: none; }
   .cz-pie > span:first-child { display: none; }
 }
 @media (max-height: 480px) { .cz-card { padding: 10px 14px; gap: 6px; } .cz-tit p, .cz-pie { display: none; } }
+
+/* =====================================================================
+   v2.1 · Contador de exámenes por confirmar
+   ===================================================================== */
+.tab-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 4px; border-radius: 999px;
+  background: #F59E0B; color: #fff; font-size: 11.5px; font-weight: 800; line-height: 1; }
+.tab-count.hidden { display: none; }

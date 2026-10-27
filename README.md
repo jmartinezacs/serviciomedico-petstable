@@ -90,6 +90,10 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v2.1** (a partir de aquí la numeración pasa de 1.20 a 2.1):
+  - **Puestos:** catálogo tomado de los puestos de los colaboradores activos (`getPuestos` en core). Menú con buscador en el examen de ingreso (obligatorio) y en el alta/edición de colaboradores; "+ Otro puesto…" permite escribir uno nuevo; al elegir el área se sugiere "Auxiliar de <área>". El alta de colaboradores ya no propone "Auxiliar" genérico.
+  - **Exámenes:** botón y encabezado de ingreso en verde; contador de exámenes por confirmar en las pestañas Ingreso/Egreso; aviso de posible duplicado al solicitar un ingreso si el nombre ya es colaborador activo o ya tiene un ingreso abierto.
+  - **Datos:** los 71 colaboradores con puesto "Auxiliar" quedaron como "Auxiliar de <área>": producción (33), logística (31), calidad (5) y procesos y mejora continua (2).
 - **v1.20:**
   - **Exámenes:** folios por tipo `EX-IN-001` (ingreso) y `EX-EG-001` (egreso), con secuencias `examenes_med_ingreso_seq` / `examenes_med_egreso_seq` y folio único por tipo. Al confirmar, el médico puede ajustar la fecha y la hora solicitadas. Toda la fila de la tabla abre el detalle (`onRowClick` de `DataTable`). La constancia muestra en la firma de la Jefatura de RH al usuario activo de Recursos Humanos cuyo puesto empieza con "Líder" (hoy Fabiola Ramos, Líder de RR.HH.). Botones con colores corporativos (azul marino y gris pizarra).
   - **Usuarios:** todos los usuarios ven la lista en solo lectura; alta, edición, activación y Configuración siguen siendo solo de administradores.

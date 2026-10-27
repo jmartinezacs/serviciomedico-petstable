@@ -12,7 +12,7 @@
 import {
   sb, state, esc, icon, refreshIcons, toast, errMsg, openModal, confirmDialog, checkForm, formValues,
   nullIfEmpty, bindCounters, todayISO, fmtDate, fmtTime, fmtDateTime, fmtLongDate, pill, DataTable, paged,
-  sanitizeSearch, debounce, getAreas, must, avisarExamen,
+  sanitizeSearch, debounce, getAreas, must, avisarExamen, getPuestos, puestoOptionsHTML, permitirNuevoPuesto,
 } from '../core.js';
 import { colaboradorPicker } from './citas.js';
 
@@ -53,8 +53,8 @@ export default {
         </div>
       </section>
       <div class="tabs" role="tablist">
-        <button role="tab" data-tab="ingreso" class="${tipoActual === 'ingreso' ? 'active' : ''}">${icon('user-round-plus')} Ingreso</button>
-        <button role="tab" data-tab="egreso" class="${tipoActual === 'egreso' ? 'active' : ''}">${icon('user-round-minus')} Egreso</button>
+        <button role="tab" data-tab="ingreso" class="${tipoActual === 'ingreso' ? 'active' : ''}">${icon('user-round-plus')} Ingreso <span class="tab-count hidden" data-count="ingreso" title="Por confirmar"></span></button>
+        <button role="tab" data-tab="egreso" class="${tipoActual === 'egreso' ? 'active' : ''}">${icon('user-round-minus')} Egreso <span class="tab-count hidden" data-count="egreso" title="Por confirmar"></span></button>
       </div>
       <div class="card">
         <div class="toolbar">
@@ -79,6 +79,7 @@ export default {
       onRowClick: async (x) => { if (await openExamen(x.id) && root) table?.load(); },
       empty: { ico: 'clipboard-check', title: 'Aún no hay exámenes', text: 'Solicita un examen de ingreso para un candidato o de egreso para un colaborador.' },
       fetch: async ({ from, to, sort, filters: f }) => {
+        contarPendientes().catch(() => {});
         let q = sb.from('v_examenes_med').select('*', { count: 'exact' }).eq('tipo', tipoActual);
         const s = sanitizeSearch(f.q);
         if (s) q = q.or(`persona.ilike.*${s}*,folio_txt.ilike.*${s}*`);
@@ -123,6 +124,17 @@ async function onClick(e) {
   }
   const x = table?.row(b.dataset.id);
   if (x && await accion(act, x)) table?.load();
+}
+
+// Exámenes por confirmar en cada pestaña
+async function contarPendientes() {
+  const res = await Promise.all(['ingreso', 'egreso'].map((t) =>
+    sb.from('examenes_med').select('id', { count: 'exact', head: true }).eq('tipo', t).eq('estado', 'pendiente')));
+  ['ingreso', 'egreso'].forEach((t, i) => {
+    const el = root?.querySelector(`[data-count="${t}"]`);
+    const n = res[i].count || 0;
+    if (el) { el.textContent = n; el.classList.toggle('hidden', !n); el.setAttribute('aria-label', `${n} por confirmar`); }
+  });
 }
 
 function acciones(x) {
@@ -191,13 +203,30 @@ function openConfirmar(x) {
   });
 }
 
+// Antes de solicitar un ingreso: avisa si la persona ya es colaborador activo o
+// ya tiene un examen de ingreso abierto (evita registros duplicados).
+const normNombre = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+async function revisarDuplicado(candidato) {
+  const n = normNombre(candidato);
+  const [col, ex] = await Promise.all([
+    sb.from('colaboradores_med').select('nombre, puesto, area:areas_med(nombre)').eq('activo', true).eq('nombre_norm', n).limit(3),
+    sb.from('v_examenes_med').select('folio_txt, persona, fecha, estado').eq('tipo', 'ingreso').in('estado', ['pendiente', 'confirmado']),
+  ]);
+  const avisos = [];
+  for (const c of col.data || []) avisos.push(`${c.nombre} ya es colaborador activo (${[c.area?.nombre, c.puesto].filter(Boolean).join(' · ')}).`);
+  for (const e of (ex.data || []).filter((e) => normNombre(e.persona) === n)) avisos.push(`Ya tiene el examen de ingreso ${e.folio_txt} ${ESTADOS[e.estado][0].toLowerCase()} para el ${fmtDate(e.fecha)}.`);
+  if (!avisos.length) return true;
+  return confirmDialog({ title: 'Posible duplicado', confirmText: 'Solicitar de todos modos',
+    message: `${avisos.join(' ')} ¿Quieres solicitar el examen de ingreso de todos modos?` });
+}
+
 // ---------- Solicitud / edición ----------
 export async function openExamenForm({ tipo = 'ingreso', examen = null } = {}) {
   const x = examen;
   if (x) tipo = x.tipo;
-  let areas = [];
+  let areas = [], puestos = [];
   if (tipo === 'ingreso') {
-    try { areas = await getAreas({ soloActivas: true }); } catch (err) { toast(errMsg(err), 'error'); return false; }
+    try { [areas, puestos] = await Promise.all([getAreas({ soloActivas: true }), getPuestos()]); } catch (err) { toast(errMsg(err), 'error'); return false; }
   }
   const hoy = todayISO();
   const ing = tipo === 'ingreso';
@@ -217,7 +246,7 @@ export async function openExamenForm({ tipo = 'ingreso', examen = null } = {}) {
             <select id="ex-area" name="area_id" required><option value="">Selecciona…</option>
               ${areas.map((a) => `<option value="${esc(a.id)}" ${x?.area_id === a.id ? 'selected' : ''}>${esc(a.nombre)}</option>`).join('')}</select></div>
           <div class="field"><label for="ex-puesto">Puesto <span class="req">*</span></label>
-            <input id="ex-puesto" name="puesto" required minlength="2" maxlength="100" autocomplete="off" value="${esc(x?.puesto || '')}" placeholder="Ej. Operador de producción"></div>
+            <select id="ex-puesto" name="puesto" required data-buscar>${puestoOptionsHTML(puestos, x?.puesto || '')}</select></div>
         </div>`
       : `
         <div class="field"><label for="cf-col-search">Colaborador <span class="req">*</span></label>
@@ -235,6 +264,7 @@ export async function openExamenForm({ tipo = 'ingreso', examen = null } = {}) {
       ${ing && !x ? '<p class="hint">Si el médico dictamina al candidato como APTO, quedará registrado como colaborador del área para sus futuras citas.</p>' : ''}
       ${!ing && !x ? '<p class="hint">Al registrar el examen de egreso, el colaborador quedará dado de baja (desactivado) en el sistema.</p>' : ''}`,
     onOpen: ({ form }) => {
+      if (ing) permitirNuevoPuesto(form.elements.puesto, form.elements.area_id);
       if (!ing && !x) colaboradorPicker(form.querySelector('#ex-col'), form.elements.colaborador_id, { todos: true, nuevo: false });
     },
     onSubmit: async ({ form }) => {
@@ -253,6 +283,7 @@ export async function openExamenForm({ tipo = 'ingreso', examen = null } = {}) {
         toast('Examen actualizado.', 'success');
         return true;
       }
+      if (ing && !(await revisarDuplicado(datos.candidato))) return false;
       const { data } = must(await sb.from('examenes_med').insert({ ...datos, tipo, ...(ing ? {} : { colaborador_id: v.colaborador_id }) })
         .select('id, folio, estado').single());
       avisarExamen('examen_nuevo', data.id);
