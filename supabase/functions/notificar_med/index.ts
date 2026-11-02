@@ -1,13 +1,16 @@
 // Edge Function: notificar_med
 // Envía avisos de citas y de exámenes médicos (ingreso/egreso) por notificación
-// push (Web Push) y, si está configurado, por correo (Resend). La invoca el sitio
+// push (Web Push) y, si está configurado, por correo. La invoca el sitio
 // después de crear o cambiar una cita o un examen; la función valida en la base
-// de datos que el evento sea real y no duplicado.
+// de datos que el evento sea real y no duplicado. Los avisos de cita dirigidos a
+// quien solicitó también llegan a los usuarios de su misma área. En citas, el
+// correo se envía solo al confirmar.
 //
 // Variables opcionales (Supabase → Edge Functions → Secrets):
-//   RESEND_API_KEY  → habilita los correos
-//   MED_EMAIL_FROM  → remitente, p. ej. "Servicio Médico <avisos@petstable.mx>"
-//   MED_SITE_URL    → URL del sitio para los enlaces (p. ej. https://servicio-medico.vercel.app)
+//   GMAIL_USER          → cuenta de Google Workspace que envía (p. ej. javier.martinez@petstable.mx)
+//   GMAIL_APP_PASSWORD  → contraseña de aplicación de esa cuenta (no la contraseña normal)
+//   RESEND_API_KEY / MED_EMAIL_FROM → alternativa con Resend si no hay Gmail
+//   MED_SITE_URL        → URL del sitio para los enlaces (p. ej. https://servicio-medico.vercel.app)
 import webpush from 'npm:web-push@3.6.7';
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
@@ -68,25 +71,46 @@ async function enviarPush(admin: any, dest: Dest[], payload: Record<string, unkn
   return push;
 }
 
-// Correo opcional (Resend)
+// Correo opcional. Preferencia: Gmail / Google Workspace por SMTP seguro (puerto
+// 465; Supabase bloquea 25 y 587) con una contraseña de aplicación; si no está
+// configurado, Resend; si tampoco, no se envían correos.
+let smtp: { sendMail: (o: Record<string, unknown>) => Promise<unknown> } | null = null;
+async function transporteGmail() {
+  const user = Deno.env.get('GMAIL_USER'), pass = Deno.env.get('GMAIL_APP_PASSWORD');
+  if (!user || !pass) return null;
+  if (!smtp) {
+    const nodemailer = (await import('npm:nodemailer@6.9.16')).default;
+    smtp = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user, pass: pass.replace(/\s+/g, '') } });
+  }
+  return { t: smtp!, user };
+}
 async function enviarCorreo(dest: Dest[], title: string, msg: string, ruta: string) {
+  const gmail = await transporteGmail();
   const resend = Deno.env.get('RESEND_API_KEY');
-  if (!resend) return 0;
+  if (!gmail && !resend) return 0;
   let correo = 0;
   const site = (Deno.env.get('MED_SITE_URL') || '').replace(/\/$/, '');
-  const from = Deno.env.get('MED_EMAIL_FROM') || 'Servicio Médico <onboarding@resend.dev>';
   for (const d of dest) {
+    if (!d.email) continue;
     const html = `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:auto;border:1px solid #e3eaef;border-radius:14px;overflow:hidden">
       <div style="background:#090D12;color:#fff;padding:18px 22px"><b style="font-size:18px">Servicio Médico</b><br><span style="color:#8494A1;font-size:12px">Salud laboral · Pet's Table S.A. de C.V.</span></div>
       <div style="padding:22px"><p style="margin:0 0 6px;color:#F58020;font-weight:800">${esc(title)}</p>
       <p style="margin:0 0 16px;color:#172431">Hola ${esc(d.nombre)},<br>${esc(msg)}</p>
       ${site ? `<a href="${esc(site)}/${esc(ruta)}" style="display:inline-block;background:#F58020;color:#fff;text-decoration:none;padding:10px 16px;border-radius:10px;font-weight:800">Ver en el sistema</a>` : ''}
       <p style="margin:18px 0 0;color:#687B8C;font-size:11px">Aviso automático. No contiene información clínica.</p></div></div>`;
-    const r = await fetch('https://api.resend.com/emails', {
-      method: 'POST', headers: { Authorization: `Bearer ${resend}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [d.email], subject: title, html }),
-    });
-    if (r.ok) correo++; else console.error('correo', r.status, await r.text());
+    try {
+      if (gmail) {
+        await gmail.t.sendMail({ from: `"Servicio Médico · Pet's Table" <${gmail.user}>`, to: d.email, subject: title, text: `Hola ${d.nombre},\n${msg}${site ? `\n\n${site}/${ruta}` : ''}`, html });
+        correo++;
+      } else {
+        const from = Deno.env.get('MED_EMAIL_FROM') || 'Servicio Médico <onboarding@resend.dev>';
+        const r = await fetch('https://api.resend.com/emails', {
+          method: 'POST', headers: { Authorization: `Bearer ${resend}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from, to: [d.email], subject: title, html }),
+        });
+        if (r.ok) correo++; else console.error('correo', r.status, await r.text());
+      }
+    } catch (e) { console.error('correo', (e as Error).message); }
   }
   return correo;
 }
@@ -210,7 +234,18 @@ Deno.serve(async (req) => {
       dest = data || [];
     }
     dest = dest.filter((d) => d.id !== yo.id);
-    if (!dest.length) return json(200, { ok: true, enviados: 0, motivo: 'Sin destinatarios' });
+    // Compañeros del área de quien solicitó (p. ej. supervisores de otro turno):
+    // también se enteran de la confirmación, cancelación o reprogramación.
+    let area: Dest[] = [];
+    if (!haciaMedico) {
+      const { data: sol } = await admin.from('usuarios_med').select('area_id').eq('id', c.solicitado_por).maybeSingle();
+      if (sol?.area_id) {
+        const { data } = await admin.from('usuarios_med').select('id, email, nombre').eq('activo', true).eq('area_id', sol.area_id)
+          .eq('es_medico', false).neq('id', c.solicitado_por);
+        area = (data || []).filter((d) => d.id !== yo.id);
+      }
+    }
+    if (!dest.length && !area.length) return json(200, { ok: true, enviados: 0, motivo: 'Sin destinatarios' });
 
     // Evita duplicados (misma cita, evento y fecha/hora)
     const clave = evento === 'reprogramada' ? `${c.fecha} ${c.hora}` : 'u';
@@ -230,8 +265,15 @@ Deno.serve(async (req) => {
       reprogramada: [`Cita ${c.folio_txt} reprogramada`, `La cita de ${c.colaborador} ahora es el ${cuando}.`],
     };
     const [title, msg] = txt[evento];
-    const push = await enviarPush(admin, dest, { title, body: msg, url: `/#/citas?cita=${c.id}`, tag: `${c.id}-${evento}`, foto });
-    const correo = await enviarCorreo(dest, title, msg, '#/citas');
+    const payload = { url: `/#/citas?cita=${c.id}`, tag: `${c.id}-${evento}`, foto };
+    const msgArea = `${msg} Solicitó: ${c.solicitante}.`;
+    let push = await enviarPush(admin, dest, { ...payload, title, body: msg });
+    if (area.length) push += await enviarPush(admin, area, { ...payload, title, body: msgArea });
+    // Correo solo al confirmar (a quien solicitó y a su área)
+    let correo = 0;
+    if (evento === 'confirmada') {
+      correo = await enviarCorreo(dest, title, msg, `#/citas?cita=${c.id}`) + await enviarCorreo(area, title, msgArea, `#/citas?cita=${c.id}`);
+    }
     await admin.from('avisos_med').update({ enviados_push: push, enviados_correo: correo }).eq('id', ins.data!.id);
     return json(200, { ok: true, push, correo });
   } catch (e) {

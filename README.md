@@ -90,6 +90,11 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v2.2:**
+  - **Citas del área:** cada usuario ve, en solo lectura, las citas solicitadas por usuarios de su misma área (`med_misma_area` en la política `citas_med_sel`); modificar o cancelar sigue siendo solo de quien la solicitó. Las atenciones (datos clínicos) siguen siendo solo del médico.
+  - **Avisos al área:** cuando el médico confirma, cancela o reprograma una cita, además de quien la solicitó se avisa a los demás usuarios activos de su área (p. ej. supervisores de otro turno), con "Solicitó: …".
+  - **Correo al confirmar:** `notificar_med` envía correo desde una cuenta de Google Workspace por SMTP seguro (smtp.gmail.com:465) con los secretos `GMAIL_USER` y `GMAIL_APP_PASSWORD` (contraseña de aplicación); si no están, usa Resend si está configurado. En citas, el correo se envía solo al confirmar (a quien solicitó y a su área).
+  - **Datos:** CM-00025 trasladada de "Heydi Castro" (Limpieza, duplicada) a "Heidy Castro" (Procesos y Mejora continua) y duplicada eliminada; se eliminaron CM-00019 y CM-00024 (el médico para sí mismo, sin medicamentos). CM-00021 se conserva (tiene medicamentos entregados; pendiente de aclarar).
 - **v2.1** (a partir de aquí la numeración pasa de 1.20 a 2.1):
   - **Puestos:** catálogo tomado de los puestos de los colaboradores activos (`getPuestos` en core). Menú con buscador en el examen de ingreso (obligatorio) y en el alta/edición de colaboradores; "+ Otro puesto…" permite escribir uno nuevo; al elegir el área se sugiere "Auxiliar de <área>". El alta de colaboradores ya no propone "Auxiliar" genérico.
   - **Exámenes:** botón y encabezado de ingreso en verde; contador de exámenes por confirmar en las pestañas Ingreso/Egreso; aviso de posible duplicado al solicitar un ingreso si el nombre ya es colaborador activo o ya tiene un ingreso abierto.

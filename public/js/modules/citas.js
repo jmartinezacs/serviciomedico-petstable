@@ -25,7 +25,7 @@ export default {
       <section class="page-intro">
         <div><span class="eyebrow">Citas médicas</span>
           <h1>${admin ? 'Citas' : 'Mis citas'}</h1>
-          <p>${admin ? 'Solicitudes, confirmaciones y atención del servicio médico.' : 'Citas que has solicitado para ti o para colaboradores.'}</p></div>
+          <p>${admin ? 'Solicitudes, confirmaciones y atención del servicio médico.' : 'Citas que tú o los usuarios de tu área han solicitado. Solo puedes modificar las que tú solicitaste.'}</p></div>
         <div class="page-actions">
           ${admin ? `<button class="btn secondary" data-c="bloqueos">${icon('calendar-off')} Días sin servicio</button>` : ''}
           <button class="btn primary" data-c="nueva">${icon('calendar-plus')} ${admin ? 'Nueva cita' : 'Solicitar cita'}</button>
@@ -96,7 +96,7 @@ function columns() {
     { label: 'Motivo', render: (c) => esc(MOTIVOS[c.motivo] || c.motivo) },
     { label: 'Estado', sort: 'estado', render: (c) => `${estadoPill(c.estado)}${c.tipo === 'urgente' ? ` ${pill('Urgente', 'bad')}` : ''}` },
   ];
-  if (state.isAdmin) cols.push({ label: 'Solicitó', render: (c) => `<span class="cell-sub">${esc(c.solicitante)}</span>` });
+  cols.push({ label: 'Solicitó', render: (c) => `<span class="cell-sub">${c.solicitado_por === state.profile.id && !state.isAdmin ? 'Tú' : esc(c.solicitante)}</span>` });
   cols.push({ label: 'Acciones', cls: 'actions', render: (c) => actionsHTML(c) });
   return cols;
 }
@@ -342,7 +342,7 @@ async function renderAgenda() {
         <div class="agenda-slot ${pasada ? 'past' : ''}">
           <span class="hora">${esc(fmtTime(c.hora))}</span>
           <div class="who"><b>${esc(c.colaborador)} ${estadoPill(c.estado)}</b>
-            <span>${esc(c.folio_txt)} · ${esc(MOTIVOS[c.motivo] || c.motivo)} · ${esc(c.area)}${state.isAdmin ? ` · Solicitó ${esc(c.solicitante)}` : ''}</span></div>
+            <span>${esc(c.folio_txt)} · ${esc(MOTIVOS[c.motivo] || c.motivo)} · ${esc(c.area)}${state.isAdmin || c.solicitado_por !== state.profile.id ? ` · Solicitó ${esc(c.solicitante)}` : ''}</span></div>
           ${actionsHTML(c)}
         </div>`).join('');
       const active = here.some((c) => ['pendiente', 'confirmada', 'atendida'].includes(c.estado));
@@ -362,10 +362,10 @@ async function renderAgenda() {
       <div class="agenda" style="margin-bottom:14px">${urgentes.map((c) => `<div class="agenda-slot urg">
         <span class="hora">${c.hora ? fmtTime(c.hora) : '—'}</span>
         <div class="who"><b>${esc(c.colaborador)} ${estadoPill(c.estado)} ${c.tipo === 'urgente' ? pill('Urgente', 'bad') : ''}</b>
-          <span>${esc(c.folio_txt)} · ${esc(c.hora ? 'Horario especial' : 'Horario por asignar')} · ${esc(c.area)}${state.isAdmin ? ` · Solicitó ${esc(c.solicitante)}` : ''}</span></div>
+          <span>${esc(c.folio_txt)} · ${esc(c.hora ? 'Horario especial' : 'Horario por asignar')} · ${esc(c.area)}${state.isAdmin || c.solicitado_por !== state.profile.id ? ` · Solicitó ${esc(c.solicitante)}` : ''}</span></div>
         ${actionsHTML(c)}</div>`).join('')}</div>` : '';
     const bloqHTML = bloqueos.length ? `<div class="notice warn">${icon('calendar-off')}<span><b>Sin servicio:</b> ${bloqueos.map((b) => `${esc(bloqueoTxt(b))} · ${esc(b.motivo)}`).join('; ')}</span></div>` : '';
-    body.innerHTML = `${bloqHTML}${urgHTML}<p class="hint" style="margin:0 0 10px">${fmtNum(ocupados.size)} de ${SLOTS.length} horarios ocupados${state.isAdmin ? '' : ` · ${fmtNum(total)} cita(s) tuyas este día`}.</p>
+    body.innerHTML = `${bloqHTML}${urgHTML}<p class="hint" style="margin:0 0 10px">${fmtNum(ocupados.size)} de ${SLOTS.length} horarios ocupados${state.isAdmin ? '' : ` · ${fmtNum(total)} cita(s) tuyas o de tu área este día`}.</p>
       <div class="agenda">${rows.join('')}</div>`;
     refreshIcons();
   } catch (err) {
@@ -431,7 +431,7 @@ async function renderSemana() {
       return `<div class="wk-cell free"><button type="button" data-c="agendar" data-fecha="${d}" data-hora="${s}" aria-label="Agendar ${DIAS[i]} ${s}">${icon('plus')}</button></div>`;
     }).join('')}`).join('');
     body.innerHTML = `<div class="wk-scroll"><div class="wk-grid"><div class="wk-hora"></div>${head}${urgRow}${filas}</div></div>
-      <p class="hint" style="margin:10px 0 0">Toca una cita para ver el detalle o un espacio libre (+) para agendar. ${state.isAdmin ? '' : 'Solo ves el nombre de las citas que tú solicitaste.'}</p>`;
+      <p class="hint" style="margin:10px 0 0">Toca una cita para ver el detalle o un espacio libre (+) para agendar. ${state.isAdmin ? '' : 'Solo ves el nombre de las citas que tú o tu área solicitaron.'}</p>`;
     refreshIcons();
   } catch (err) {
     if (t !== semanaToken) return;

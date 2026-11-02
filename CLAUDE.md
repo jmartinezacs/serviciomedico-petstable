@@ -114,6 +114,7 @@ Other frontend files:
 - **Colaboradores and users.** Every `usuarios_med` row has a linked colaborador through `colaboradores_med.usuario_id`. The trigger `usuarios_med_colaborador` keeps its name, area and puesto in sync.
 - **Citas.**
   - Who can book: a non-admin may only book a cita for themselves or for a colaborador of their own area, enforced by `med_puede_citar` in the trigger. Admins may book for anyone.
+  - Who can see: admins see all; a user sees the citas they requested plus, read-only, those requested by users of their own area (`med_misma_area` in `citas_med_sel`).
   - `tipo` is `normal` or `urgente`.
   - Normal citas use 20-min slots on weekdays, 09:00 to 17:40 (`med_es_bloque`, checked in the trigger). The doctor's lunch break (`config_med.comida_inicio/fin`, default 15:00–16:00) blocks slots through `med_motivo_bloqueo`; `getBloqueos` adds it as a pseudo-block (pass `{ comida: false }` to skip it), and `recordatorios_med` notifies all users when it starts (`avisos_comida_med`, once per day). The doctor may book or reschedule a normal cita at any time; the frontend maps such a time to its block with `slotDe` in `core.js`. A partial unique index on `(fecha, hora)` prevents double booking.
   - Push subscriptions belong to the device, not the session. Logout keeps them. On login, `push.sincronizar()` relinks the endpoint to the signed-in user through the RPC `med_vincular_push`, or re-subscribes if permission is already granted. Only "Desactivar en este dispositivo" unsubscribes, and it sets the pref `med.push.off`. Cita push URLs are `/#/citas?cita=<id>`, which opens the detail.
@@ -140,7 +141,7 @@ Other frontend files:
 ### Edge Functions (`supabase/functions/`, deployed via MCP)
 
 - **`gestionar_usuarios_med`** is admin-only and creates Auth accounts. It is the only code that uses the service role for that.
-- **`notificar_med`** sends Web Push (`npm:web-push`) and optional Resend email for cita events.
+- **`notificar_med`** sends Web Push (`npm:web-push`) and optional email. Email prefers Gmail SMTP on port 465 (secrets `GMAIL_USER`, `GMAIL_APP_PASSWORD`; Supabase blocks 25/587) and falls back to Resend. For citas, email goes only on `confirmada`. Cita notices addressed to the requester also go to the other active users of the requester's area.
   - It is called from the frontend through `avisar(evento, citaId)`.
   - It re-checks that the event really happened before sending.
   - Resend needs the secrets `RESEND_API_KEY`, `MED_EMAIL_FROM` and `MED_SITE_URL`.
