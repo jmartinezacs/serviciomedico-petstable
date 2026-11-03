@@ -74,6 +74,7 @@ async function enviarPush(admin: any, dest: Dest[], payload: Record<string, unkn
 // Correo opcional. Preferencia: Gmail / Google Workspace por SMTP seguro (puerto
 // 465; Supabase bloquea 25 y 587) con una contraseña de aplicación; si no está
 // configurado, Resend; si tampoco, no se envían correos.
+type Correo = { estado?: string; tono?: 'ok' | 'warn' | 'bad' | 'info'; detalles?: [string, string][]; nota?: string; boton?: string };
 let smtp: { sendMail: (o: Record<string, unknown>) => Promise<unknown> } | null = null;
 async function transporteGmail() {
   const user = Deno.env.get('GMAIL_USER'), pass = Deno.env.get('GMAIL_APP_PASSWORD');
@@ -84,7 +85,50 @@ async function transporteGmail() {
   }
   return { t: smtp!, user };
 }
-async function enviarCorreo(dest: Dest[], title: string, msg: string, ruta: string) {
+const correoConfigurado = () => !!(Deno.env.get('GMAIL_USER') && Deno.env.get('GMAIL_APP_PASSWORD')) || !!Deno.env.get('RESEND_API_KEY');
+const fechaLarga = (iso: string) => {
+  const s = new Intl.DateTimeFormat('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
+
+// Plantilla HTML (tablas y estilos en línea para que se vea igual en Gmail, Outlook y celular)
+function plantillaCorreo(nombre: string, title: string, msg: string, ruta: string, o: Correo = {}) {
+  const site = (Deno.env.get('MED_SITE_URL') || '').replace(/\/$/, '');
+  const tonos = { ok: ['#E8F7EE', '#15803D'], warn: ['#FFF4E5', '#B45309'], bad: ['#FDECEC', '#B91C1C'], info: ['#E6F8F8', '#0E7C7C'] };
+  const [fondo, color] = tonos[o.tono || 'info'];
+  const filas = (o.detalles || []).map(([k, v], i) => `
+    <tr><td style="padding:10px 14px;${i ? 'border-top:1px solid #E8EDF1;' : ''}color:#687B8C;font-size:13px;width:38%;vertical-align:top">${esc(k)}</td>
+        <td style="padding:10px 14px;${i ? 'border-top:1px solid #E8EDF1;' : ''}color:#172431;font-size:14px;font-weight:700;vertical-align:top">${esc(v)}</td></tr>`).join('');
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title></head>
+<body style="margin:0;padding:0;background:#EEF2F5;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased">
+<div style="display:none;max-height:0;overflow:hidden">${esc(msg)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF2F5;padding:28px 12px"><tr><td align="center">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 6px 24px rgba(11,34,53,.08)">
+    <tr><td style="height:5px;background:#F58020;line-height:5px;font-size:0">&nbsp;</td></tr>
+    <tr><td style="background:#0B2235;padding:20px 26px">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+        ${site ? `<td style="padding-right:14px;vertical-align:middle"><img src="${esc(site)}/apple-touch-icon.png" width="46" height="46" alt="" style="display:block;border-radius:12px;border:0"></td>` : ''}
+        <td style="vertical-align:middle"><div style="color:#FFFFFF;font-size:19px;font-weight:800;letter-spacing:.2px">Servicio Médico</div>
+          <div style="color:#9FB3C2;font-size:12.5px;margin-top:2px">Salud laboral · Pet's Table S.A. de C.V.</div></td>
+      </tr></table></td></tr>
+    <tr><td style="padding:28px 26px 8px">
+      ${o.estado ? `<span style="display:inline-block;background:${fondo};color:${color};font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:6px 12px;border-radius:999px">${esc(o.estado)}</span>` : ''}
+      <h1 style="margin:14px 0 6px;color:#0B2235;font-size:22px;line-height:1.3">${esc(title)}</h1>
+      <p style="margin:0 0 4px;color:#172431;font-size:15px;line-height:1.55">Hola <b>${esc(nombre)}</b>,</p>
+      <p style="margin:0 0 18px;color:#3B4C5A;font-size:15px;line-height:1.55">${esc(msg)}</p>
+    </td></tr>
+    ${filas ? `<tr><td style="padding:0 26px 6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E1E8EE;border-radius:12px;border-collapse:separate;background:#FAFCFD">${filas}</table></td></tr>` : ''}
+    ${o.nota ? `<tr><td style="padding:14px 26px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#FFF7EF;border-left:4px solid #F58020;border-radius:8px;padding:12px 14px;color:#5A4632;font-size:13.5px;line-height:1.5">${esc(o.nota)}</td></tr></table></td></tr>` : ''}
+    ${site ? `<tr><td style="padding:22px 26px 6px"><a href="${esc(site)}/${esc(ruta)}" style="display:inline-block;background:#F58020;color:#FFFFFF;text-decoration:none;padding:13px 22px;border-radius:10px;font-weight:800;font-size:15px">${esc(o.boton || 'Ver en el sistema')}</a></td></tr>` : ''}
+    <tr><td style="padding:24px 26px 26px"><div style="border-top:1px solid #E8EDF1;padding-top:16px;color:#8494A1;font-size:12px;line-height:1.55">
+      Este es un aviso automático de Servicio Médico de Pet's Table. No contiene información clínica.<br>
+      Si tienes dudas, acude al consultorio o responde a este correo.</div></td></tr>
+  </table>
+  <div style="color:#9AA9B5;font-size:11px;margin-top:14px">© ${new Date().getFullYear()} Pet's Table S.A. de C.V.</div>
+</td></tr></table></body></html>`;
+}
+
+async function enviarCorreo(dest: Dest[], title: string, msg: string, ruta: string, o: Correo = {}) {
   const gmail = await transporteGmail();
   const resend = Deno.env.get('RESEND_API_KEY');
   if (!gmail && !resend) return 0;
@@ -92,27 +136,41 @@ async function enviarCorreo(dest: Dest[], title: string, msg: string, ruta: stri
   const site = (Deno.env.get('MED_SITE_URL') || '').replace(/\/$/, '');
   for (const d of dest) {
     if (!d.email) continue;
-    const html = `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:auto;border:1px solid #e3eaef;border-radius:14px;overflow:hidden">
-      <div style="background:#090D12;color:#fff;padding:18px 22px"><b style="font-size:18px">Servicio Médico</b><br><span style="color:#8494A1;font-size:12px">Salud laboral · Pet's Table S.A. de C.V.</span></div>
-      <div style="padding:22px"><p style="margin:0 0 6px;color:#F58020;font-weight:800">${esc(title)}</p>
-      <p style="margin:0 0 16px;color:#172431">Hola ${esc(d.nombre)},<br>${esc(msg)}</p>
-      ${site ? `<a href="${esc(site)}/${esc(ruta)}" style="display:inline-block;background:#F58020;color:#fff;text-decoration:none;padding:10px 16px;border-radius:10px;font-weight:800">Ver en el sistema</a>` : ''}
-      <p style="margin:18px 0 0;color:#687B8C;font-size:11px">Aviso automático. No contiene información clínica.</p></div></div>`;
+    const html = plantillaCorreo(d.nombre, title, msg, ruta, o);
+    const texto = [`Hola ${d.nombre},`, msg, ...(o.detalles || []).map(([k, v]) => `${k}: ${v}`), o.nota || '', site ? `${site}/${ruta}` : ''].filter(Boolean).join('\n');
     try {
       if (gmail) {
-        await gmail.t.sendMail({ from: `"Servicio Médico · Pet's Table" <${gmail.user}>`, to: d.email, subject: title, text: `Hola ${d.nombre},\n${msg}${site ? `\n\n${site}/${ruta}` : ''}`, html });
+        await gmail.t.sendMail({ from: `"Servicio Médico · Pet's Table" <${gmail.user}>`, to: d.email, subject: title, text: texto, html });
         correo++;
       } else {
         const from = Deno.env.get('MED_EMAIL_FROM') || 'Servicio Médico <onboarding@resend.dev>';
         const r = await fetch('https://api.resend.com/emails', {
           method: 'POST', headers: { Authorization: `Bearer ${resend}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from, to: [d.email], subject: title, html }),
+          body: JSON.stringify({ from, to: [d.email], subject: title, html, text: texto }),
         });
         if (r.ok) correo++; else console.error('correo', r.status, await r.text());
       }
     } catch (e) { console.error('correo', (e as Error).message); }
   }
   return correo;
+}
+
+// Datos del correo de cita confirmada (real y de prueba)
+// deno-lint-ignore no-explicit-any
+function correoConfirmada(c: any, conSolicitante: boolean): [string, string, Correo] {
+  const urg = c.tipo === 'urgente';
+  return [`Cita ${c.folio_txt} confirmada`,
+    urg ? `Servicio Médico atenderá la cita urgente de ${c.colaborador}.` : `Servicio Médico confirmó la cita de ${c.colaborador}. Estos son los datos:`,
+    {
+      estado: urg ? 'Cita urgente confirmada' : 'Cita confirmada', tono: 'ok', boton: 'Ver la cita',
+      detalles: [
+        ['Folio', c.folio_txt], ['Colaborador', c.colaborador], ['Área', c.area || '—'],
+        ['Fecha', fechaLarga(c.fecha)], ['Hora', c.hora ? `${hora(c.hora)} h` : 'Por asignar'],
+        ['Motivo', MOTIVOS[c.motivo] || c.motivo || '—'],
+        ...(conSolicitante ? [['Solicitó', c.solicitante] as [string, string]] : []),
+      ],
+      nota: 'Pide al colaborador presentarse puntualmente en el consultorio de Servicio Médico. Si ya no podrá asistir, cancela o reprograma la cita desde el sistema para liberar el horario.',
+    }];
 }
 
 Deno.serve(async (req) => {
@@ -138,6 +196,21 @@ Deno.serve(async (req) => {
     if (body.accion === 'init') {
       const k = await asegurarClaves(admin);
       return json(200, { publica: k.vapid_publica });
+    }
+
+    // Correo de prueba (solo administradores): con vista=true devuelve el HTML
+    // sin enviarlo; si no, lo envía únicamente al correo de quien lo pide.
+    if (body.accion === 'correo_prueba') {
+      if (yo.rol !== 'admin') return json(403, { error: 'Solo para administradores.' });
+      const manana = new Date(Date.now() - 6 * 3600 * 1000 + 24 * 3600 * 1000).toISOString().slice(0, 10);
+      const ej = { folio_txt: 'CM-00000', colaborador: 'Juan Pérez López', area: 'Producción', fecha: manana, hora: '10:20:00',
+        motivo: 'consulta_general', tipo: 'normal', solicitante: yo.nombre };
+      const [t, m, o] = correoConfirmada(ej, false);
+      const titulo = `[Prueba] ${t}`;
+      if (body.vista) return json(200, { html: plantillaCorreo(yo.nombre, titulo, m, '#/citas', o), configurado: correoConfigurado(), asunto: titulo });
+      if (!correoConfigurado()) return json(200, { ok: false, configurado: false });
+      const n = await enviarCorreo([{ id: yo.id, email: yo.email, nombre: yo.nombre }], titulo, m, '#/citas', o);
+      return json(200, { ok: n > 0, configurado: true, para: yo.email });
     }
 
     // ---------------- Exámenes médicos (ingreso / egreso) ----------------
@@ -272,7 +345,11 @@ Deno.serve(async (req) => {
     // Correo solo al confirmar (a quien solicitó y a su área)
     let correo = 0;
     if (evento === 'confirmada') {
-      correo = await enviarCorreo(dest, title, msg, `#/citas?cita=${c.id}`) + await enviarCorreo(area, title, msgArea, `#/citas?cita=${c.id}`);
+      const ruta = `#/citas?cita=${c.id}`;
+      const [t1, m1, o1] = correoConfirmada(c, false);
+      const [, , o2] = correoConfirmada(c, true);
+      correo = await enviarCorreo(dest, t1, m1, ruta, o1)
+        + await enviarCorreo(area, t1, `${m1.replace(/ Estos son los datos:$/, '')} La solicitó ${c.solicitante}, de tu área.`, ruta, o2);
     }
     await admin.from('avisos_med').update({ enviados_push: push, enviados_correo: correo }).eq('id', ins.data!.id);
     return json(200, { ok: true, push, correo });

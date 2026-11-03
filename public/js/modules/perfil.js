@@ -2,7 +2,7 @@
 // Perfil del usuario: datos, cambio de contraseña, tema e instalación.
 // =====================================================================
 import {
-  sb, state, esc, icon, refreshIcons, toast, errMsg, checkForm, prefs, fmtDateTime, APP_VERSION, avatarHTML, push, pill,
+  sb, state, esc, icon, refreshIcons, toast, errMsg, checkForm, prefs, fmtDateTime, APP_VERSION, avatarHTML, push, pill, openModal,
 } from '../core.js';
 
 // Estado y control de las notificaciones push de este dispositivo
@@ -50,6 +50,34 @@ async function pintarNotificaciones(box) {
     } catch (err) { toast(errMsg(err), 'error'); }
     pintarNotificaciones(box);
   });
+}
+
+// Correo de confirmación (administradores): vista previa con datos de ejemplo,
+// generada por notificar_med con la misma plantilla que los correos reales, o
+// envío de prueba solo al correo propio.
+async function correoPrueba(btn) {
+  const vista = btn.dataset.mail === 'vista';
+  btn.disabled = true;
+  try {
+    const { data, error } = await sb.functions.invoke('notificar_med', { body: { accion: 'correo_prueba', vista } });
+    if (error) throw error;
+    if (vista) {
+      await openModal({
+        title: 'Vista previa del correo', size: 'lg', submitText: 'Cerrar', onSubmit: () => true,
+        subtitle: `Asunto: ${data.asunto} · De: Servicio Médico · Pet's Table`,
+        body: `${data.configurado ? '' : `<div class="notice warn">${icon('info')}<span>El envío de correos aún no está configurado (falta la contraseña de aplicación de Gmail en Supabase). Esta es solo la vista previa.</span></div>`}
+          <iframe class="mail-preview" title="Vista previa del correo" sandbox="" srcdoc="${esc(data.html)}"></iframe>
+          <p class="hint" style="margin-top:8px">Datos de ejemplo. El logotipo y el botón “Ver la cita” aparecen cuando se configura la dirección del sitio (MED_SITE_URL).</p>`,
+      });
+    } else if (!data?.configurado) {
+      toast('El envío de correos aún no está configurado: falta agregar la contraseña de aplicación de Gmail en Supabase.', 'warning', 7000);
+    } else if (data.ok) {
+      toast(`Correo de prueba enviado a ${data.para}. Revisa tu bandeja (y Spam).`, 'success', 7000);
+    } else {
+      toast('No se pudo enviar el correo de prueba. Revisa la contraseña de aplicación de Gmail.', 'error', 7000);
+    }
+  } catch (err) { toast(errMsg(err), 'error'); }
+  btn.disabled = false;
 }
 
 let deferredPrompt = null;
@@ -103,6 +131,11 @@ export default {
           </div>
           <div class="section-title" style="margin-top:22px">${icon('bell-ring')} Notificaciones en este dispositivo</div>
           <div id="notif-box"><div class="skeleton" style="height:36px"></div></div>
+          ${state.isAdmin ? `<div class="section-title" style="margin-top:22px">${icon('mail')} Correo de confirmación de citas</div>
+          <p class="hint" style="margin:0 0 10px">Revisa cómo se ve el correo que reciben quien solicitó la cita y su área cuando Servicio Médico la confirma.</p>
+          <div class="page-actions" style="justify-content:flex-start">
+            <button class="btn secondary" data-mail="vista">${icon('eye')} Ver vista previa</button>
+            <button class="btn primary" data-mail="enviar">${icon('send')} Enviarme un correo de prueba</button></div>` : ''}
           <div class="section-title" style="margin-top:22px">${icon('smartphone')} Instalar en la pantalla de inicio</div>
           ${standalone ? `<p class="hint">${icon('check-circle-2')} Ya estás usando la aplicación instalada.</p>` : `
           <button class="btn secondary hidden" id="install-btn">${icon('download')} Instalar aplicación</button>
@@ -119,6 +152,7 @@ export default {
       el.querySelectorAll('[data-theme-opt]').forEach((x) => x.classList.toggle('active', x === b));
     }));
     pintarNotificaciones(el.querySelector('#notif-box'));
+    el.querySelectorAll('[data-mail]').forEach((b) => b.addEventListener('click', () => correoPrueba(b)));
     const ib = el.querySelector('#install-btn');
     if (ib && deferredPrompt) {
       ib.classList.remove('hidden');
