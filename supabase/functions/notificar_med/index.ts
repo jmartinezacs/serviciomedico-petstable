@@ -74,7 +74,10 @@ async function enviarPush(admin: any, dest: Dest[], payload: Record<string, unkn
 // Correo opcional. Preferencia: Gmail / Google Workspace por SMTP seguro (puerto
 // 465; Supabase bloquea 25 y 587) con una contraseña de aplicación; si no está
 // configurado, Resend; si tampoco, no se envían correos.
-type Correo = { estado?: string; tono?: 'ok' | 'warn' | 'bad' | 'info'; detalles?: [string, string][]; nota?: string; boton?: string };
+type Correo = {
+  estado?: string; tono?: 'ok' | 'warn' | 'bad' | 'info'; detalles?: [string, string][]; nota?: string; boton?: string;
+  destacado?: { etiqueta: string; valor: string; sub?: string };
+};
 let smtp: { sendMail: (o: Record<string, unknown>) => Promise<unknown> } | null = null;
 async function transporteGmail() {
   const user = Deno.env.get('GMAIL_USER'), pass = Deno.env.get('GMAIL_APP_PASSWORD');
@@ -91,40 +94,97 @@ const fechaLarga = (iso: string) => {
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
-// Plantilla HTML (tablas y estilos en línea para que se vea igual en Gmail, Outlook y celular)
-function plantillaCorreo(nombre: string, title: string, msg: string, ruta: string, o: Correo = {}) {
+// Plantilla HTML (tablas y estilos en línea para que se vea igual en Gmail,
+// Outlook y celular). `logo` es la fuente de la imagen: cid:… en los correos
+// (adjunto incrustado), __LOGO__ en la vista previa (el sitio pone la imagen) o
+// vacío si no hay logo (se muestra el nombre de la empresa en texto).
+const LOGO_CID = 'logo-petstable';
+// El logotipo se publica con el sitio (logo-correo.png); se descarga una vez y se
+// adjunta incrustado para que se vea aunque el cliente bloquee imágenes remotas.
+let logoCache: string | null | undefined;
+async function logoB64() {
+  if (logoCache !== undefined) return logoCache;
   const site = (Deno.env.get('MED_SITE_URL') || '').replace(/\/$/, '');
-  const tonos = { ok: ['#E8F7EE', '#15803D'], warn: ['#FFF4E5', '#B45309'], bad: ['#FDECEC', '#B91C1C'], info: ['#E6F8F8', '#0E7C7C'] };
-  const [fondo, color] = tonos[o.tono || 'info'];
+  logoCache = null;
+  if (site) {
+    try {
+      const r = await fetch(`${site}/logo-correo.png`);
+      if (r.ok && (r.headers.get('content-type') || '').includes('image/png')) {
+        const b = new Uint8Array(await r.arrayBuffer());
+        let s = '';
+        for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+        logoCache = btoa(s);
+      }
+    } catch (e) { console.error('logo', (e as Error).message); }
+  }
+  return logoCache;
+}
+function plantillaCorreo(nombre: string, title: string, msg: string, ruta: string, o: Correo = {}, logo = `cid:${LOGO_CID}`) {
+  const site = (Deno.env.get('MED_SITE_URL') || '').replace(/\/$/, '');
+  const tonos = { ok: ['#E7F6EC', '#15803D', '#16A34A'], warn: ['#FFF4E5', '#B45309', '#F59E0B'], bad: ['#FDECEC', '#B91C1C', '#DC2626'], info: ['#E6F8F8', '#0E7C7C', '#1BC7C7'] };
+  const [fondo, color, fuerte] = tonos[o.tono || 'info'];
+  const font = "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
   const filas = (o.detalles || []).map(([k, v], i) => `
-    <tr><td style="padding:10px 14px;${i ? 'border-top:1px solid #E8EDF1;' : ''}color:#687B8C;font-size:13px;width:38%;vertical-align:top">${esc(k)}</td>
-        <td style="padding:10px 14px;${i ? 'border-top:1px solid #E8EDF1;' : ''}color:#172431;font-size:14px;font-weight:700;vertical-align:top">${esc(v)}</td></tr>`).join('');
-  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title></head>
-<body style="margin:0;padding:0;background:#EEF2F5;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased">
-<div style="display:none;max-height:0;overflow:hidden">${esc(msg)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF2F5;padding:28px 12px"><tr><td align="center">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 6px 24px rgba(11,34,53,.08)">
-    <tr><td style="height:5px;background:#F58020;line-height:5px;font-size:0">&nbsp;</td></tr>
-    <tr><td style="background:#0B2235;padding:20px 26px">
-      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-        ${site ? `<td style="padding-right:14px;vertical-align:middle"><img src="${esc(site)}/apple-touch-icon.png" width="46" height="46" alt="" style="display:block;border-radius:12px;border:0"></td>` : ''}
-        <td style="vertical-align:middle"><div style="color:#FFFFFF;font-size:19px;font-weight:800;letter-spacing:.2px">Servicio Médico</div>
-          <div style="color:#9FB3C2;font-size:12.5px;margin-top:2px">Salud laboral · Pet's Table S.A. de C.V.</div></td>
+          <tr>
+            <td style="padding:12px 16px;${i ? 'border-top:1px solid #EDF1F4;' : ''}${font};color:#6B7C8A;font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;width:36%;vertical-align:top">${esc(k)}</td>
+            <td style="padding:12px 16px;${i ? 'border-top:1px solid #EDF1F4;' : ''}${font};color:#0B2235;font-size:15px;font-weight:600;vertical-align:top">${esc(v)}</td>
+          </tr>`).join('');
+  const d = o.destacado;
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>${esc(title)}</title></head>
+<body style="margin:0;padding:0;background:#F1F4F7;-webkit-font-smoothing:antialiased">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(msg)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1F4F7"><tr><td align="center" style="padding:32px 12px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px">
+    <!-- Encabezado con logotipo -->
+    <tr><td style="padding:0 4px 18px">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="vertical-align:middle">${logo
+          ? `<img src="${logo}" width="96" alt="Pet's Table" style="display:block;width:96px;height:auto;border:0">`
+          : `<span style="${font};color:#F58020;font-size:26px;font-weight:900;letter-spacing:-.5px">pet's table</span>`}</td>
+        <td align="right" style="vertical-align:middle;${font}">
+          <div style="color:#0B2235;font-size:15px;font-weight:800">Servicio Médico</div>
+          <div style="color:#6B7C8A;font-size:12px;margin-top:2px">Salud laboral</div></td>
       </tr></table></td></tr>
-    <tr><td style="padding:28px 26px 8px">
-      ${o.estado ? `<span style="display:inline-block;background:${fondo};color:${color};font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:6px 12px;border-radius:999px">${esc(o.estado)}</span>` : ''}
-      <h1 style="margin:14px 0 6px;color:#0B2235;font-size:22px;line-height:1.3">${esc(title)}</h1>
-      <p style="margin:0 0 4px;color:#172431;font-size:15px;line-height:1.55">Hola <b>${esc(nombre)}</b>,</p>
-      <p style="margin:0 0 18px;color:#3B4C5A;font-size:15px;line-height:1.55">${esc(msg)}</p>
-    </td></tr>
-    ${filas ? `<tr><td style="padding:0 26px 6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E1E8EE;border-radius:12px;border-collapse:separate;background:#FAFCFD">${filas}</table></td></tr>` : ''}
-    ${o.nota ? `<tr><td style="padding:14px 26px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#FFF7EF;border-left:4px solid #F58020;border-radius:8px;padding:12px 14px;color:#5A4632;font-size:13.5px;line-height:1.5">${esc(o.nota)}</td></tr></table></td></tr>` : ''}
-    ${site ? `<tr><td style="padding:22px 26px 6px"><a href="${esc(site)}/${esc(ruta)}" style="display:inline-block;background:#F58020;color:#FFFFFF;text-decoration:none;padding:13px 22px;border-radius:10px;font-weight:800;font-size:15px">${esc(o.boton || 'Ver en el sistema')}</a></td></tr>` : ''}
-    <tr><td style="padding:24px 26px 26px"><div style="border-top:1px solid #E8EDF1;padding-top:16px;color:#8494A1;font-size:12px;line-height:1.55">
-      Este es un aviso automático de Servicio Médico de Pet's Table. No contiene información clínica.<br>
-      Si tienes dudas, acude al consultorio o responde a este correo.</div></td></tr>
+    <!-- Tarjeta -->
+    <tr><td style="background:#FFFFFF;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(11,34,53,.08)">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="height:6px;line-height:6px;font-size:0;background:#F58020">&nbsp;</td><td style="height:6px;width:30%;line-height:6px;font-size:0;background:#1BC7C7">&nbsp;</td></tr>
+        <tr><td colspan="2" style="padding:34px 32px 6px;${font}">
+          ${o.estado ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="width:30px;height:30px;border-radius:15px;background:${fuerte};color:#FFFFFF;font-size:17px;font-weight:800;text-align:center;line-height:30px">${o.tono === 'ok' ? '&#10003;' : '!'}</td>
+            <td style="padding-left:10px;color:${color};font-size:13px;font-weight:800;letter-spacing:.8px;text-transform:uppercase">${esc(o.estado)}</td></tr></table>` : ''}
+          <h1 style="margin:18px 0 10px;color:#0B2235;font-size:26px;line-height:1.25;font-weight:800">${esc(title)}</h1>
+          <p style="margin:0 0 6px;color:#0B2235;font-size:16px;line-height:1.6">Hola <b>${esc(nombre)}</b>,</p>
+          <p style="margin:0;color:#4A5B69;font-size:16px;line-height:1.6">${esc(msg)}</p>
+        </td></tr>
+        ${d ? `<tr><td colspan="2" style="padding:24px 32px 0">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${fondo};border-radius:14px"><tr>
+            <td style="padding:18px 20px;${font}">
+              <div style="color:${color};font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase">${esc(d.etiqueta)}</div>
+              <div style="color:#0B2235;font-size:22px;font-weight:800;margin-top:6px;line-height:1.3">${esc(d.valor)}</div>
+              ${d.sub ? `<div style="color:#0B2235;font-size:30px;font-weight:800;margin-top:2px;letter-spacing:-.5px">${esc(d.sub)}</div>` : ''}
+            </td></tr></table></td></tr>` : ''}
+        ${filas ? `<tr><td colspan="2" style="padding:20px 32px 0">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E3E9EE;border-radius:14px;border-collapse:separate">${filas}
+          </table></td></tr>` : ''}
+        ${o.nota ? `<tr><td colspan="2" style="padding:20px 32px 0">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+            <td style="width:4px;background:#F58020;border-radius:4px">&nbsp;</td>
+            <td style="padding:4px 0 4px 14px;${font};color:#4A5B69;font-size:14px;line-height:1.6">${esc(o.nota)}</td></tr></table></td></tr>` : ''}
+        ${site ? `<tr><td colspan="2" style="padding:28px 32px 0">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:12px;background:#F58020">
+            <a href="${esc(site)}/${esc(ruta)}" style="display:inline-block;padding:14px 26px;${font};color:#FFFFFF;font-size:15px;font-weight:800;text-decoration:none;border-radius:12px">${esc(o.boton || 'Ver en el sistema')} &rarr;</a>
+          </td></tr></table></td></tr>` : ''}
+        <tr><td colspan="2" style="padding:32px 32px 30px;${font}">
+          <div style="border-top:1px solid #EDF1F4;padding-top:18px;color:#8494A1;font-size:12.5px;line-height:1.6">
+            Aviso automático de Servicio Médico. No contiene información clínica.<br>Si tienes dudas, acude al consultorio o responde a este correo.</div></td></tr>
+      </table></td></tr>
+    <!-- Pie -->
+    <tr><td align="center" style="padding:22px 12px 0;${font};color:#97A6B2;font-size:12px;line-height:1.6">
+      <b style="color:#6B7C8A">Pet's Table S.A. de C.V.</b> · Servicio Médico · Salud laboral<br>
+      © ${new Date().getFullYear()} Pet's Table. Uso interno.</td></tr>
   </table>
-  <div style="color:#9AA9B5;font-size:11px;margin-top:14px">© ${new Date().getFullYear()} Pet's Table S.A. de C.V.</div>
 </td></tr></table></body></html>`;
 }
 
@@ -134,19 +194,23 @@ async function enviarCorreo(dest: Dest[], title: string, msg: string, ruta: stri
   if (!gmail && !resend) return 0;
   let correo = 0;
   const site = (Deno.env.get('MED_SITE_URL') || '').replace(/\/$/, '');
+  const logo = await logoB64();
   for (const d of dest) {
     if (!d.email) continue;
-    const html = plantillaCorreo(d.nombre, title, msg, ruta, o);
-    const texto = [`Hola ${d.nombre},`, msg, ...(o.detalles || []).map(([k, v]) => `${k}: ${v}`), o.nota || '', site ? `${site}/${ruta}` : ''].filter(Boolean).join('\n');
+    const html = plantillaCorreo(d.nombre, title, msg, ruta, o, logo ? `cid:${LOGO_CID}` : '');
+    const texto = [`Hola ${d.nombre},`, msg, o.destacado ? `${o.destacado.etiqueta}: ${o.destacado.valor} ${o.destacado.sub || ''}` : '',
+      ...(o.detalles || []).map(([k, v]) => `${k}: ${v}`), o.nota || '', site ? `${site}/${ruta}` : ''].filter(Boolean).join('\n');
     try {
       if (gmail) {
-        await gmail.t.sendMail({ from: `"Servicio Médico · Pet's Table" <${gmail.user}>`, to: d.email, subject: title, text: texto, html });
+        await gmail.t.sendMail({ from: `"Servicio Médico · Pet's Table" <${gmail.user}>`, to: d.email, subject: title, text: texto, html,
+          attachments: logo ? [{ filename: 'petstable.png', content: logo, encoding: 'base64', cid: LOGO_CID, contentDisposition: 'inline' }] : [] });
         correo++;
       } else {
         const from = Deno.env.get('MED_EMAIL_FROM') || 'Servicio Médico <onboarding@resend.dev>';
         const r = await fetch('https://api.resend.com/emails', {
           method: 'POST', headers: { Authorization: `Bearer ${resend}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from, to: [d.email], subject: title, html, text: texto }),
+          body: JSON.stringify({ from, to: [d.email], subject: title, html, text: texto,
+            ...(logo ? { attachments: [{ filename: 'petstable.png', content: logo, content_id: LOGO_CID }] } : {}) }),
         });
         if (r.ok) correo++; else console.error('correo', r.status, await r.text());
       }
@@ -160,13 +224,13 @@ async function enviarCorreo(dest: Dest[], title: string, msg: string, ruta: stri
 function correoConfirmada(c: any, conSolicitante: boolean): [string, string, Correo] {
   const urg = c.tipo === 'urgente';
   return [`Cita ${c.folio_txt} confirmada`,
-    urg ? `Servicio Médico atenderá la cita urgente de ${c.colaborador}.` : `Servicio Médico confirmó la cita de ${c.colaborador}. Estos son los datos:`,
+    urg ? `Servicio Médico atenderá la cita urgente de ${c.colaborador}.` : `Servicio Médico confirmó la cita de ${c.colaborador}.`,
     {
       estado: urg ? 'Cita urgente confirmada' : 'Cita confirmada', tono: 'ok', boton: 'Ver la cita',
+      destacado: { etiqueta: 'Fecha y hora', valor: fechaLarga(c.fecha), sub: c.hora ? `${hora(c.hora)} h` : 'Horario por asignar' },
       detalles: [
-        ['Folio', c.folio_txt], ['Colaborador', c.colaborador], ['Área', c.area || '—'],
-        ['Fecha', fechaLarga(c.fecha)], ['Hora', c.hora ? `${hora(c.hora)} h` : 'Por asignar'],
-        ['Motivo', MOTIVOS[c.motivo] || c.motivo || '—'],
+        ['Colaborador', c.colaborador], ['Área', c.area || '—'],
+        ['Motivo', MOTIVOS[c.motivo] || c.motivo || '—'], ['Folio', c.folio_txt],
         ...(conSolicitante ? [['Solicitó', c.solicitante] as [string, string]] : []),
       ],
       nota: 'Pide al colaborador presentarse puntualmente en el consultorio de Servicio Médico. Si ya no podrá asistir, cancela o reprograma la cita desde el sistema para liberar el horario.',
@@ -207,7 +271,10 @@ Deno.serve(async (req) => {
         motivo: 'consulta_general', tipo: 'normal', solicitante: yo.nombre };
       const [t, m, o] = correoConfirmada(ej, false);
       const titulo = `[Prueba] ${t}`;
-      if (body.vista) return json(200, { html: plantillaCorreo(yo.nombre, titulo, m, '#/citas', o), configurado: correoConfigurado(), asunto: titulo });
+      if (body.vista) {
+        const html = plantillaCorreo(yo.nombre, titulo, m, '#/citas', o, '__LOGO__');
+        return json(200, { html, configurado: correoConfigurado(), asunto: titulo });
+      }
       if (!correoConfigurado()) return json(200, { ok: false, configurado: false });
       const n = await enviarCorreo([{ id: yo.id, email: yo.email, nombre: yo.nombre }], titulo, m, '#/citas', o);
       return json(200, { ok: n > 0, configurado: true, para: yo.email });
@@ -349,7 +416,7 @@ Deno.serve(async (req) => {
       const [t1, m1, o1] = correoConfirmada(c, false);
       const [, , o2] = correoConfirmada(c, true);
       correo = await enviarCorreo(dest, t1, m1, ruta, o1)
-        + await enviarCorreo(area, t1, `${m1.replace(/ Estos son los datos:$/, '')} La solicitó ${c.solicitante}, de tu área.`, ruta, o2);
+        + await enviarCorreo(area, t1, `${m1} La solicitó ${c.solicitante}, de tu área.`, ruta, o2);
     }
     await admin.from('avisos_med').update({ enviados_push: push, enviados_correo: correo }).eq('id', ins.data!.id);
     return json(200, { ok: true, push, correo });

@@ -141,7 +141,7 @@ Other frontend files:
 ### Edge Functions (`supabase/functions/`, deployed via MCP)
 
 - **`gestionar_usuarios_med`** is admin-only and creates Auth accounts. It is the only code that uses the service role for that.
-- **`notificar_med`** sends Web Push (`npm:web-push`) and optional email. Email prefers Gmail SMTP on port 465 (secrets `GMAIL_USER`, `GMAIL_APP_PASSWORD`; Supabase blocks 25/587) and falls back to Resend. For citas, email goes only on `confirmada`. Cita notices addressed to the requester also go to the other active users of the requester's area.
+- **`notificar_med`** sends Web Push (`npm:web-push`) and optional email. The email template (`plantillaCorreo`) embeds the company logo as an inline `cid` attachment, downloaded from the published `logo-correo.png` at `MED_SITE_URL`; admins preview it and send a test from Mi perfil (`accion: correo_prueba`). Email prefers Gmail SMTP on port 465 (secrets `GMAIL_USER`, `GMAIL_APP_PASSWORD`; Supabase blocks 25/587) and falls back to Resend. For citas, email goes only on `confirmada`. Cita notices addressed to the requester also go to the other active users of the requester's area.
   - It is called from the frontend through `avisar(evento, citaId)`.
   - It re-checks that the event really happened before sending.
   - Resend needs the secrets `RESEND_API_KEY`, `MED_EMAIL_FROM` and `MED_SITE_URL`.

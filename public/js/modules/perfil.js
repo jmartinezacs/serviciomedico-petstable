@@ -62,12 +62,19 @@ async function correoPrueba(btn) {
     const { data, error } = await sb.functions.invoke('notificar_med', { body: { accion: 'correo_prueba', vista } });
     if (error) throw error;
     if (vista) {
+      // El logotipo se publica con el sitio; se incrusta como data URI para la vista previa
+      let logo = '';
+      try {
+        const b = await (await fetch('/logo-correo.png')).blob();
+        logo = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(b); });
+      } catch { /* sin logo: se muestra el nombre en texto */ }
+      const html = String(data.html).replace('__LOGO__', /^data:image\/png/.test(logo) ? logo : '');
       await openModal({
         title: 'Vista previa del correo', size: 'lg', submitText: 'Cerrar', onSubmit: () => true,
         subtitle: `Asunto: ${data.asunto} · De: Servicio Médico · Pet's Table`,
         body: `${data.configurado ? '' : `<div class="notice warn">${icon('info')}<span>El envío de correos aún no está configurado (falta la contraseña de aplicación de Gmail en Supabase). Esta es solo la vista previa.</span></div>`}
-          <iframe class="mail-preview" title="Vista previa del correo" sandbox="" srcdoc="${esc(data.html)}"></iframe>
-          <p class="hint" style="margin-top:8px">Datos de ejemplo. El logotipo y el botón “Ver la cita” aparecen cuando se configura la dirección del sitio (MED_SITE_URL).</p>`,
+          <iframe class="mail-preview" title="Vista previa del correo" sandbox="" srcdoc="${esc(html)}"></iframe>
+          <p class="hint" style="margin-top:8px">Datos de ejemplo. El botón “Ver la cita” aparece cuando se configura la dirección del sitio (MED_SITE_URL) en Supabase.</p>`,
       });
     } else if (!data?.configurado) {
       toast('El envío de correos aún no está configurado: falta agregar la contraseña de aplicación de Gmail en Supabase.', 'warning', 7000);
