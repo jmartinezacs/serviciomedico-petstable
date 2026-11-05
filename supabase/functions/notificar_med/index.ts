@@ -4,7 +4,9 @@
 // después de crear o cambiar una cita o un examen; la función valida en la base
 // de datos que el evento sea real y no duplicado. Los avisos de cita dirigidos a
 // quien solicitó también llegan a los usuarios de su misma área. En citas, el
-// correo se envía solo al confirmar.
+// correo se envía al confirmar, reprogramar y cancelar (no en la solicitud
+// nueva); si la cita queda confirmada con horario, el correo lleva un archivo
+// .ics para agregarla al calendario.
 //
 // Variables opcionales (Supabase → Edge Functions → Secrets):
 //   GMAIL_USER          → cuenta de Google Workspace que envía (p. ej. javier.martinez@petstable.mx)
@@ -77,6 +79,7 @@ async function enviarPush(admin: any, dest: Dest[], payload: Record<string, unkn
 type Correo = {
   estado?: string; tono?: 'ok' | 'warn' | 'bad' | 'info'; detalles?: [string, string][]; nota?: string; boton?: string;
   destacado?: { etiqueta: string; valor: string; sub?: string };
+  ics?: string; // evento de calendario adjunto (cita.ics)
 };
 let smtp: { sendMail: (o: Record<string, unknown>) => Promise<unknown> } | null = null;
 async function transporteGmail() {
@@ -152,7 +155,7 @@ function plantillaCorreo(nombre: string, title: string, msg: string, ruta: strin
         <tr><td style="height:6px;line-height:6px;font-size:0;background:#F58020">&nbsp;</td><td style="height:6px;width:30%;line-height:6px;font-size:0;background:#1BC7C7">&nbsp;</td></tr>
         <tr><td colspan="2" style="padding:34px 32px 6px;${font}">
           ${o.estado ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr>
-            <td style="width:30px;height:30px;border-radius:15px;background:${fuerte};color:#FFFFFF;font-size:17px;font-weight:800;text-align:center;line-height:30px">${o.tono === 'ok' ? '&#10003;' : '!'}</td>
+            <td style="width:30px;height:30px;border-radius:15px;background:${fuerte};color:#FFFFFF;font-size:17px;font-weight:800;text-align:center;line-height:30px">${{ ok: '&#10003;', bad: '&#10005;', warn: '&#8635;' }[o.tono || ''] || '!'}</td>
             <td style="padding-left:10px;color:${color};font-size:13px;font-weight:800;letter-spacing:.8px;text-transform:uppercase">${esc(o.estado)}</td></tr></table>` : ''}
           <h1 style="margin:18px 0 10px;color:#0B2235;font-size:26px;line-height:1.25;font-weight:800">${esc(title)}</h1>
           <p style="margin:0 0 6px;color:#0B2235;font-size:16px;line-height:1.6">Hola <b>${esc(nombre)}</b>,</p>
@@ -176,6 +179,8 @@ function plantillaCorreo(nombre: string, title: string, msg: string, ruta: strin
           <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:12px;background:#F58020">
             <a href="${esc(site)}/${esc(ruta)}" style="display:inline-block;padding:14px 26px;${font};color:#FFFFFF;font-size:15px;font-weight:800;text-decoration:none;border-radius:12px">${esc(o.boton || 'Ver en el sistema')} &rarr;</a>
           </td></tr></table></td></tr>` : ''}
+        ${o.ics ? `<tr><td colspan="2" style="padding:16px 32px 0;${font};color:#4A5B69;font-size:13.5px;line-height:1.6">
+          <b style="color:#0B2235">&#128197; Agrégala a tu calendario:</b> abre el archivo adjunto <b>cita.ics</b> y se guardará en Google Calendar, Outlook o el calendario del celular con un recordatorio 15 minutos antes.</td></tr>` : ''}
         <tr><td colspan="2" style="padding:32px 32px 30px;${font}">
           <div style="border-top:1px solid #EDF1F4;padding-top:18px;color:#8494A1;font-size:12.5px;line-height:1.6">
             Aviso automático de Servicio Médico. No contiene información clínica.<br>Si tienes dudas, acude al consultorio o responde a este correo.</div></td></tr>
@@ -198,19 +203,26 @@ async function enviarCorreo(dest: Dest[], title: string, msg: string, ruta: stri
   for (const d of dest) {
     if (!d.email) continue;
     const html = plantillaCorreo(d.nombre, title, msg, ruta, o, logo ? `cid:${LOGO_CID}` : '');
+    const adjuntos: Record<string, unknown>[] = [
+      ...(logo ? [{ filename: 'petstable.png', content: logo, encoding: 'base64', cid: LOGO_CID, contentDisposition: 'inline' }] : []),
+      ...(o.ics ? [{ filename: 'cita.ics', content: o.ics, contentType: 'text/calendar; charset=utf-8; method=PUBLISH' }] : []),
+    ];
     const texto = [`Hola ${d.nombre},`, msg, o.destacado ? `${o.destacado.etiqueta}: ${o.destacado.valor} ${o.destacado.sub || ''}` : '',
       ...(o.detalles || []).map(([k, v]) => `${k}: ${v}`), o.nota || '', site ? `${site}/${ruta}` : ''].filter(Boolean).join('\n');
     try {
       if (gmail) {
         await gmail.t.sendMail({ from: `"Servicio Médico · Pet's Table" <${gmail.user}>`, to: d.email, subject: title, text: texto, html,
-          attachments: logo ? [{ filename: 'petstable.png', content: logo, encoding: 'base64', cid: LOGO_CID, contentDisposition: 'inline' }] : [] });
+          attachments: adjuntos });
         correo++;
       } else {
         const from = Deno.env.get('MED_EMAIL_FROM') || 'Servicio Médico <onboarding@resend.dev>';
         const r = await fetch('https://api.resend.com/emails', {
           method: 'POST', headers: { Authorization: `Bearer ${resend}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ from, to: [d.email], subject: title, html, text: texto,
-            ...(logo ? { attachments: [{ filename: 'petstable.png', content: logo, content_id: LOGO_CID }] } : {}) }),
+            attachments: [
+              ...(logo ? [{ filename: 'petstable.png', content: logo, content_id: LOGO_CID }] : []),
+              ...(o.ics ? [{ filename: 'cita.ics', content: btoa(String.fromCharCode(...new TextEncoder().encode(o.ics))) }] : []),
+            ] }),
         });
         if (r.ok) correo++; else console.error('correo', r.status, await r.text());
       }
@@ -234,6 +246,72 @@ function correoConfirmada(c: any, conSolicitante: boolean): [string, string, Cor
         ...(conSolicitante ? [['Solicitó', c.solicitante] as [string, string]] : []),
       ],
       nota: 'Pide al colaborador presentarse puntualmente en el consultorio de Servicio Médico. Si ya no podrá asistir, cancela o reprograma la cita desde el sistema para liberar el horario.',
+      ics: icsCita(c),
+    }];
+}
+
+// Evento de calendario (.ics) de una cita confirmada con horario. Hora local de
+// Ciudad de México (UTC−6, sin horario de verano); bloque de 30 minutos con
+// recordatorio 15 minutos antes. El UID es fijo por cita: si se reprograma, el
+// calendario que lo importe de nuevo actualiza el mismo evento.
+// deno-lint-ignore no-explicit-any
+function icsCita(c: any): string | undefined {
+  if (!c.hora || c.estado !== 'confirmada' || !c.id) return undefined;
+  const local = (d: Date) => d.toISOString().slice(0, 16).replace(/[-:]/g, '') + '00';
+  const ini = new Date(`${c.fecha}T${hora(c.hora)}:00Z`); // reloj local tratado como UTC solo para sumar minutos
+  const fin = new Date(ini.getTime() + 30 * 60000);
+  const tx = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  // Plegado de líneas largas (RFC 5545): continuaciones que empiezan con espacio
+  const plegar = (l: string) => { const p: string[] = []; for (let i = 0; i < l.length; i += 60) p.push((i ? ' ' : '') + l.slice(i, i + 60)); return p.join('\r\n'); };
+  const seq = Math.floor(new Date(c.updated_at || Date.now()).getTime() / 1000);
+  return [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', "PRODID:-//Pet's Table//Servicio Medico//ES", 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VTIMEZONE', 'TZID:America/Mexico_City', 'BEGIN:STANDARD', 'DTSTART:19700101T000000',
+    'TZOFFSETFROM:-0600', 'TZOFFSETTO:-0600', 'TZNAME:CST', 'END:STANDARD', 'END:VTIMEZONE',
+    'BEGIN:VEVENT', `UID:cita-${c.id}@servicio-medico.petstable.mx`, `SEQUENCE:${seq}`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}Z`,
+    `DTSTART;TZID=America/Mexico_City:${local(ini)}`, `DTEND;TZID=America/Mexico_City:${local(fin)}`,
+    `SUMMARY:${tx(`Servicio Médico · ${c.colaborador}`)}`,
+    `DESCRIPTION:${tx(`Cita ${c.folio_txt} · ${MOTIVOS[c.motivo] || c.motivo || ''} · Área: ${c.area || '—'}`)}`,
+    'LOCATION:Consultorio de Servicio Médico', 'STATUS:CONFIRMED', 'TRANSP:OPAQUE',
+    'BEGIN:VALARM', 'TRIGGER:-PT15M', 'ACTION:DISPLAY', `DESCRIPTION:${tx(`Cita en Servicio Médico: ${c.colaborador}`)}`, 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR', '',
+  ].map(plegar).join('\r\n');
+}
+
+// Correo de cita reprogramada o cancelada. `paraMedico`: el aviso va al médico
+// (lo generó quien solicitó); `rechazada`: el médico canceló una cita urgente.
+// deno-lint-ignore no-explicit-any
+function correoCambioCita(c: any, evento: 'reprogramada' | 'cancelada', conSolicitante: boolean, paraMedico: boolean, rechazada = false): [string, string, Correo] {
+  const detalles: [string, string][] = [
+    ['Colaborador', c.colaborador], ['Área', c.area || '—'],
+    ['Motivo', MOTIVOS[c.motivo] || c.motivo || '—'], ['Folio', c.folio_txt],
+    ...(conSolicitante || paraMedico ? [['Solicitó', c.solicitante] as [string, string]] : []),
+  ];
+  const sub = c.hora ? `${hora(c.hora)} h` : 'Horario por asignar';
+  if (evento === 'cancelada') {
+    const pal = rechazada ? 'rechazada' : 'cancelada';
+    return [`Cita ${c.folio_txt} ${pal}`,
+      paraMedico ? `${c.solicitante} canceló la cita de ${c.colaborador}.` : `Servicio Médico ${rechazada ? 'rechazó' : 'canceló'} la cita de ${c.colaborador}.`,
+      {
+        estado: `Cita ${pal}`, tono: 'bad', boton: 'Ver la cita',
+        destacado: { etiqueta: 'Fecha de la cita', valor: fechaLarga(c.fecha), sub },
+        detalles: [...detalles, ...(c.motivo_cancelacion ? [['Motivo de cancelación', c.motivo_cancelacion] as [string, string]] : [])],
+        nota: paraMedico ? 'El horario quedó libre en la agenda.'
+          : 'El colaborador ya no debe presentarse en este horario. Si aún necesita atención, solicita una nueva cita desde el sistema o acude al consultorio.',
+      }];
+  }
+  const confirmada = c.estado === 'confirmada';
+  return [`Cita ${c.folio_txt} reprogramada`,
+    paraMedico ? `${c.solicitante} cambió la fecha u hora de la cita de ${c.colaborador}.` : `Servicio Médico cambió la fecha u hora de la cita de ${c.colaborador}.`,
+    {
+      estado: 'Cita reprogramada', tono: 'warn', boton: paraMedico ? 'Revisar la cita' : 'Ver la cita',
+      destacado: { etiqueta: 'Nueva fecha y hora', valor: fechaLarga(c.fecha), sub },
+      detalles: [...detalles, ['Estado', confirmada ? 'Confirmada' : 'Pendiente de confirmar']],
+      nota: paraMedico ? 'Revisa el nuevo horario y confírmalo desde el sistema.'
+        : confirmada ? 'Pide al colaborador presentarse en el nuevo horario. El horario anterior ya no es válido.'
+          : 'El nuevo horario está pendiente de confirmación por Servicio Médico; recibirás otro aviso cuando se confirme.',
+      ics: paraMedico ? undefined : icsCita(c),
     }];
 }
 
@@ -267,9 +345,11 @@ Deno.serve(async (req) => {
     if (body.accion === 'correo_prueba') {
       if (yo.rol !== 'admin') return json(403, { error: 'Solo para administradores.' });
       const manana = new Date(Date.now() - 6 * 3600 * 1000 + 24 * 3600 * 1000).toISOString().slice(0, 10);
-      const ej = { folio_txt: 'CM-00000', colaborador: 'Juan Pérez López', area: 'Producción', fecha: manana, hora: '10:20:00',
-        motivo: 'consulta_general', tipo: 'normal', solicitante: yo.nombre };
-      const [t, m, o] = correoConfirmada(ej, false);
+      const tipoPrueba = ['reprogramada', 'cancelada'].includes(body.tipo) ? body.tipo : 'confirmada';
+      const ej = { id: 'prueba', folio_txt: 'CM-00000', colaborador: 'Juan Pérez López', area: 'Producción', fecha: manana, hora: '10:20:00',
+        motivo: 'consulta_general', tipo: 'normal', solicitante: yo.nombre, estado: tipoPrueba === 'cancelada' ? 'cancelada' : 'confirmada',
+        motivo_cancelacion: tipoPrueba === 'cancelada' ? 'El colaborador no se presentó a laborar.' : null, updated_at: new Date().toISOString() };
+      const [t, m, o] = tipoPrueba === 'confirmada' ? correoConfirmada(ej, false) : correoCambioCita(ej, tipoPrueba, false, false);
       const titulo = `[Prueba] ${t}`;
       if (body.vista) {
         const html = plantillaCorreo(yo.nombre, titulo, m, '#/citas', o, '__LOGO__');
@@ -409,12 +489,16 @@ Deno.serve(async (req) => {
     const msgArea = `${msg} Solicitó: ${c.solicitante}.`;
     let push = await enviarPush(admin, dest, { ...payload, title, body: msg });
     if (area.length) push += await enviarPush(admin, area, { ...payload, title, body: msgArea });
-    // Correo solo al confirmar (a quien solicitó y a su área)
+    // Correo al confirmar, reprogramar o cancelar (a quien corresponda el aviso y
+    // a los compañeros del área de quien solicitó); la solicitud nueva solo va por push.
     let correo = 0;
-    if (evento === 'confirmada') {
+    if (evento !== 'nueva_cita') {
       const ruta = `#/citas?cita=${c.id}`;
-      const [t1, m1, o1] = correoConfirmada(c, false);
-      const [, , o2] = correoConfirmada(c, true);
+      const rechazada = urg && !esSolicitante;
+      const [t1, m1, o1] = evento === 'confirmada' ? correoConfirmada(c, false)
+        : correoCambioCita(c, evento as 'reprogramada' | 'cancelada', false, haciaMedico, rechazada);
+      const [, , o2] = evento === 'confirmada' ? correoConfirmada(c, true)
+        : correoCambioCita(c, evento as 'reprogramada' | 'cancelada', true, false, rechazada);
       correo = await enviarCorreo(dest, t1, m1, ruta, o1)
         + await enviarCorreo(area, t1, `${m1} La solicitó ${c.solicitante}, de tu área.`, ruta, o2);
     }

@@ -90,6 +90,10 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v2.5:**
+  - **Correo también al reprogramar y cancelar** la cita (además de confirmar), a quien corresponde el aviso y a los usuarios del área de quien solicitó. Si quien solicitó cancela o reprograma, el correo va al médico. La solicitud nueva sigue solo por push.
+  - **Archivo de calendario (`cita.ics`)** adjunto cuando la cita queda confirmada con horario: se agrega a Google Calendar, Outlook o el celular, con recordatorio 15 minutos antes (bloque de 30 min, hora de Ciudad de México). El UID es fijo por cita.
+  - **Mi perfil:** la vista previa y el correo de prueba permiten elegir confirmada, reprogramada o cancelada.
 - **v2.2:**
   - **Citas del área:** cada usuario ve, en solo lectura, las citas solicitadas por usuarios de su misma área (`med_misma_area` en la política `citas_med_sel`); modificar o cancelar sigue siendo solo de quien la solicitó. Las atenciones (datos clínicos) siguen siendo solo del médico.
   - **Avisos al área:** cuando el médico confirma, cancela o reprograma una cita, además de quien la solicitó se avisa a los demás usuarios activos de su área (p. ej. supervisores de otro turno), con "Solicitó: …".
