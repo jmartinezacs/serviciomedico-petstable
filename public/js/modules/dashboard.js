@@ -13,6 +13,7 @@ import { openCitaForm, openDetalle } from './citas.js';
 import { openEntrada } from './inventario.js';
 import { openColaboradorForm } from './colaboradores.js';
 import { openExamenForm } from './examenes.js';
+import { describir } from './bitacora.js';
 
 let root, token = 0;
 
@@ -207,7 +208,8 @@ async function load() {
           .gt('existencia', 0).in('estado_caducidad', ['caducado', 'por_caducar']).order('caducidad').limit(6),
         sb.from('v_stock_med').select('id, clave, nombre, existencia_vigente, stock_minimo, unidad, estado_stock')
           .eq('activo', true).gt('stock_minimo', 0).in('estado_stock', ['bajo', 'agotado']).order('existencia_vigente').limit(6),
-        sb.from('bitacora_med').select('id, tabla, accion, usuario_email, created_at, registro_id').order('created_at', { ascending: false }).limit(8),
+        sb.from('v_bitacora_med').select('id, tabla, registro_id, accion, cambios, usuario_email, created_at, actor_nombre, actor_foto, actor_medico, objeto, referencia, subtipo')
+          .order('created_at', { ascending: false }).limit(8),
       );
     }
     const [res, disp, notif] = await Promise.all([
@@ -358,12 +360,21 @@ function accesoHTML() {
   </section>`;
 }
 
-const TABLAS = { citas_med: 'Citas', atenciones_med: 'Atención', colaboradores_med: 'Colaboradores', medicamentos_med: 'Medicamentos', usuarios_med: 'Usuarios', areas_med: 'Áreas', config_med: 'Configuración' };
+// Actividad reciente: foto de quien hizo la acción y la misma descripción breve de la Bitácora
 const ACC = { INSERT: ['Alta', 'ok'], UPDATE: ['Cambio', 'info'], DELETE: ['Baja', 'bad'] };
+function hace(ts) {
+  const min = Math.round((Date.now() - new Date(ts).getTime()) / 60000);
+  if (min < 1) return 'Hace un momento';
+  if (min < 60) return `Hace ${min} min`;
+  if (min < 24 * 60 && new Date(ts).toDateString() === new Date().toDateString()) return `Hoy, ${fmtTime(new Date(ts).toTimeString().slice(0, 5))} h`;
+  return fmtDateTime(ts);
+}
 function actividadHTML(act) {
   return `<div class="card">${cardHead('Actividad reciente', 'Últimos cambios registrados en la bitácora', `<button class="btn secondary" data-dash="#/bitacora">${icon('history')} Bitácora</button>`)}
-    ${act?.length ? `<div class="list">${act.map((b) => `<div class="list-item">${pill(ACC[b.accion]?.[0] || b.accion, ACC[b.accion]?.[1])}
-      <div class="li-main"><b>${esc(TABLAS[b.tabla] || b.tabla)}</b><span>${esc(b.usuario_email || 'Sistema')} · ${fmtDateTime(b.created_at)}</span></div></div>`).join('')}</div>`
+    ${act?.length ? `<div class="list act-list">${act.map((b) => `<div class="list-item act-item">
+      ${b.usuario_email ? `<span class="act-photo">${avatarHTML(b.actor_nombre || b.usuario_email, b.actor_foto, 'sm')}</span>` : `<span class="act-photo user-photo bit-sistema">${icon('cpu')}</span>`}
+      <div class="li-main"><span class="act-desc">${describir(b)}</span>
+        <span class="act-meta">${pill(ACC[b.accion]?.[0] || b.accion, ACC[b.accion]?.[1])} ${esc(hace(b.created_at))}</span></div></div>`).join('')}</div>`
       : emptyState({ ico: 'history', title: 'Sin actividad', text: 'Aquí aparecerán los cambios recientes.' })}</div>`;
 }
 
@@ -384,16 +395,16 @@ function userHTML(k, prox) {
 }
 
 const ESTADO_COLOR = { pendiente: '#FFB020', confirmada: '#1BC7C7', atendida: '#1BB56F', cancelada: '#9AAAB6', no_asistio: '#E0464E' };
-const PAD_COLORES = ['#F58020', '#1BC7C7', '#2563EB', '#16A34A', '#7C3AED', '#DB2777', '#E8890C', '#0891B2', '#65A30D', '#DC2626', '#9333EA', '#0D9488', '#CA8A04', '#4F46E5', '#BE185D', '#64748B'];
+// Un solo color por gráfica de una serie (la longitud de la barra ya dice la
+// cantidad; varios colores sin significado distraen)
+const COLOR_PAD = '#0FA3A6', COLOR_AREA = '#5B8DEF', COLOR_MOTIVO = '#F58020', COLOR_TOP = '#7A5BE6';
 function drawPadecimientos(pad) {
   if (!pad?.total) return;
-  const color = new Map();
-  pad.general.forEach((g, i) => color.set(g.padecimiento, PAD_COLORES[i % PAD_COLORES.length]));
   const barra = (id, items) => makeChart(document.getElementById(id), {
     type: 'bar',
     data: {
       labels: items.map((x) => x.padecimiento),
-      datasets: [{ label: 'Consultas', data: items.map((x) => x.n), backgroundColor: items.map((x) => color.get(x.padecimiento) || '#94A3B8'), borderRadius: 6, maxBarThickness: 22 }],
+      datasets: [{ label: 'Consultas', data: items.map((x) => x.n), backgroundColor: COLOR_PAD, maxBarThickness: 22 }],
     },
     options: { indexAxis: 'y', plugins: { legend: { display: false } } },
   });
@@ -411,8 +422,8 @@ function drawCharts(k, pad) {
       labels: serie.map((s) => fmtPeriodo(s.periodo)),
       datasets: [
         // Barras agrupadas: citas solicitadas (sin canceladas) y atendidas, lado a lado
-        { label: 'Citas', data: serie.map((s) => s.total), backgroundColor: '#F58020', borderRadius: 6, maxBarThickness: 26 },
-        { label: 'Atendidas', data: serie.map((s) => s.atendidas), backgroundColor: '#1BB56F', borderRadius: 6, maxBarThickness: 26 },
+        { label: 'Citas', data: serie.map((s) => s.total), backgroundColor: '#F58020', maxBarThickness: 26 },
+        { label: 'Atendidas', data: serie.map((s) => s.atendidas), backgroundColor: '#1BB56F', maxBarThickness: 26 },
       ],
     },
   });
@@ -421,23 +432,23 @@ function drawCharts(k, pad) {
     type: 'doughnut',
     data: {
       labels: pe.map(([e]) => ESTADOS[e]?.label || e),
-      datasets: [{ data: pe.map(([, n]) => n), backgroundColor: pe.map(([e]) => ESTADO_COLOR[e] || '#999'), borderWidth: 0 }],
+      datasets: [{ data: pe.map(([, n]) => n), backgroundColor: pe.map(([e]) => ESTADO_COLOR[e] || '#999') }],
     },
-    options: { plugins: { legend: { position: 'bottom' } } },
+    options: { plugins: { medCentro: { label: 'citas' } } },
   });
   makeChart(document.getElementById('ch-area'), {
     type: 'bar',
-    data: { labels: (k.por_area || []).map((a) => a.area), datasets: [{ label: 'Citas', data: (k.por_area || []).map((a) => a.n), backgroundColor: (k.por_area || []).map((_, i) => PAD_COLORES[i % PAD_COLORES.length]), borderRadius: 6, maxBarThickness: 22 }] },
+    data: { labels: (k.por_area || []).map((a) => a.area), datasets: [{ label: 'Citas', data: (k.por_area || []).map((a) => a.n), backgroundColor: COLOR_AREA, maxBarThickness: 22 }] },
     options: { indexAxis: 'y', plugins: { legend: { display: false } } },
   });
   makeChart(document.getElementById('ch-motivo'), {
     type: 'bar',
-    data: { labels: (k.por_motivo || []).map((m) => MOTIVOS[m.motivo] || m.motivo), datasets: [{ label: 'Citas', data: (k.por_motivo || []).map((m) => m.n), backgroundColor: (k.por_motivo || []).map((_, i) => PAD_COLORES[(i + 3) % PAD_COLORES.length]), borderRadius: 6, maxBarThickness: 30 }] },
+    data: { labels: (k.por_motivo || []).map((m) => MOTIVOS[m.motivo] || m.motivo), datasets: [{ label: 'Citas', data: (k.por_motivo || []).map((m) => m.n), backgroundColor: COLOR_MOTIVO, maxBarThickness: 34 }] },
     options: { plugins: { legend: { display: false } } },
   });
   makeChart(document.getElementById('ch-top'), {
     type: 'bar',
-    data: { labels: (k.top_dispensados || []).map((m) => m.medicamento), datasets: [{ label: 'Unidades', data: (k.top_dispensados || []).map((m) => m.n), backgroundColor: '#7A5BE6', borderRadius: 6, maxBarThickness: 22 }] },
+    data: { labels: (k.top_dispensados || []).map((m) => m.medicamento), datasets: [{ label: 'Unidades', data: (k.top_dispensados || []).map((m) => m.n), backgroundColor: COLOR_TOP, maxBarThickness: 22 }] },
     options: { indexAxis: 'y', plugins: { legend: { display: false } } },
   });
 }

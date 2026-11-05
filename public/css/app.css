@@ -1294,3 +1294,14 @@ body { transition: none; }
    v2.3 · Vista previa del correo de confirmación
    ===================================================================== */
 .mail-preview { display: block; width: 100%; height: min(68vh, 760px); border: 1px solid var(--line); border-radius: 14px; background: #EEF2F5; }
+
+/* =====================================================================
+   v2.6 · Actividad reciente con foto y gráficas
+   ===================================================================== */
+.act-list .act-item { align-items: flex-start; gap: 11px; padding: 11px 12px; }
+.act-photo { flex: 0 0 auto; display: inline-flex; margin-top: 1px; }
+.list-item .act-desc { display: block; font-size: 13px; line-height: 1.45; color: var(--text); white-space: normal; }
+.list-item .act-desc b, .act-desc b { display: inline; font-weight: 700; font-size: inherit; white-space: normal; overflow: visible; }
+.act-desc .mono { font-size: 11.5px; }
+.list-item .act-meta { display: flex; align-items: center; gap: 8px; margin-top: 5px; font-size: 11.5px; color: var(--muted); }
+.act-meta .pill { font-size: 10.5px; padding: 1px 8px; }

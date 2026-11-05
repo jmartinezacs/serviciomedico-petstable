@@ -439,68 +439,120 @@ const charts = new Set();
 const chartConfigs = new WeakMap();
 export function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 export const PALETTE = ['#F58020', '#1BC7C7', '#0B2235', '#1BB56F', '#7A5BE6', '#E0464E', '#FFB020', '#5B8DEF'];
-// Etiqueta de datos: el valor centrado dentro de cada barra o segmento de pastel
-// (se dibuja en el canvas, así que también aparece al copiar la gráfica)
+// Etiquetas de datos (se dibujan en el canvas, así que también aparecen al
+// guardar la imagen): en barras, el valor junto al extremo de la barra en color
+// de texto; en dona, el valor dentro de los segmentos grandes y el total al centro.
+const FUENTE = 'Inter, Segoe UI, system-ui, sans-serif';
+const fmtN = (v) => new Intl.NumberFormat('es-MX').format(v);
 const etiquetasDatos = {
   id: 'medEtiquetas',
   afterDatasetsDraw(chart) {
     const tipo = chart.config.type;
     if (!['bar', 'doughnut', 'pie'].includes(tipo)) return;
     const { ctx } = chart;
+    const zoom = !!chart.canvas.dataset.zoom;
     const horiz = chart.options.indexAxis === 'y';
+    const area = chart.chartArea;
     ctx.save();
-    ctx.font = `800 ${chart.canvas.dataset.zoom ? 15 : 11}px Inter, Segoe UI, system-ui, sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'middle';
     chart.data.datasets.forEach((ds, di) => {
       const meta = chart.getDatasetMeta(di);
       if (meta.hidden || meta.type === 'line') return;
       meta.data.forEach((el, i) => {
         const v = Number(ds.data[i]);
         if (!v || el.hidden) return;
-        const label = new Intl.NumberFormat('es-MX').format(v);
-        let x, y, dentro = true;
+        const label = fmtN(v);
         if (tipo === 'bar') {
+          ctx.font = `700 ${zoom ? 14 : 11}px ${FUENTE}`;
           const p = el.getProps(['x', 'y', 'base'], true);
-          const largo = horiz ? Math.abs(p.x - p.base) : Math.abs(p.base - p.y);
-          const ancho = ctx.measureText(label).width + 6;
-          dentro = largo >= (horiz ? ancho : 16);
-          if (dentro) { x = horiz ? (p.x + p.base) / 2 : p.x; y = horiz ? p.y : (p.y + p.base) / 2; }
-          else { x = horiz ? p.x + ancho / 2 + 2 : p.x; y = horiz ? p.y : p.y - 9; }
+          const w = ctx.measureText(label).width;
+          if (horiz) {
+            // a la derecha del extremo; si no cabe, dentro de la barra en blanco
+            const fuera = p.x + 6 + w <= area.right + 34;
+            ctx.textAlign = fuera ? 'left' : 'right';
+            ctx.fillStyle = fuera ? (cssVar('--text') || '#172431') : '#FFFFFF';
+            ctx.fillText(label, fuera ? p.x + 6 : p.x - 6, p.y);
+          } else {
+            ctx.textAlign = 'center';
+            ctx.fillStyle = cssVar('--text') || '#172431';
+            ctx.fillText(label, p.x, p.y - (zoom ? 12 : 9));
+          }
         } else {
-          if (el.circumference < 0.12) return;
-          ({ x, y } = el.tooltipPosition(true));
-        }
-        if (dentro) {
-          ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(9, 13, 18, .45)'; ctx.lineJoin = 'round';
-          ctx.strokeText(label, x, y);
+          if (el.circumference < 0.35) return;
+          const { x, y } = el.tooltipPosition(true);
+          ctx.font = `700 ${zoom ? 14 : 11}px ${FUENTE}`;
+          ctx.textAlign = 'center';
           ctx.fillStyle = '#FFFFFF';
-        } else ctx.fillStyle = cssVar('--text') || '#172431';
-        ctx.fillText(label, x, y);
+          ctx.fillText(label, x, y);
+        }
       });
     });
+    // Total al centro de la dona
+    if (tipo === 'doughnut' && area) {
+      const total = (chart.data.datasets[0]?.data || []).reduce((s, n, i) => s + (chart.getDataVisibility(i) ? Number(n) || 0 : 0), 0);
+      const cx = (area.left + area.right) / 2, cy = (area.top + area.bottom) / 2;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = cssVar('--text') || '#172431';
+      ctx.font = `800 ${zoom ? 38 : 26}px ${FUENTE}`;
+      ctx.fillText(fmtN(total), cx, cy - (zoom ? 8 : 5));
+      ctx.fillStyle = cssVar('--muted') || '#687B8C';
+      ctx.font = `600 ${zoom ? 14 : 11}px ${FUENTE}`;
+      ctx.fillText(chart.options.plugins?.medCentro?.label || 'Total', cx, cy + (zoom ? 20 : 14));
+    }
     ctx.restore();
   },
 };
 export function makeChart(canvas, config) {
   if (!window.Chart || !canvas) return null;
-  const muted = cssVar('--muted') || '#687B8C', line = cssVar('--line') || '#E3EAEF', text = cssVar('--text') || '#172431';
-  window.Chart.defaults.font.family = 'Inter, Segoe UI, system-ui, sans-serif';
+  const muted = cssVar('--muted') || '#687B8C', line = cssVar('--line') || '#E3EAEF', text = cssVar('--text') || '#172431', card = cssVar('--card') || '#FFFFFF';
+  window.Chart.defaults.font.family = FUENTE;
   window.Chart.defaults.color = muted;
+  const dona = config.type === 'doughnut' || config.type === 'pie';
+  const horiz = config.options?.indexAxis === 'y';
+  const varias = (config.data?.datasets || []).length > 1;
+  // Marcas: barras con extremo redondeado (la base queda recta), separación
+  // entre barras y segmentos de dona separados por una línea del color de fondo
+  (config.data?.datasets || []).forEach((d) => {
+    if (config.type === 'bar' && !d.type) Object.assign(d, { borderRadius: 5, borderSkipped: 'start', categoryPercentage: varias ? 0.72 : 0.78, barPercentage: varias ? 0.86 : 0.9 });
+    if (dona) Object.assign(d, { borderWidth: 2, borderColor: card, hoverOffset: 6, borderRadius: 4 });
+  });
+  const ejeValor = { grid: { color: line, drawTicks: false, tickBorderDash: [3, 4] }, border: { display: false, dash: [3, 4] }, ticks: { color: muted, precision: 0, padding: 8, font: { size: 11 } }, beginAtZero: true, grace: '8%' };
+  const ejeCategoria = { grid: { display: false }, border: { display: false }, ticks: { color: horiz ? text : muted, padding: 6, font: { size: horiz ? 12 : 11, weight: horiz ? '600' : '500' } } };
+  const { legend: legendCfg, ...otrosPlugins } = config.options?.plugins || {};
   const c = new window.Chart(canvas, {
     ...config,
     plugins: [...(config.plugins || []), etiquetasDatos],
     options: {
-      responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 650, easing: 'easeOutQuart' },
+      interaction: { mode: dona ? 'point' : 'index', intersect: dona, axis: horiz ? 'y' : 'x' },
+      layout: { padding: dona ? 6 : horiz ? { right: 34, top: 4 } : { top: 20 } },
       plugins: {
-        legend: { labels: { color: text, boxWidth: 12, boxHeight: 12, usePointStyle: true }, ...(config.options?.plugins?.legend || {}) },
-        tooltip: { backgroundColor: '#102536', padding: 10, cornerRadius: 10 },
+        ...otrosPlugins,
+        legend: {
+          display: dona || varias,
+          position: dona ? 'bottom' : 'top', align: dona ? 'center' : 'end',
+          labels: { color: text, boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: dona ? 'circle' : 'rectRounded', padding: 14, font: { size: 12, weight: '600' } },
+          ...(legendCfg || {}),
+        },
+        tooltip: {
+          backgroundColor: '#0B2235', borderColor: 'rgba(255,255,255,.08)', borderWidth: 1,
+          padding: { x: 12, y: 10 }, cornerRadius: 10, caretSize: 6, boxPadding: 6, usePointStyle: true,
+          titleFont: { size: 12.5, weight: '700' }, bodyFont: { size: 12 }, titleMarginBottom: 6,
+          callbacks: dona ? {
+            label: (ctx) => {
+              const tot = ctx.dataset.data.reduce((s, n) => s + (Number(n) || 0), 0);
+              return ` ${ctx.label}: ${fmtN(ctx.parsed)} (${tot ? Math.round((ctx.parsed / tot) * 100) : 0}%)`;
+            },
+          } : {},
+        },
       },
-      scales: config.type === 'doughnut' ? {} : {
-        x: { grid: { color: line, drawTicks: false }, ticks: { color: muted, precision: 0 }, border: { display: false }, ...(config.options?.scales?.x || {}) },
-        y: { grid: { color: line, drawTicks: false }, ticks: { color: muted, precision: 0 }, border: { display: false }, beginAtZero: true, ...(config.options?.scales?.y || {}) },
+      scales: dona ? {} : {
+        x: { ...(horiz ? ejeValor : ejeCategoria), ...(config.options?.scales?.x || {}) },
+        y: { ...(horiz ? ejeCategoria : ejeValor), ...(config.options?.scales?.y || {}) },
       },
       ...(config.options?.indexAxis ? { indexAxis: config.options.indexAxis } : {}),
-      ...(config.type === 'doughnut' ? { cutout: '64%' } : {}),
+      ...(dona ? { cutout: '68%' } : {}),
     },
   });
   charts.add(c);
@@ -509,15 +561,18 @@ export function makeChart(canvas, config) {
 }
 // Cambio de tema inmediato: re-colorea las gráficas sin volver a consultar datos
 export function restyleCharts() {
-  const muted = cssVar('--muted'), line = cssVar('--line'), text = cssVar('--text');
+  const muted = cssVar('--muted'), line = cssVar('--line'), text = cssVar('--text'), card = cssVar('--card');
   charts.forEach((c) => {
     try {
       const o = c.options;
+      const horiz = o.indexAxis === 'y';
       if (o.plugins?.legend?.labels) o.plugins.legend.labels.color = text;
-      for (const s of Object.values(o.scales || {})) {
-        if (s.ticks) s.ticks.color = muted;
+      for (const [k, s] of Object.entries(o.scales || {})) {
+        const categoria = horiz ? k === 'y' : k === 'x';
+        if (s.ticks) s.ticks.color = categoria && horiz ? text : muted;
         if (s.grid) s.grid.color = line;
       }
+      if (['doughnut', 'pie'].includes(c.config.type)) c.data.datasets.forEach((d) => { d.borderColor = card; });
       c.update('none');
     } catch { /* gráfica ya destruida */ }
   });

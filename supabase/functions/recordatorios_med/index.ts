@@ -9,6 +9,9 @@
 //   4) Cada ejecución: a quien solicitó cada cita confirmada que empieza en
 //      unos 40-60 minutos.
 //   5) Al iniciar la hora de comida del médico (config_med): a todos los usuarios.
+//   6) Modo "inminente" (otro trabajo de pg_cron, cada minuto, solo cuando hay
+//      citas por empezar): a quien solicitó cada cita confirmada que empieza en
+//      unos 5 minutos. En ese modo no se hace nada más.
 // Los recordatorios de cita se registran en avisos_med para no repetirse.
 // Protegida con un secreto que vive en la base de datos (med_private.cron).
 import webpush from 'npm:web-push@3.6.7';
@@ -63,7 +66,9 @@ Deno.serve(async (req) => {
     const h = Number(p.hour), min = Number(p.minute);
     if (['Sat', 'Sun'].includes(p.weekday)) return json(200, { ok: true, omitido: 'Fin de semana: sin recordatorios.' });
     if (h < 7 || h > 19) return json(200, { ok: true, omitido: 'Fuera del horario de avisos (07:00-19:00).' });
-    const enPunto = min < 10; // la ejecución de la hora en punto (pg_cron puede llegar con segundos de retraso)
+    const inminente = (await req.json().catch(() => ({})))?.modo === 'inminente';
+    // la ejecución de la hora en punto (pg_cron puede llegar con segundos de retraso)
+    const enPunto = !inminente && min < 10;
     const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(ahora);
     const minutosHoy = h * 60 + min;
 
@@ -125,9 +130,23 @@ Deno.serve(async (req) => {
         } });
       }
     }
-    {
+    const t = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    if (inminente) {
+      // 6) Cita que empieza en unos 5 minutos (ventana 4-6 min; avisos_med evita repetir)
+      const desde = minutosHoy + 4, hasta = minutosHoy + 6;
+      if (hasta < 24 * 60) {
+        const { data } = await admin.from('citas_med').select(sel).eq('estado', 'confirmada').eq('fecha', hoy)
+          .gte('hora', t(desde)).lt('hora', t(hasta)).order('hora');
+        for (const c of (data || []) as unknown as Cita[]) {
+          porSolicitante.push({ usuario: c.solicitado_por, cita: c, evento: 'recordatorio_5min', aviso: {
+            title: `En 5 minutos: cita a las ${hhmm(c.hora)} h`,
+            body: `${c.colaborador?.nombre || 'Colaborador'} · ${folio(c.folio)}. Es momento de enviarlo a Servicio Médico.`,
+            url: `/#/citas?cita=${c.id}`, tag: `recordatorio-${c.id}`,
+          } });
+        }
+      }
+    } else {
       const desde = minutosHoy + 35, hasta = minutosHoy + 65;
-      const t = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
       if (hasta < 24 * 60) {
         const { data } = await admin.from('citas_med').select(sel).eq('estado', 'confirmada').eq('fecha', hoy)
           .gte('hora', t(desde)).lt('hora', t(hasta)).order('hora');
@@ -153,7 +172,7 @@ Deno.serve(async (req) => {
     // 5) Hora de comida del médico: aviso a todos los usuarios al iniciar (una vez al día,
     //    en la ejecución que cae dentro de los primeros 20 minutos; no en días sin servicio)
     let comida: Aviso | null = null;
-    {
+    if (!inminente) {
       const { data: cfg } = await admin.from('config_med').select('comida_inicio, comida_fin').eq('id', 1).maybeSingle();
       if (cfg?.comida_inicio && cfg?.comida_fin) {
         const [hi, mi] = String(cfg.comida_inicio).split(':').map(Number);

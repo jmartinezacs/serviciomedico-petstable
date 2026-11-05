@@ -105,7 +105,7 @@ const listaCampos = (b) => {
 const nuevo = (b, k) => (Array.isArray(b.cambios?.[k]) ? b.cambios[k][1] : undefined);
 const cuandoTxt = (f, h) => [f ? `el ${fmtDate(f)}` : '', h ? `a las ${fmtTime(h)} h` : ''].filter(Boolean).join(' ');
 
-function describir(b) {
+export function describir(b) {
   if (b.tabla === 'atenciones_med' && !b.objeto) return esc('Registró la atención de una cita (contenido clínico no auditado).');
   const A = `<b>${esc(actorNombre(b))}</b>`;
   const O = `<b>${esc(b.objeto || 'un registro')}</b>`;

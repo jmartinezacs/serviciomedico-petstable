@@ -90,6 +90,10 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v2.6:**
+  - **Recordatorio 5 minutos antes:** el trabajo de pg_cron `med_recordatorio_5min` revisa cada minuto, en SQL, si hay citas confirmadas que empiezan en 4-6 minutos (hora de Ciudad de México); solo entonces llama a `recordatorios_med` con `{"modo":"inminente"}`, que avisa por push a quien solicitó (evento `recordatorio_5min` en `avisos_med`, sin repetir).
+  - **Actividad reciente del panel:** foto de quien hizo la acción y la misma descripción breve de la Bitácora (`v_bitacora_med`), con tiempo relativo.
+  - **Gráficas:** estilo unificado en `makeChart` (barras con extremo redondeado, cuadrícula discreta solo en el eje de valores, valores al final de cada barra, dona más fina con total al centro y porcentaje en la ayuda emergente, leyenda solo cuando hay varias series) y un color por gráfica de una sola serie.
 - **v2.5:**
   - **Correo también al reprogramar y cancelar** la cita (además de confirmar), a quien corresponde el aviso y a los usuarios del área de quien solicitó. Si quien solicitó cancela o reprograma, el correo va al médico. La solicitud nueva sigue solo por push.
   - **Archivo de calendario (`cita.ics`)** adjunto cuando la cita queda confirmada con horario: se agrega a Google Calendar, Outlook o el celular, con recordatorio 15 minutos antes (bloque de 30 min, hora de Ciudad de México). El UID es fijo por cita.
