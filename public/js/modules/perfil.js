@@ -55,13 +55,17 @@ async function pintarNotificaciones(box) {
 // Correos de citas (administradores): vista previa con datos de ejemplo del tipo
 // elegido (confirmada, reprogramada o cancelada),
 // generada por notificar_med con la misma plantilla que los correos reales, o
-// envío de prueba solo al correo propio.
+// envío de prueba solo al correo propio. Con data-resumen, lo mismo para el
+// resumen mensual (resumen_mensual_med, datos reales del mes anterior).
 async function correoPrueba(btn) {
   const vista = btn.dataset.mail === 'vista';
+  const resumen = 'resumen' in btn.dataset;
   const tipo = document.getElementById('mail-tipo')?.value || 'confirmada';
   btn.disabled = true;
   try {
-    const { data, error } = await sb.functions.invoke('notificar_med', { body: { accion: 'correo_prueba', vista, tipo } });
+    const { data, error } = resumen
+      ? await sb.functions.invoke('resumen_mensual_med', { body: vista ? { vista: true } : { enviar: true } })
+      : await sb.functions.invoke('notificar_med', { body: { accion: 'correo_prueba', vista, tipo } });
     if (error) throw error;
     if (vista) {
       // El logotipo se publica con el sitio; se incrusta como data URI para la vista previa
@@ -76,7 +80,10 @@ async function correoPrueba(btn) {
         subtitle: `Asunto: ${data.asunto} · De: Servicio Médico · Pet's Table`,
         body: `${data.configurado ? '' : `<div class="notice warn">${icon('info')}<span>El envío de correos aún no está configurado (falta la contraseña de aplicación de Gmail en Supabase). Esta es solo la vista previa.</span></div>`}
           <iframe class="mail-preview" title="Vista previa del correo" sandbox="" srcdoc="${esc(html)}"></iframe>
-          <p class="hint" style="margin-top:8px">Datos de ejemplo. El botón “Ver la cita” aparece cuando se configura la dirección del sitio (MED_SITE_URL) en Supabase.</p>`,
+          ${resumen
+            ? `<p class="hint" style="margin-top:8px">Datos reales del mes anterior. Se envía solo el día 1 de cada mes a las 08:00 h a: ${
+              data.destinatarios?.length ? data.destinatarios.map((d) => `<b>${esc(d.nombre)}</b> (${esc(d.puesto)})`).join(', ') : '<b>nadie</b> (ningún usuario activo tiene los puestos configurados)'}.</p>`
+            : '<p class="hint" style="margin-top:8px">Datos de ejemplo. El botón “Ver la cita” aparece cuando se configura la dirección del sitio (MED_SITE_URL) en Supabase.</p>'}`,
       });
     } else if (!data?.configurado) {
       toast('El envío de correos aún no está configurado: falta agregar la contraseña de aplicación de Gmail en Supabase.', 'warning', 7000);
@@ -149,7 +156,12 @@ export default {
               <option value="cancelada">Cita cancelada</option>
             </select>
             <button class="btn secondary" data-mail="vista">${icon('eye')} Ver vista previa</button>
-            <button class="btn primary" data-mail="enviar">${icon('send')} Enviarme un correo de prueba</button></div>` : ''}
+            <button class="btn primary" data-mail="enviar">${icon('send')} Enviarme un correo de prueba</button></div>
+          <div class="section-title" style="margin-top:22px">${icon('bar-chart-3')} Resumen mensual por correo</div>
+          <p class="hint" style="margin:0 0 10px">Cada día 1, a las 08:00 h, se envía el resumen del mes anterior al Supervisor de seguridad, salud y ambiente, al Gerente y al Ingeniero de procesos y mejora continua. Solo datos agregados, sin nombres de colaboradores.</p>
+          <div class="page-actions" style="justify-content:flex-start">
+            <button class="btn secondary" data-mail="vista" data-resumen>${icon('eye')} Ver resumen del mes anterior</button>
+            <button class="btn primary" data-mail="enviar" data-resumen>${icon('send')} Enviármelo de prueba</button></div>` : ''}
           <div class="section-title" style="margin-top:22px">${icon('smartphone')} Instalar en la pantalla de inicio</div>
           ${standalone ? `<p class="hint">${icon('check-circle-2')} Ya estás usando la aplicación instalada.</p>` : `
           <button class="btn secondary hidden" id="install-btn">${icon('download')} Instalar aplicación</button>

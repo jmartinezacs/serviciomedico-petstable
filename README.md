@@ -90,6 +90,9 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v2.7:**
+  - **Resumen mensual por correo:** el día 1 de cada mes a las 08:00 h (Ciudad de México), el trabajo de pg_cron `med_resumen_mensual` llama a la Edge Function `resumen_mensual_med`, que envía el resumen del mes anterior a los usuarios activos cuyo puesto esté en `config_med.resumen_puestos` (Supervisor de seguridad, salud y ambiente; Gerente de procesos y mejora continua; Ingeniero de procesos y mejora continua). Incluye consultas atendidas y comparación con el mes anterior, colaboradores atendidos, citas, departamentos, padecimientos, motivos, medicamentos entregados, exámenes y alertas de inventario. Solo datos agregados (función `med_resumen_mensual`). `resumenes_med` evita enviar dos veces el mismo mes.
+  - **Mi perfil (administradores):** vista previa del resumen del mes anterior con la lista de destinatarios y envío de prueba solo al propio correo.
 - **v2.6:**
   - **Recordatorio 5 minutos antes:** el trabajo de pg_cron `med_recordatorio_5min` revisa cada minuto, en SQL, si hay citas confirmadas que empiezan en 4-6 minutos (hora de Ciudad de México); solo entonces llama a `recordatorios_med` con `{"modo":"inminente"}`, que avisa por push a quien solicitó (evento `recordatorio_5min` en `avisos_med`, sin repetir).
   - **Actividad reciente del panel:** foto de quien hizo la acción y la misma descripción breve de la Bitácora (`v_bitacora_med`), con tiempo relativo.
