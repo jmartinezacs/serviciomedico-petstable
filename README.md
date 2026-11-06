@@ -90,6 +90,9 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v2.8:**
+  - **Panel:** anillo de horarios libres en SVG (degradado, una marca por horario, brillo y llenado animado solo la primera vez). KPI con barra lateral, ícono y tinte del mismo color: azul, naranja, verde y rojo (clases `k-azul`, `k-naranja`, `k-verde`, `k-rojo`).
+  - **Gráficas:** en departamento, motivo y padecimiento cada categoría tiene su color, asignado por nombre en orden alfabético (no cambia si sube o baja de lugar). Todas las barras llevan degradado y sombra suave (`degradadoBarra` y `sombraMarcas` en core.js).
 - **v2.7:**
   - **Resumen mensual por correo:** el día 1 de cada mes a las 08:00 h (Ciudad de México), el trabajo de pg_cron `med_resumen_mensual` llama a la Edge Function `resumen_mensual_med`, que envía el resumen del mes anterior a los usuarios activos cuyo puesto esté en `config_med.resumen_puestos` (Supervisor de seguridad, salud y ambiente; Gerente de procesos y mejora continua; Ingeniero de procesos y mejora continua). Incluye consultas atendidas y comparación con el mes anterior, colaboradores atendidos, citas, departamentos, padecimientos, motivos, medicamentos entregados, exámenes y alertas de inventario. Solo datos agregados (función `med_resumen_mensual`). `resumenes_med` evita enviar dos veces el mismo mes.
   - **Mi perfil (administradores):** vista previa del resumen del mes anterior con la lista de destinatarios y envío de prueba solo al propio correo.

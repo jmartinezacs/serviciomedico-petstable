@@ -140,6 +140,25 @@ async function disponibilidad() {
   }
   return { tipo: 'cerrado', fecha: sig, libres: await libresDe(sig, false, bloqueos), base: SLOTS.length, finde: !isWeekday(hoy), motivo: diaBloq?.motivo };
 }
+// Indicador de horarios libres: anillo con degradado y una marca exterior por
+// cada horario del día. La animación de llenado solo corre la primera vez, para
+// que no se repita cada vez que el panel se actualiza.
+let anilloAnimado = false;
+function anilloHTML(n, base, pct) {
+  const anim = anilloAnimado ? '' : ' anim';
+  anilloAnimado = true;
+  const marcas = Math.max(1, base || 1);
+  return `<div class="avail-ring${anim}" role="img" aria-label="${n} de ${marcas} horarios libres">
+    <svg viewBox="0 0 140 140" aria-hidden="true">
+      <defs><linearGradient id="avail-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="ar-s1"/><stop offset="1" class="ar-s2"/></linearGradient></defs>
+      <circle class="ar-marcas" cx="70" cy="70" r="65" pathLength="${marcas}" stroke-dasharray="0.16 0.84" transform="rotate(-90 70 70)"/>
+      <circle class="ar-pista" cx="70" cy="70" r="53"/>
+      ${n ? `<circle class="ar-valor" cx="70" cy="70" r="53" pathLength="100" stroke-dasharray="${pct} 100" transform="rotate(-90 70 70)"/>` : ''}
+    </svg>
+    <b>${n}<small>libres</small><em>de ${marcas}</em></b>
+  </div>`;
+}
+
 function availHTML(d) {
   if (!d) return '';
   const n = d.libres.length;
@@ -155,7 +174,7 @@ function availHTML(d) {
       `Próximo día con servicio: ${dia} · ${n} ${n === 1 ? 'horario libre' : 'horarios libres'}.`],
   }[d.tipo];
   return `<section class="avail ${t[0]}" aria-label="Disponibilidad de citas">
-    <div class="avail-ring" style="--p:${pct}"><b>${n}<small>libres</small></b></div>
+    ${anilloHTML(n, d.base, pct)}
     <div class="avail-txt"><span class="avail-tag">${esc(t[1])}</span><h3>${esc(t[2])}</h3><p>${esc(t[3])} Atención de lunes a viernes de 9:00 a 18:00.</p>
       ${n ? `<div class="avail-slots">${chips}</div>` : ''}</div>
     <div class="avail-cta ${state.puedeExamenes ? 'con-examenes' : ''}">
@@ -293,10 +312,10 @@ function adminHTML(k, prox, lotes, stock, act, pad) {
   ];
   return `
     <div class="grid grid-4">
-      ${kpi('i-blue', 'calendar-clock', 'Citas de hoy', k.citas_hoy, 'Programadas y atendidas hoy', '#/citas?vista=agenda')}
-      ${kpi('c2 i-amber', 'hourglass', 'Por confirmar', k.pendientes, 'Pendientes a partir de hoy', '#/citas?estado=pendiente')}
-      ${kpi('c3 i-violet', 'check-circle-2', 'Atendidas', pe.atendida || 0, 'En el periodo seleccionado', '#/citas?estado=atendida')}
-      ${kpi(k.bajo_minimo > 0 ? 'danger i-pink' : 'c4 i-pink', 'package-x', 'Stock bajo mínimo', k.bajo_minimo, `De ${fmtNum(k.medicamentos_activos)} medicamentos activos`, '#/inventario?estado=alerta')}
+      ${kpi('k-azul', 'calendar-clock', 'Citas de hoy', k.citas_hoy, 'Programadas y atendidas hoy', '#/citas?vista=agenda')}
+      ${kpi('k-naranja', 'hourglass', 'Por confirmar', k.pendientes, 'Pendientes a partir de hoy', '#/citas?estado=pendiente')}
+      ${kpi('k-verde', 'check-circle-2', 'Atendidas', pe.atendida || 0, 'En el periodo seleccionado', '#/citas?estado=atendida')}
+      ${kpi(k.bajo_minimo > 0 ? 'danger k-rojo' : 'k-rojo', 'package-x', 'Stock bajo mínimo', k.bajo_minimo, `De ${fmtNum(k.medicamentos_activos)} medicamentos activos`, '#/inventario?estado=alerta')}
     </div>
     <div class="grid grid-3 mt">
       ${statusCard(k.por_caducar ? 'warn' : '', 'Lotes por caducar', `Caducan en ${k.dias_alerta} días o menos`, k.por_caducar, '#/inventario?cad=por_caducar')}
@@ -382,10 +401,10 @@ function userHTML(k, prox) {
   const pe = k.por_estado || {};
   return `
     <div class="grid grid-4">
-      ${kpi('i-blue', 'calendar-check', 'Confirmadas próximas', k.confirmadas_proximas, 'A partir de hoy', '#/citas?estado=confirmada')}
-      ${kpi('c2 i-amber', 'hourglass', 'Pendientes', k.pendientes, 'Esperando confirmación', '#/citas?estado=pendiente')}
-      ${kpi('c3 i-violet', 'check-circle-2', 'Atendidas', pe.atendida || 0, 'En el periodo seleccionado')}
-      ${kpi('c4 i-pink', 'x-circle', 'Canceladas', pe.cancelada || 0, 'En el periodo seleccionado')}
+      ${kpi('k-azul', 'calendar-check', 'Confirmadas próximas', k.confirmadas_proximas, 'A partir de hoy', '#/citas?estado=confirmada')}
+      ${kpi('k-naranja', 'hourglass', 'Pendientes', k.pendientes, 'Esperando confirmación', '#/citas?estado=pendiente')}
+      ${kpi('k-verde', 'check-circle-2', 'Atendidas', pe.atendida || 0, 'En el periodo seleccionado')}
+      ${kpi('k-rojo', 'x-circle', 'Canceladas', pe.cancelada || 0, 'En el periodo seleccionado')}
     </div>
     <div class="grid grid-2 mt">
       <div class="card">${cardHead('Mis próximas citas', 'Pendientes y confirmadas', `<button class="btn primary" data-dash="nueva-cita">${icon('calendar-plus')} Solicitar cita</button>`)}${proximasHTML(prox)}</div>
@@ -395,16 +414,19 @@ function userHTML(k, prox) {
 }
 
 const ESTADO_COLOR = { pendiente: '#FFB020', confirmada: '#1BC7C7', atendida: '#1BB56F', cancelada: '#9AAAB6', no_asistio: '#E0464E' };
-// Un solo color por gráfica de una serie (la longitud de la barra ya dice la
-// cantidad; varios colores sin significado distraen)
-const COLOR_PAD = '#0FA3A6', COLOR_AREA = '#5B8DEF', COLOR_MOTIVO = '#F58020', COLOR_TOP = '#7A5BE6';
+// Cada categoría con su color. Se asigna por nombre en orden alfabético (no por
+// lugar en la gráfica), así una categoría no cambia de color cuando sube o baja.
+const COLORES = ['#F58020', '#0FA3A6', '#2563EB', '#16A34A', '#7C3AED', '#DB2777', '#E8890C', '#0891B2', '#65A30D', '#DC2626', '#9333EA', '#0D9488', '#CA8A04', '#4F46E5', '#BE185D', '#64748B'];
+const coloresPorNombre = (nombres) => new Map([...new Set(nombres)].sort((a, b) => a.localeCompare(b, 'es')).map((n, i) => [n, COLORES[i % COLORES.length]]));
+const COLOR_TOP = '#7A5BE6';
 function drawPadecimientos(pad) {
   if (!pad?.total) return;
+  const color = coloresPorNombre(pad.general.map((g) => g.padecimiento));
   const barra = (id, items) => makeChart(document.getElementById(id), {
     type: 'bar',
     data: {
       labels: items.map((x) => x.padecimiento),
-      datasets: [{ label: 'Consultas', data: items.map((x) => x.n), backgroundColor: COLOR_PAD, maxBarThickness: 22 }],
+      datasets: [{ label: 'Consultas', data: items.map((x) => x.n), backgroundColor: items.map((x) => color.get(x.padecimiento) || '#64748B'), maxBarThickness: 22 }],
     },
     options: { indexAxis: 'y', plugins: { legend: { display: false } } },
   });
@@ -436,14 +458,16 @@ function drawCharts(k, pad) {
     },
     options: { plugins: { medCentro: { label: 'citas' } } },
   });
+  const colorArea = coloresPorNombre((k.por_area || []).map((a) => a.area));
   makeChart(document.getElementById('ch-area'), {
     type: 'bar',
-    data: { labels: (k.por_area || []).map((a) => a.area), datasets: [{ label: 'Citas', data: (k.por_area || []).map((a) => a.n), backgroundColor: COLOR_AREA, maxBarThickness: 22 }] },
+    data: { labels: (k.por_area || []).map((a) => a.area), datasets: [{ label: 'Citas', data: (k.por_area || []).map((a) => a.n), backgroundColor: (k.por_area || []).map((a) => colorArea.get(a.area)), maxBarThickness: 22 }] },
     options: { indexAxis: 'y', plugins: { legend: { display: false } } },
   });
+  const colorMotivo = coloresPorNombre(Object.keys(MOTIVOS));
   makeChart(document.getElementById('ch-motivo'), {
     type: 'bar',
-    data: { labels: (k.por_motivo || []).map((m) => MOTIVOS[m.motivo] || m.motivo), datasets: [{ label: 'Citas', data: (k.por_motivo || []).map((m) => m.n), backgroundColor: COLOR_MOTIVO, maxBarThickness: 34 }] },
+    data: { labels: (k.por_motivo || []).map((m) => MOTIVOS[m.motivo] || m.motivo), datasets: [{ label: 'Citas', data: (k.por_motivo || []).map((m) => m.n), backgroundColor: (k.por_motivo || []).map((m) => colorMotivo.get(m.motivo) || '#64748B'), maxBarThickness: 34 }] },
     options: { plugins: { legend: { display: false } } },
   });
   makeChart(document.getElementById('ch-top'), {

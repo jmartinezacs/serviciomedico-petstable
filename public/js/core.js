@@ -502,6 +502,41 @@ const etiquetasDatos = {
     ctx.restore();
   },
 };
+// Sombreado de las barras: degradado a lo largo de cada barra (de la base al
+// extremo) y una sombra suave debajo. Los colores de `config` se quedan como hex
+// para que la vista ampliada pueda copiarlos.
+const mezclar = (hex, con, t) => {
+  const c = (h, i) => parseInt(h.slice(i, i + 2), 16);
+  const canal = (i) => Math.round(c(hex, i) + (c(con, i) - c(hex, i)) * t).toString(16).padStart(2, '0');
+  return `#${canal(1)}${canal(3)}${canal(5)}`;
+};
+const baseDe = (color, i) => (Array.isArray(color) ? color[(i || 0) % color.length] : color);
+function degradadoBarra(color, horiz) {
+  return (ctx) => {
+    const base = baseDe(color, ctx.dataIndex);
+    const { chart } = ctx;
+    const eje = chart.scales?.[horiz ? 'x' : 'y'];
+    if (!chart.chartArea || !eje || ctx.dataIndex === undefined || typeof base !== 'string' || !base.startsWith('#')) return base;
+    const p0 = eje.getPixelForValue(0), p1 = eje.getPixelForValue(Number(ctx.dataset.data[ctx.dataIndex]) || 0);
+    if (!Number.isFinite(p0) || !Number.isFinite(p1) || p0 === p1) return base;
+    const g = horiz ? chart.ctx.createLinearGradient(p0, 0, p1, 0) : chart.ctx.createLinearGradient(0, p0, 0, p1);
+    g.addColorStop(0, mezclar(base, '#000000', 0.16));
+    g.addColorStop(1, mezclar(base, '#FFFFFF', 0.26));
+    return g;
+  };
+}
+const sombraMarcas = {
+  id: 'medSombra',
+  beforeDatasetDraw(chart) {
+    const { ctx } = chart;
+    ctx.save();
+    ctx.shadowColor = 'rgba(11, 34, 53, .24)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 3;
+  },
+  afterDatasetDraw(chart) { chart.ctx.restore(); },
+};
 export function makeChart(canvas, config) {
   if (!window.Chart || !canvas) return null;
   const muted = cssVar('--muted') || '#687B8C', line = cssVar('--line') || '#E3EAEF', text = cssVar('--text') || '#172431', card = cssVar('--card') || '#FFFFFF';
@@ -519,9 +554,14 @@ export function makeChart(canvas, config) {
   const ejeValor = { grid: { color: line, drawTicks: false, tickBorderDash: [3, 4] }, border: { display: false, dash: [3, 4] }, ticks: { color: muted, precision: 0, padding: 8, font: { size: 11 } }, beginAtZero: true, grace: '8%' };
   const ejeCategoria = { grid: { display: false }, border: { display: false }, ticks: { color: horiz ? text : muted, padding: 6, font: { size: horiz ? 12 : 11, weight: horiz ? '600' : '500' } } };
   const { legend: legendCfg, ...otrosPlugins } = config.options?.plugins || {};
+  const data = config.type !== 'bar' ? config.data : {
+    ...config.data,
+    datasets: config.data.datasets.map((d) => ({ ...d, medBase: d.backgroundColor, backgroundColor: degradadoBarra(d.backgroundColor, horiz) })),
+  };
   const c = new window.Chart(canvas, {
     ...config,
-    plugins: [...(config.plugins || []), etiquetasDatos],
+    data,
+    plugins: [...(config.plugins || []), sombraMarcas, etiquetasDatos],
     options: {
       responsive: true, maintainAspectRatio: false,
       animation: { duration: 650, easing: 'easeOutQuart' },
@@ -544,7 +584,13 @@ export function makeChart(canvas, config) {
               const tot = ctx.dataset.data.reduce((s, n) => s + (Number(n) || 0), 0);
               return ` ${ctx.label}: ${fmtN(ctx.parsed)} (${tot ? Math.round((ctx.parsed / tot) * 100) : 0}%)`;
             },
-          } : {},
+          } : {
+            // El cuadro de color del tooltip va liso (el degradado es de la barra)
+            labelColor: (ctx) => {
+              const b = baseDe(ctx.dataset.medBase, ctx.dataIndex);
+              return { backgroundColor: b, borderColor: b };
+            },
+          },
         },
       },
       scales: dona ? {} : {
