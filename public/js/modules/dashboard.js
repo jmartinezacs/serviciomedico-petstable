@@ -171,24 +171,20 @@ function estadosDe(fecha, libres, bloqueos, esHoy) {
   });
 }
 // Indicador de horarios libres. Al entrar al Panel el anillo gira hacia la
-// derecha mientras se completa hasta el porcentaje real (libres / base), y las
-// marcas exteriores (una por horario del día, con su estado real) se encienden
-// en orden. Si los datos cambian sin salir de la vista, el arco y la cifra pasan
+// derecha mientras se completa hasta el porcentaje real (libres / base) y la
+// cifra cuenta en sincronía. Si los datos cambian sin salir de la vista, el arco y la cifra pasan
 // del valor anterior al nuevo. Nada de esto altera el cálculo.
 let ringPrevio = null; // { n, pct } del último pintado en esta vista
-function anilloHTML(n, base, pct, estados) {
+function anilloHTML(n, base, pct) {
   const marcas = Math.max(1, base || 1);
   const primero = ringPrevio === null;
   const cambia = !primero && (ringPrevio.pct !== pct || ringPrevio.n !== n);
-  const T = estados.length || 1;
-  const ticks = estados.map((x, i) => `<circle class="ar-t t-${x.e}" style="--i:${i}" cx="80" cy="80" r="75" pathLength="${T}" stroke-dasharray="0.58 ${T}" stroke-dashoffset="${-i - 0.21}" transform="rotate(-90 80 80)"/>`).join('');
   const desde = primero ? 0 : ringPrevio.pct;
   return `<div class="avail-ring${primero ? ' anim' : cambia ? ' cambio' : ''}" style="--pct:${pct};--desde:${desde}" role="img" aria-label="${n} de ${marcas} horarios libres (${pct} %)">
     <svg viewBox="0 0 160 160" aria-hidden="true">
       <defs><linearGradient id="avail-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="ar-s1"/><stop offset="1" class="ar-s2"/></linearGradient></defs>
-      <g class="ar-ticks">${ticks}</g>
-      <circle class="ar-pista" cx="80" cy="80" r="60"/>
-      <g class="ar-giro">${n ? `<circle class="ar-valor" cx="80" cy="80" r="60" pathLength="100" stroke-dasharray="${pct} 100" transform="rotate(-90 80 80)"/>` : ''}</g>
+      <circle class="ar-pista" cx="80" cy="80" r="68"/>
+      <g class="ar-giro">${n ? `<circle class="ar-valor" cx="80" cy="80" r="68" pathLength="100" stroke-dasharray="${pct} 100" transform="rotate(-90 80 80)"/>` : ''}</g>
     </svg>
     <div class="ar-centro"><b class="ar-num" data-desde="${primero ? 0 : ringPrevio.n}" data-hasta="${n}">${n}</b><small>libres</small><em>de ${marcas}</em>
       <span class="ar-pct">${pct} %</span></div>
@@ -210,7 +206,7 @@ function contarAnillo(raiz) {
   el.textContent = a;
   cuadro(paso);
 }
-const ESTADO_SLOT = { libre: 'Disponible', ocupado: 'Ocupado', nd: 'No disponible', comida: 'Comida' };
+const ESTADO_SLOT = { libre: 'Disponible', ocupado: 'Ocupado', nd: 'No disp.', comida: 'Comida' };
 const VISIBLES = 12;
 function slotsHTML(d) {
   const est = d.estados || [];
@@ -221,7 +217,7 @@ function slotsHTML(d) {
     const oculto = i < i0 || i >= i0 + VISIBLES ? ' extra' : '';
     const st = `style="--i:${Math.max(0, i - i0)}"`;
     return x.e === 'libre'
-      ? `<button class="slot-chip s-libre${oculto}" ${st} data-dash="agendar" data-fecha="${d.fecha}" data-hora="${x.s}" title="Agendar a las ${x.s}"><b>${x.s}</b><small>${ESTADO_SLOT.libre}</small></button>`
+      ? `<button class="slot-chip s-libre${oculto}" ${st} data-dash="agendar" data-fecha="${d.fecha}" data-hora="${x.s}" title="Disponible · agendar a las ${x.s}" aria-label="${x.s}, disponible"><b>${x.s}</b></button>`
       : `<span class="slot-chip s-${x.e}${oculto}" ${st} aria-disabled="true" title="${x.s} · ${ESTADO_SLOT[x.e]}"><b>${x.s}</b><small>${ESTADO_SLOT[x.e]}</small></span>`;
   };
   return `<div class="slots-pro">
@@ -261,7 +257,7 @@ function availHTML(d) {
       `Próximo día con servicio: ${dia} · ${n} ${n === 1 ? 'horario libre' : 'horarios libres'}.`],
   }[d.tipo];
   const html = `<section class="avail avail-pro ${t[0]}${ringPrevio === null ? ' entra-av' : ''}" aria-label="Disponibilidad de citas">
-    ${anilloHTML(n, d.base, pct, d.estados || [])}
+    ${anilloHTML(n, d.base, pct)}
     <div class="avail-txt"><span class="avail-tag">${esc(t[1])}</span><h3>${esc(t[2])}</h3><p>${esc(t[3])} Atención de lunes a viernes de 9:00 a 18:00.</p>
       ${(d.estados || []).length ? slotsHTML(d) : ''}</div>
   </section>`;

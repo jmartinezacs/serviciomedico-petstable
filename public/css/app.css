@@ -1825,3 +1825,132 @@ body.cargando .top::after { content: ""; position: absolute; left: 0; bottom: -1
   .avail-pro.entra-av .slot-chip, .slots-pro.todos .slot-chip.extra, .slot-chip, .slot-chip::after, .am, .am::after, .am-ilus .emoji, .am-ir, #view.entra .acciones-med > *,
   .hello .emoji.hello-ilus, #view.entra .hello .emoji.hello-ilus { animation: none !important; transition: none !important; }
 }
+
+/* =====================================================================
+   v2.11 · Paleta de acciones unificada, anillo sin marcas y más grande,
+   horarios rediseñados y botones «Nueva cita». Solo presentación.
+   ---------------------------------------------------------------------
+   Jerarquía de color de las acciones:
+   · Principal (crear, guardar, Nueva cita): naranja Pet's Table, un solo
+     degradado profundo (#F7892B → #D9590B).
+   · Secundaria (ver, filtrar, cancelar diálogo): superficie con borde;
+     al pasar el cursor, borde y tinte naranja suaves.
+   · Urgencia / peligro (urgencia, no asistió, eliminar): rojo #DC2626.
+   · Positiva (confirmar, examen de ingreso): verde #16A34A.
+   · Neutra de marca (examen de egreso, ir al panel): azul marino #1E3A55.
+   Solo la acción principal va rellena en el Panel; las demás van en
+   tarjeta con tinte de su color para que no compitan entre sí.
+   ===================================================================== */
+:root {
+  --ac-p1: #F7892B; --ac-p2: #D9590B; --ac-p-sombra: rgba(217, 89, 11, .45);
+  --ac-u: #DC2626; --ac-u-txt: #B91C1C;
+  --ac-g: #16A34A; --ac-g-txt: #15803D;
+  --ac-n: #1E3A55; --ac-n-txt: #1E3A55;
+}
+:root[data-theme="dark"] { --ac-u-txt: #FCA5A5; --ac-g-txt: #86EFAC; --ac-n: #4F7BA6; --ac-n-txt: #A7C4E2; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ac-u-txt: #FCA5A5; --ac-g-txt: #86EFAC; --ac-n: #4F7BA6; --ac-n-txt: #A7C4E2; } }
+
+/* ---------- Botones de toda la app ---------- */
+.btn.primary { background: linear-gradient(180deg, var(--ac-p1), var(--ac-p2)); border-color: transparent; color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 6px 14px -6px var(--ac-p-sombra); }
+.btn.primary:hover:not(:disabled) { background: linear-gradient(180deg, #F58020, #C9520A); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 10px 20px -8px var(--ac-p-sombra); }
+.btn.secondary:hover:not(:disabled) { border-color: color-mix(in srgb, var(--orange) 50%, var(--input-line)); background: color-mix(in srgb, var(--orange) 5%, var(--card)); color: var(--text); }
+.btn.danger, .btn.btn-noasistio, .urg-btn { background: linear-gradient(180deg, #E5484D, #C42121); border-color: transparent; color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 6px 14px -6px rgba(196, 33, 33, .5); }
+.btn.danger:hover:not(:disabled), .btn.btn-noasistio:hover:not(:disabled), .urg-btn:hover:not(:disabled) { background: linear-gradient(180deg, #DC2626, #A81B1B); border-color: transparent; color: #fff; }
+.btn.btn-confirmar, .ex-btn.ex-ingreso { background: linear-gradient(180deg, #22A355, #15803D); border-color: transparent; color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 6px 14px -6px rgba(21, 128, 61, .5); }
+.btn.btn-confirmar:hover:not(:disabled) { background: linear-gradient(180deg, #16A34A, #126B33); border-color: transparent; }
+.ex-btn.ex-egreso { background: linear-gradient(180deg, #2B4C6E, #17314A); border-color: transparent; color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 6px 14px -6px rgba(23, 49, 74, .55); }
+.ex-form-head.ex-ingreso { background: linear-gradient(135deg, #15803D, #22A355); }
+.ex-form-head.ex-egreso { background: linear-gradient(135deg, #17314A, #2B4C6E); }
+
+/* ---------- Anillo sin marcas exteriores y más grande ---------- */
+.ar-ticks { display: none; }
+:root .avail.avail-pro .avail-ring { width: 268px; height: 268px; }
+.avail-pro .avail-ring::before { inset: 26px; }
+.avail-pro .ar-pista { stroke-width: 17; }
+.avail-pro .ar-valor { stroke-width: 17; }
+.avail-ring .ar-num { font-size: 72px; }
+.ar-centro small { font-size: 13px; margin-top: 8px; }
+.ar-centro em { font-size: 13px; }
+.ar-pct { margin-top: 12px; font-size: 13.5px; padding: 5px 13px; }
+@media (max-width: 900px) { :root .avail.avail-pro .avail-ring { width: 236px; height: 236px; } .avail-ring .ar-num { font-size: 62px; } }
+@media (max-width: 640px) { :root .avail.avail-pro .avail-ring { width: min(280px, 78vw); height: min(280px, 78vw); } .avail-ring .ar-num { font-size: 74px; } }
+
+/* ---------- Horarios ---------- */
+.sp-grid { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; }
+.slot-chip { min-height: 52px; padding: 7px 6px; gap: 1px; border-radius: 13px; border: 1px solid transparent; box-shadow: none; }
+.slot-chip b { font-size: 16.5px; font-weight: 700; letter-spacing: -.01em; }
+.slot-chip small { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; }
+/* Disponible: tinte verde, punto en la esquina; sin texto redundante */
+.slot-chip.s-libre { color: var(--ac-g-txt); background: color-mix(in srgb, var(--ac-g) 9%, var(--card)); border-color: color-mix(in srgb, var(--ac-g) 32%, var(--line));
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 6px 14px -10px rgba(22, 163, 74, .6); }
+.slot-chip.s-libre b { color: var(--ac-g-txt); font-weight: 800; }
+.slot-chip.s-libre::before { top: 6px; right: 6px; width: 7px; height: 7px; background: #22C55E; box-shadow: 0 0 0 2.5px color-mix(in srgb, #22C55E 22%, transparent); }
+.slot-chip.s-libre:hover, .slot-chip.s-libre:focus-visible { transform: translateY(-2px); background: linear-gradient(180deg, #22B35E, #15803D); border-color: transparent;
+  box-shadow: 0 12px 22px -12px rgba(21, 128, 61, .85); outline: none; }
+.slot-chip.s-libre:focus-visible { box-shadow: 0 0 0 3px rgba(27, 199, 199, .55), 0 12px 22px -12px rgba(21, 128, 61, .85); }
+.slot-chip.s-libre:hover b, .slot-chip.s-libre:focus-visible b { color: #fff; }
+.slot-chip.s-libre:active { transform: scale(.95); }
+.slot-chip.s-libre.elegido { background: linear-gradient(180deg, #22B35E, #15803D); } .slot-chip.s-libre.elegido b { color: #fff; }
+/* Ocupado: superficie neutra, hora atenuada */
+.slot-chip.s-ocupado { background: var(--soft); border-color: transparent; color: var(--muted); }
+.slot-chip.s-ocupado b { color: color-mix(in srgb, var(--muted) 85%, transparent); font-weight: 600; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); text-decoration-thickness: 1.5px; }
+/* No disponible y comida: contorno punteado */
+.slot-chip.s-nd { background: transparent; border: 1px dashed color-mix(in srgb, var(--muted) 45%, transparent); opacity: .6; }
+.slot-chip.s-nd b { color: var(--muted); font-weight: 600; }
+.slot-chip.s-comida { background: color-mix(in srgb, #F59E0B 7%, var(--card)); border: 1px dashed color-mix(in srgb, #F59E0B 55%, transparent); color: #B45309; }
+.slot-chip.s-comida b { color: color-mix(in srgb, #B45309 70%, var(--muted)); font-weight: 600; }
+:root[data-theme="dark"] .slot-chip.s-comida { color: #FCD34D; } :root[data-theme="dark"] .slot-chip.s-comida b { color: #E7C77A; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .slot-chip.s-comida { color: #FCD34D; } :root:not([data-theme="light"]) .slot-chip.s-comida b { color: #E7C77A; } }
+.l-libre { background: #22C55E; border-radius: 50%; }
+.l-ocupado { background: var(--soft); border: 1px solid color-mix(in srgb, var(--muted) 35%, transparent); }
+@media (max-width: 640px) {
+  .sp-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+  .slot-chip { min-height: 50px; padding: 6px 2px; border-radius: 12px; }
+  .slot-chip b { font-size: 15px; }
+  .slot-chip small { font-size: 8.5px; letter-spacing: .03em; }
+}
+
+/* ---------- Acciones del Panel: una principal rellena, las demás en tarjeta ---------- */
+.am-cita { --glow: var(--ac-p-sombra); background: linear-gradient(140deg, #F99540 0%, var(--ac-p1) 35%, var(--ac-p2) 100%); }
+.am:is(.am-urg, .am-ing, .am-egr) { color: var(--text); border: 1px solid color-mix(in srgb, var(--c) 30%, var(--line));
+  background: linear-gradient(155deg, color-mix(in srgb, var(--c) 12%, var(--card)), var(--card) 72%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 12px 26px -18px color-mix(in srgb, var(--c) 70%, transparent); }
+.am-urg { --c: var(--ac-u); --c-txt: var(--ac-u-txt); }
+.am-ing { --c: var(--ac-g); --c-txt: var(--ac-g-txt); }
+.am-egr { --c: var(--ac-n); --c-txt: var(--ac-n-txt); }
+.am:is(.am-urg, .am-ing, .am-egr)::before { background: radial-gradient(circle, color-mix(in srgb, var(--c) 18%, transparent), transparent 70%); }
+.am:is(.am-urg, .am-ing, .am-egr)::after { background: linear-gradient(110deg, transparent 32%, color-mix(in srgb, var(--c) 10%, transparent) 50%, transparent 68%); }
+.am:is(.am-urg, .am-ing, .am-egr) .am-txt b { color: var(--c-txt); text-shadow: none; }
+.am:is(.am-urg, .am-ing, .am-egr) .am-txt small { color: var(--muted); }
+.am:is(.am-urg, .am-ing, .am-egr) .am-ilus { background: var(--card); box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 22%, transparent), 0 10px 18px -12px color-mix(in srgb, var(--c) 80%, transparent); }
+.am:is(.am-urg, .am-ing, .am-egr) .am-ir { color: var(--c-txt); background: color-mix(in srgb, var(--c) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 28%, transparent); }
+.am:is(.am-urg, .am-ing, .am-egr):hover, .am:is(.am-urg, .am-ing, .am-egr):focus-visible { border-color: color-mix(in srgb, var(--c) 55%, var(--line));
+  box-shadow: 0 2px 4px rgba(15, 23, 42, .06), 0 22px 36px -20px color-mix(in srgb, var(--c) 85%, transparent); }
+.am:is(.am-urg, .am-ing, .am-egr):hover .am-ir { background: var(--c); color: #fff; }
+.am-cita .am-ilus { background: #FFFFFF; }
+:root[data-theme="dark"] .am:is(.am-urg, .am-ing, .am-egr) { box-shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 16px 30px -20px rgba(0, 0, 0, .8); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .am:is(.am-urg, .am-ing, .am-egr) { box-shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 16px 30px -20px rgba(0, 0, 0, .8); } }
+:root[data-theme="dark"] .am:is(.am-urg, .am-ing, .am-egr) .am-ilus { background: rgba(255, 255, 255, .94); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .am:is(.am-urg, .am-ing, .am-egr) .am-ilus { background: rgba(255, 255, 255, .94); } }
+
+/* ---------- Botones flotantes ---------- */
+.fab { width: 60px; height: 60px; border: 0; isolation: isolate; transition: transform .2s cubic-bezier(.3, 1.4, .5, 1), box-shadow .2s; }
+.fab svg { width: 26px; height: 26px; stroke-width: 2.2; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .25)); }
+.fab-cita { background: radial-gradient(circle at 32% 24%, rgba(255, 255, 255, .38), transparent 48%), linear-gradient(160deg, var(--ac-p1), var(--ac-p2));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--card) 88%, transparent), 0 14px 28px -8px var(--ac-p-sombra), inset 0 -3px 0 rgba(0, 0, 0, .12); }
+.fab-cita::after { content: ""; position: absolute; z-index: -1; inset: -3px; border-radius: 50%; border: 2px solid rgba(245, 128, 32, .55); opacity: 0; animation: fabHalo 2.6s 1.2s ease-out 2; pointer-events: none; }
+@keyframes fabHalo { 0% { opacity: .9; transform: scale(.9); } 100% { opacity: 0; transform: scale(1.35); } }
+.fab-home { border: 0; background: radial-gradient(circle at 32% 24%, rgba(255, 255, 255, .2), transparent 48%), linear-gradient(160deg, #24496B, #0B2235);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--card) 88%, transparent), inset 0 0 0 2px rgba(27, 199, 199, .55), 0 14px 28px -10px rgba(2, 12, 20, .6); }
+.fab:hover, .fab:focus-visible { transform: translateY(-3px) scale(1.05); }
+.fab-cita:hover, .fab-cita:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--card) 88%, transparent), 0 0 0 7px rgba(245, 128, 32, .2), 0 18px 32px -8px var(--ac-p-sombra); }
+.fab-home:hover, .fab-home:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--card) 88%, transparent), inset 0 0 0 2px rgba(27, 199, 199, .8), 0 0 0 7px rgba(27, 199, 199, .18), 0 18px 32px -10px rgba(2, 12, 20, .6); }
+.fab:active { transform: scale(.94); }
+.fab-tip { border-radius: 10px; padding: 7px 11px; box-shadow: 0 10px 22px -10px rgba(0, 0, 0, .5); }
+@media (max-width: 720px) { .fab { width: 54px; height: 54px; } .fab svg { width: 24px; height: 24px; } }
+
+@media (prefers-reduced-motion: reduce) { .fab, .fab-cita::after, .slot-chip { animation: none !important; transition: none !important; } }

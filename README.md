@@ -90,6 +90,11 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v2.11 · Paleta de acciones y Panel (solo presentación):**
+  - **Paleta unificada** (bloque v2.11 de app.css): principal en naranja Pet's Table (#F7892B → #D9590B), secundaria en superficie con borde, urgencia y peligro en rojo #DC2626, positiva en verde #16A34A y neutra de marca en azul marino #1E3A55. En el Panel solo «Nueva cita» va rellena; urgencia y exámenes van en tarjeta con tinte de su color.
+  - **Anillo** sin marcas exteriores y más grande (268 px en escritorio, hasta 280 px en celular), con la misma animación.
+  - **Horarios** más limpios: los disponibles solo muestran la hora con el punto verde; ocupados en superficie neutra con la hora tachada; no disponibles y comida con contorno punteado. Cuatro por fila en celular.
+  - **Botones flotantes** con el mismo naranja principal, aro y brillo; el de «Nueva cita» hace un halo suave al aparecer.
 - **v2.10 · Panel (solo presentación; el cálculo de disponibilidad no cambia):**
   - **Anillo de disponibilidad** más grande (236 px): al entrar al Panel gira hacia la derecha y se completa hasta el porcentaje real (libres / horarios del día), las marcas exteriores (una por horario, con su estado real) se encienden en orden y la cifra cuenta en sincronía; al final aparece el porcentaje. Si los datos cambian, pasa del valor anterior al nuevo.
   - **Horarios** en rejilla con estado: disponible (se puede tocar para agendar), ocupado, no disponible y comida del médico, con leyenda y conteo; muestra 12 y «Ver los N horarios del día».
