@@ -34,14 +34,14 @@ function periodRange(p, desde, hasta) {
 
 export default {
   async render(el) {
-    root = el; cifrasAnimadas = false;
+    root = el; cifrasAnimadas = false; ringPrevio = null;
     const p = state.profile;
     const per = prefs.get('med.dash.period') || 'mes';
     el.innerHTML = `
       <section class="page-intro">
         <div>
           <span class="eyebrow">Panel general</span>
-          <h1 class="hello">Hola, ${state.isMedico ? 'Dr. ' : ''}${esc(p.nombre.split(' ')[0])} <span class="paws" aria-hidden="true">${icon('paw-print')}${icon('paw-print')}</span></h1>
+          <h1 class="hello">Hola, ${state.isMedico ? 'Dr. ' : ''}${esc(p.nombre.split(' ')[0])} ${emoji('huella', 'hello-ilus')}</h1>
           <p>${state.isAdmin ? 'Resumen de citas e inventario del servicio médico.' : 'Resumen de las citas que has solicitado.'}</p>
         </div>
         <div class="toolbar" style="margin:0">
@@ -102,7 +102,20 @@ async function onClick(e) {
   if (act === 'cita') { await openDetalle(a.dataset.id); load(); return; }
   if (act === 'urgente') { if (await openCitaForm({ urgente: true })) load(); return; }
   if (act === 'examen-ingreso' || act === 'examen-egreso') { await openExamenForm({ tipo: act.slice(7) }); return; }
-  if (act === 'agendar') { if (await openCitaForm({ fecha: a.dataset.fecha, hora: a.dataset.hora })) load(); return; }
+  if (act === 'slots-todos') {
+    const box = a.closest('.slots-pro');
+    const abierto = box.classList.toggle('todos');
+    a.setAttribute('aria-expanded', String(abierto));
+    a.querySelector('span').textContent = abierto ? 'Ver menos horarios' : `Ver los ${box.querySelectorAll('.slot-chip').length} horarios del día`;
+    return;
+  }
+  if (act === 'agendar') {
+    // Efecto de selección del horario antes de abrir el formulario
+    a.classList.add('elegido');
+    setTimeout(() => a.classList.remove('elegido'), 600);
+    if (await openCitaForm({ fecha: a.dataset.fecha, hora: a.dataset.hora })) load();
+    return;
+  }
   if (act === 'notif-on') {
     a.disabled = true;
     try { await push.activar(); toast('Notificaciones activadas en este dispositivo.', 'success'); a.closest('.notif-banner')?.remove(); }
@@ -133,30 +146,106 @@ async function disponibilidad() {
   const restantes = SLOTS.filter((s) => s > nowHHMM() && !bloqueoDe(bloqueos, hoy, s)).length;
   const sig = sigHabil(hoy, bloqueos);
   const diaBloq = isWeekday(hoy) ? bloqueoDe(bloqueos, hoy) : null;
+  let d;
   if (isWeekday(hoy) && !diaBloq && restantes > 0) {
     const libres = await libresDe(hoy, true, bloqueos);
-    if (libres.length) return { tipo: 'hoy', fecha: hoy, libres, base: restantes };
-    return { tipo: 'lleno', fecha: sig, libres: await libresDe(sig, false, bloqueos), base: SLOTS.length, finde: false };
+    d = libres.length ? { tipo: 'hoy', fecha: hoy, libres, base: restantes }
+      : { tipo: 'lleno', fecha: sig, libres: await libresDe(sig, false, bloqueos), base: SLOTS.length, finde: false };
+  } else {
+    d = { tipo: 'cerrado', fecha: sig, libres: await libresDe(sig, false, bloqueos), base: SLOTS.length, finde: !isWeekday(hoy), motivo: diaBloq?.motivo };
   }
-  return { tipo: 'cerrado', fecha: sig, libres: await libresDe(sig, false, bloqueos), base: SLOTS.length, finde: !isWeekday(hoy), motivo: diaBloq?.motivo };
+  // Solo presentación: el estado de cada horario del día mostrado, a partir de
+  // los mismos libres y bloqueos (no cambia el cálculo de disponibilidad).
+  d.estados = estadosDe(d.fecha, d.libres, bloqueos, d.fecha === hoy);
+  return d;
 }
-// Indicador de horarios libres: anillo con degradado y una marca exterior por
-// cada horario del día. La animación de llenado solo corre la primera vez, para
-// que no se repita cada vez que el panel se actualiza.
-let anilloAnimado = false;
-function anilloHTML(n, base, pct) {
-  const anim = anilloAnimado ? '' : ' anim';
-  anilloAnimado = true;
+function estadosDe(fecha, libres, bloqueos, esHoy) {
+  const now = nowHHMM();
+  const lib = new Set(libres);
+  return SLOTS.map((s) => {
+    if (lib.has(s)) return { s, e: 'libre' };
+    const b = bloqueoDe(bloqueos, fecha, s);
+    if (b) return { s, e: b.tipo === 'comida' ? 'comida' : 'nd' };
+    if (esHoy && s <= now) return { s, e: 'nd' };
+    return { s, e: 'ocupado' };
+  });
+}
+// Indicador de horarios libres. Al entrar al Panel el anillo gira hacia la
+// derecha mientras se completa hasta el porcentaje real (libres / base), y las
+// marcas exteriores (una por horario del día, con su estado real) se encienden
+// en orden. Si los datos cambian sin salir de la vista, el arco y la cifra pasan
+// del valor anterior al nuevo. Nada de esto altera el cálculo.
+let ringPrevio = null; // { n, pct } del último pintado en esta vista
+function anilloHTML(n, base, pct, estados) {
   const marcas = Math.max(1, base || 1);
-  return `<div class="avail-ring${anim}" role="img" aria-label="${n} de ${marcas} horarios libres">
-    <svg viewBox="0 0 140 140" aria-hidden="true">
+  const primero = ringPrevio === null;
+  const cambia = !primero && (ringPrevio.pct !== pct || ringPrevio.n !== n);
+  const T = estados.length || 1;
+  const ticks = estados.map((x, i) => `<circle class="ar-t t-${x.e}" style="--i:${i}" cx="80" cy="80" r="75" pathLength="${T}" stroke-dasharray="0.58 ${T}" stroke-dashoffset="${-i - 0.21}" transform="rotate(-90 80 80)"/>`).join('');
+  const desde = primero ? 0 : ringPrevio.pct;
+  return `<div class="avail-ring${primero ? ' anim' : cambia ? ' cambio' : ''}" style="--pct:${pct};--desde:${desde}" role="img" aria-label="${n} de ${marcas} horarios libres (${pct} %)">
+    <svg viewBox="0 0 160 160" aria-hidden="true">
       <defs><linearGradient id="avail-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="ar-s1"/><stop offset="1" class="ar-s2"/></linearGradient></defs>
-      <circle class="ar-marcas" cx="70" cy="70" r="65" pathLength="${marcas}" stroke-dasharray="0.16 0.84" transform="rotate(-90 70 70)"/>
-      <circle class="ar-pista" cx="70" cy="70" r="53"/>
-      ${n ? `<circle class="ar-valor" cx="70" cy="70" r="53" pathLength="100" stroke-dasharray="${pct} 100" transform="rotate(-90 70 70)"/>` : ''}
+      <g class="ar-ticks">${ticks}</g>
+      <circle class="ar-pista" cx="80" cy="80" r="60"/>
+      <g class="ar-giro">${n ? `<circle class="ar-valor" cx="80" cy="80" r="60" pathLength="100" stroke-dasharray="${pct} 100" transform="rotate(-90 80 80)"/>` : ''}</g>
     </svg>
-    <b>${n}<small>libres</small><em>de ${marcas}</em></b>
+    <div class="ar-centro"><b class="ar-num" data-desde="${primero ? 0 : ringPrevio.n}" data-hasta="${n}">${n}</b><small>libres</small><em>de ${marcas}</em>
+      <span class="ar-pct">${pct} %</span></div>
   </div>`;
+}
+// Cifra del anillo: cuenta en sincronía con el arco (o del valor anterior al nuevo)
+function contarAnillo(raiz) {
+  const el = raiz?.querySelector('.ar-num');
+  if (!el) return;
+  const a = Number(el.dataset.desde), b = Number(el.dataset.hasta);
+  if (a === b || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = b; return; }
+  const dur = a === 0 && el.closest('.anim') ? 1500 : 700, t0 = performance.now();
+  const cuadro = (fn) => (document.hidden ? setTimeout(() => fn(performance.now()), 16) : requestAnimationFrame(fn));
+  const paso = (t) => {
+    const k = Math.min(1, (t - t0) / dur), e = 1 - (1 - k) ** 3;
+    el.textContent = Math.round(a + (b - a) * e);
+    if (k < 1 && el.isConnected) cuadro(paso);
+  };
+  el.textContent = a;
+  cuadro(paso);
+}
+const ESTADO_SLOT = { libre: 'Disponible', ocupado: 'Ocupado', nd: 'No disponible', comida: 'Comida' };
+const VISIBLES = 12;
+function slotsHTML(d) {
+  const est = d.estados || [];
+  const cuenta = (e) => est.filter((x) => x.e === e || (e === 'nd' && x.e === 'comida')).length;
+  // Ventana visible: a partir del primer horario libre (dos antes para contexto)
+  const i0 = Math.max(0, Math.min(est.findIndex((x) => x.e === 'libre') - 2, est.length - VISIBLES));
+  const chip = (x, i) => {
+    const oculto = i < i0 || i >= i0 + VISIBLES ? ' extra' : '';
+    const st = `style="--i:${Math.max(0, i - i0)}"`;
+    return x.e === 'libre'
+      ? `<button class="slot-chip s-libre${oculto}" ${st} data-dash="agendar" data-fecha="${d.fecha}" data-hora="${x.s}" title="Agendar a las ${x.s}"><b>${x.s}</b><small>${ESTADO_SLOT.libre}</small></button>`
+      : `<span class="slot-chip s-${x.e}${oculto}" ${st} aria-disabled="true" title="${x.s} · ${ESTADO_SLOT[x.e]}"><b>${x.s}</b><small>${ESTADO_SLOT[x.e]}</small></span>`;
+  };
+  return `<div class="slots-pro">
+    <div class="sp-head"><span class="sp-ley"><i class="l-libre"></i>Disponibles <b>${cuenta('libre')}</b></span><span class="sp-ley"><i class="l-ocupado"></i>Ocupados <b>${cuenta('ocupado')}</b></span><span class="sp-ley"><i class="l-nd"></i>No disponibles <b>${cuenta('nd')}</b></span></div>
+    <div class="sp-grid">${est.map(chip).join('')}</div>
+    ${est.length > VISIBLES ? `<button type="button" class="sp-mas" data-dash="slots-todos" aria-expanded="false">${icon('chevron-down')} <span>Ver los ${est.length} horarios del día</span></button>` : ''}
+  </div>`;
+}
+// Acciones médicas principales: tarjetas con ilustración (mismos destinos que antes)
+function accionesHTML() {
+  const t = [
+    ['nueva-cita', 'am-cita', 'cita_nueva', state.isAdmin ? 'Nueva cita' : 'Solicitar cita', state.isAdmin ? 'Agenda en bloques de 20 minutos' : 'Para ti o un colaborador'],
+    ['urgente', 'am-urg', 'urgente', 'Cita de urgencia', 'Atención inmediata o extraordinaria'],
+    ...(state.puedeExamenes ? [
+      ['examen-ingreso', 'am-ing', 'examen_ingreso', 'Examen de ingreso', 'Valoración de un candidato'],
+      ['examen-egreso', 'am-egr', 'examen_egreso', 'Examen de egreso', 'Valoración al retirarse'],
+    ] : []),
+  ];
+  return `<section class="acciones-med n${t.length}" aria-label="Acciones principales">
+    ${t.map(([a, cls, il, tit, sub]) => `<button type="button" class="am ${cls}" data-dash="${a}">
+      <span class="am-ilus" aria-hidden="true">${emoji(il)}</span>
+      <span class="am-txt"><b>${esc(tit)}</b><small>${esc(sub)}</small></span>
+      <span class="am-ir" aria-hidden="true">${icon('arrow-right')}</span></button>`).join('')}
+  </section>`;
 }
 
 function availHTML(d) {
@@ -164,8 +253,6 @@ function availHTML(d) {
   const n = d.libres.length;
   const pct = Math.round((n / Math.max(1, d.base)) * 100);
   const dia = fmtLongDate(d.fecha);
-  const chips = d.libres.slice(0, 8).map((s) => `<button data-dash="agendar" data-fecha="${d.fecha}" data-hora="${s}" title="Agendar a las ${s}">${s}</button>`).join('')
-    + (n > 8 ? `<span class="more">+${n - 8} más</span>` : '');
   const t = {
     hoy: ['', 'Citas disponibles hoy', `${n} ${n === 1 ? 'horario libre' : 'horarios libres'} hoy`, `El próximo es a las ${d.libres[0]} h. Toca un horario para agendar.`],
     lleno: ['lleno', 'Agenda llena hoy', 'Ya no hay horarios disponibles hoy', `Próximo día hábil: ${dia} · ${n} ${n === 1 ? 'horario libre' : 'horarios libres'}.`],
@@ -173,17 +260,13 @@ function availHTML(d) {
       d.finde ? 'Hoy no hay servicio médico' : d.motivo ? `Hoy no hay servicio: ${d.motivo}` : 'El servicio de hoy ya concluyó',
       `Próximo día con servicio: ${dia} · ${n} ${n === 1 ? 'horario libre' : 'horarios libres'}.`],
   }[d.tipo];
-  return `<section class="avail ${t[0]}" aria-label="Disponibilidad de citas">
-    ${anilloHTML(n, d.base, pct)}
+  const html = `<section class="avail avail-pro ${t[0]}${ringPrevio === null ? ' entra-av' : ''}" aria-label="Disponibilidad de citas">
+    ${anilloHTML(n, d.base, pct, d.estados || [])}
     <div class="avail-txt"><span class="avail-tag">${esc(t[1])}</span><h3>${esc(t[2])}</h3><p>${esc(t[3])} Atención de lunes a viernes de 9:00 a 18:00.</p>
-      ${n ? `<div class="avail-slots">${chips}</div>` : ''}</div>
-    <div class="avail-cta ${state.puedeExamenes ? 'con-examenes' : ''}">
-      <button class="btn primary lg" data-dash="nueva-cita">${icon('calendar-plus')} ${state.isAdmin ? 'Nueva cita' : 'Solicitar cita'}</button>
-      <button class="btn urg-btn" data-dash="urgente">${icon('siren')} Cita de urgencia</button>
-      ${state.puedeExamenes ? `<button class="btn ex-btn ex-ingreso" data-dash="examen-ingreso">${icon('user-round-plus')} Examen de ingreso</button>
-      <button class="btn ex-btn ex-egreso" data-dash="examen-egreso">${icon('user-round-minus')} Examen de egreso</button>` : ''}
-    </div>
+      ${(d.estados || []).length ? slotsHTML(d) : ''}</div>
   </section>`;
+  ringPrevio = { n, pct };
+  return html;
 }
 async function notifHTML() {
   if (prefs.get('med.notif.omitir') === '1') return '';
@@ -240,10 +323,11 @@ async function load() {
     if (t !== token) return;
     const [k, prox, pad, lotes, stock, act] = res.map((r) => r.data);
     destroyCharts();
-    body.innerHTML = notif + availHTML(disp)
+    body.innerHTML = notif + availHTML(disp) + accionesHTML()
       + (state.isAdmin ? adminHTML(k, prox, lotes, stock, act, pad) : userHTML(k, prox)) + quickHTML() + accesoHTML();
     refreshIcons();
     drawCharts(k, pad);
+    contarAnillo(body);
     // Las cifras cuentan desde 0 solo en el primer pintado de la vista (no en cada filtro)
     if (!cifrasAnimadas) { cifrasAnimadas = true; animarCifras(body); }
   } catch (err) {

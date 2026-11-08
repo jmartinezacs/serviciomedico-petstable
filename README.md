@@ -90,6 +90,11 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v2.10 · Panel (solo presentación; el cálculo de disponibilidad no cambia):**
+  - **Anillo de disponibilidad** más grande (236 px): al entrar al Panel gira hacia la derecha y se completa hasta el porcentaje real (libres / horarios del día), las marcas exteriores (una por horario, con su estado real) se encienden en orden y la cifra cuenta en sincronía; al final aparece el porcentaje. Si los datos cambian, pasa del valor anterior al nuevo.
+  - **Horarios** en rejilla con estado: disponible (se puede tocar para agendar), ocupado, no disponible y comida del médico, con leyenda y conteo; muestra 12 y «Ver los N horarios del día».
+  - **Acciones médicas** (nueva cita, urgencia, examen de ingreso y de egreso) como tarjetas con ilustración, profundidad y animación; mismos destinos que antes.
+  - **Saludo** con la ilustración de huella de Ruta de calidad.
 - **v2.9 · Sistema visual de Ruta de calidad (solo diseño; sin cambios en datos, cálculos ni flujos):**
   - **Ilustraciones propias a todo color** (`public/emoji/*.svg`, generadas desde `fuentes/ilustraciones.src` con `perl tools/gen-ilustraciones.pl fuentes/ilustraciones.src public/emoji`) en el menú, el dock, los encabezados de cada vista, las pestañas, los KPI, las tarjetas del Panel, las etiquetas de estado de cita, los estados vacíos y Mi perfil. Los botones de acción y los campos conservan sus íconos de línea.
   - **Dock móvil flotante** (≤ 720 px) con píldora activa: administrador Panel, Citas, Inventario y Perfil; usuario Panel, Mis citas y Perfil.
