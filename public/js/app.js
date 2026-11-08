@@ -3,7 +3,7 @@
 // =====================================================================
 import {
   sb, state, prefs, esc, icon, refreshIcons, toast, errMsg, openModal, checkForm,
-  destroyCharts, APP_VERSION, TZ, navigate, avatarHTML, restyleCharts, push,
+  destroyCharts, APP_VERSION, TZ, navigate, avatarHTML, restyleCharts, push, emoji,
 } from './core.js';
 import dashboard from './modules/dashboard.js';
 import citas from './modules/citas.js';
@@ -16,16 +16,18 @@ import perfil from './modules/perfil.js';
 import reportes from './modules/reportes.js';
 import examenes from './modules/examenes.js';
 
+// ilus: ilustración a color (public/emoji) del menú, el dock y el encabezado de la vista; icon: respaldo lucide.
+// mobile: va en el dock del celular (administrador: Panel, Citas, Inventario, Perfil; usuario: Panel, Mis citas, Perfil).
 const ROUTES = {
-  panel:          { mod: dashboard,     icon: 'layout-dashboard', label: 'Panel',          roles: ['admin', 'usuario'], mobile: true },
-  citas:          { mod: citas,         icon: 'calendar-days',    label: 'Citas',          labelUser: 'Mis citas', roles: ['admin', 'usuario'], mobile: true },
-  colaboradores:  { mod: colaboradores, icon: 'users',            label: 'Colaboradores',  roles: ['admin', 'usuario'], mobile: true },
-  inventario:     { mod: inventario,    icon: 'pill',             label: 'Inventario',     roles: ['admin'], mobile: true },
-  examenes:       { mod: examenes,      icon: 'clipboard-check',  label: 'Exámenes médicos', roles: ['admin', 'usuario'], puede: () => state.puedeExamenes },
-  reportes:       { mod: reportes,      icon: 'file-spreadsheet', label: 'Reportes',       roles: ['admin'] },
-  usuarios:       { mod: usuarios,      icon: 'user-cog',         label: 'Usuarios',       roles: ['admin', 'usuario'] },
-  bitacora:       { mod: bitacora,      icon: 'history',          label: 'Bitácora',       roles: ['admin'] },
-  perfil:         { mod: perfil,        icon: 'circle-user',      label: 'Mi perfil',      roles: ['admin', 'usuario'], mobile: true },
+  panel:          { mod: dashboard,     icon: 'layout-dashboard', ilus: 'n_panel',         label: 'Panel',          roles: ['admin', 'usuario'], mobile: true },
+  citas:          { mod: citas,         icon: 'calendar-days',    ilus: 'n_citas',         label: 'Citas',          labelUser: 'Mis citas', roles: ['admin', 'usuario'], mobile: true },
+  colaboradores:  { mod: colaboradores, icon: 'users',            ilus: 'n_colaboradores', label: 'Colaboradores',  corto: 'Personal', roles: ['admin', 'usuario'] },
+  inventario:     { mod: inventario,    icon: 'pill',             ilus: 'n_inventario',    label: 'Inventario',     roles: ['admin'], mobile: true },
+  examenes:       { mod: examenes,      icon: 'clipboard-check',  ilus: 'n_examenes',      label: 'Exámenes médicos', corto: 'Exámenes', roles: ['admin', 'usuario'], puede: () => state.puedeExamenes },
+  reportes:       { mod: reportes,      icon: 'file-spreadsheet', ilus: 'n_reportes',      label: 'Reportes',       roles: ['admin'] },
+  usuarios:       { mod: usuarios,      icon: 'user-cog',         ilus: 'n_usuarios',      label: 'Usuarios',       roles: ['admin', 'usuario'] },
+  bitacora:       { mod: bitacora,      icon: 'history',          ilus: 'n_bitacora',      label: 'Bitácora',       roles: ['admin'] },
+  perfil:         { mod: perfil,        icon: 'circle-user',      ilus: 'n_perfil',        label: 'Mi perfil',      corto: 'Perfil', roles: ['admin', 'usuario'], mobile: true },
 };
 
 const $ = (s) => document.querySelector(s);
@@ -197,10 +199,23 @@ function label(r) { return !state.isAdmin && r.labelUser ? r.labelUser : r.label
 
 function buildNav() {
   const items = Object.entries(ROUTES).filter(([k]) => allowed(k));
-  $('#nav').innerHTML = items.map(([k, r]) => `<a href="#/${k}" data-route="${k}">${icon(r.icon)}<span>${esc(label(r))}</span></a>`).join('');
+  const ico = (r) => (r.ilus ? emoji(r.ilus, 'nav-ilus') : icon(r.icon));
+  $('#nav').innerHTML = items.map(([k, r]) => `<a href="#/${k}" data-route="${k}">${ico(r)}<span>${esc(label(r))}</span></a>`).join('');
+  // Dock del celular: máximo 5 accesos, con la etiqueta corta cuando el nombre es largo
+  const corto = (r) => (!state.isAdmin && r.labelUser ? r.labelUser : r.corto || r.label);
   $('#mobile-nav').innerHTML = items.filter(([, r]) => r.mobile).slice(0, 5)
-    .map(([k, r]) => `<a href="#/${k}" data-route="${k}">${icon(r.icon)}<span>${esc(label(r))}</span></a>`).join('');
+    .map(([k, r]) => `<a href="#/${k}" data-route="${k}" title="${esc(label(r))}">${ico(r)}<span>${esc(corto(r))}</span></a>`).join('');
   refreshIcons();
+}
+
+// Ilustración de la sección junto al título de cada vista (el Panel conserva su saludo)
+function ilustrarEncabezado(view, r) {
+  const intro = view.querySelector('.page-intro');
+  const h1 = intro?.querySelector('h1');
+  if (!r.ilus || !h1 || r === ROUTES.panel || intro.querySelector('.intro-ilus')) return;
+  const box = h1.parentElement;
+  box.classList.add('intro-con-ilus');
+  box.insertAdjacentHTML('afterbegin', `<span class="intro-ilus" aria-hidden="true">${emoji(r.ilus)}</span>`);
 }
 
 function parseHash() {
@@ -232,15 +247,24 @@ async function route() {
     });
     document.title = 'Servicio Médico';
     closeMenu();
-    const view = $('#view');
-    view.innerHTML = '';
+    // Contenedor nuevo en cada vista (los eventos de la vista anterior no se acumulan)
+    // con la clase "entra" para su aparición suave; barra de carga mientras se arma.
+    const viejo = $('#view');
+    const view = viejo.cloneNode(false);
+    view.classList.remove('entra');
+    void view.offsetWidth;
+    view.classList.add('entra');
+    viejo.replaceWith(view);
+    document.body.classList.add('cargando');
     window.scrollTo(0, 0);
     await r.mod.render(view, params);
+    ilustrarEncabezado(view, r);
     refreshIcons();
   } catch (err) {
     console.error(err);
     $('#view').innerHTML = `<div class="card">${esc(errMsg(err))}</div>`;
   } finally {
+    document.body.classList.remove('cargando');
     routing = false;
     if (pendingRoute) { pendingRoute = false; route(); }
   }

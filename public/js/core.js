@@ -119,8 +119,45 @@ export const ESTADOS = {
   no_asistio: { label: 'No asistió', cls: 'bad', icon: 'user-x' },
 };
 export const pill = (text, cls = 'gray') => `<span class="pill ${cls}">${esc(text)}</span>`;
-export const estadoPill = (e) => pill(ESTADOS[e]?.label || e, ESTADOS[e]?.cls || 'gray');
 export const icon = (name, cls = '') => `<i data-lucide="${name}"${cls ? ` class="${cls}"` : ''}></i>`;
+// Ilustración a color propia (fuentes/ilustraciones.src → public/emoji), decorativa
+export const emoji = (slug, cls = '') => `<img class="emoji ${cls}" src="/emoji/${slug}.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">`;
+// Ilustración de cada estado de cita (etiquetas de estado y KPI)
+export const ILUS_ESTADO = { pendiente: 'cita_pendiente', confirmada: 'cita_confirmada', atendida: 'cita_atendida', cancelada: 'cita_cancelada', no_asistio: 'cita_no_asistio' };
+export const estadoPill = (e) => `<span class="pill ${ESTADOS[e]?.cls || 'gray'} con-ilus">${ILUS_ESTADO[e] ? emoji(ILUS_ESTADO[e], 'pill-ilus') : ''}${esc(ESTADOS[e]?.label || e)}</span>`;
+export const urgentePill = () => `<span class="pill bad con-ilus">${emoji('urgente', 'pill-ilus')}Urgente</span>`;
+
+// Indicador (Panel). tono: orange, green, red, blue o violet. ilus: ilustración de public/emoji.
+// texto: el valor es una palabra. barra: porcentaje 0 a 100. go: ruta al pulsar (data-dash del Panel).
+export function kpiHTML({ tono, ico = 'circle', ilus = '', label, valor, desc, go = '', texto = false, barra = null, extra = '' }) {
+  const link = go ? ` data-dash="${esc(go)}" role="link" tabindex="0"` : '';
+  return `<div class="kx t-${tono}${texto ? ' texto' : ''}${go ? ' go' : ''}${extra ? ` ${extra}` : ''}"${link}>
+    <span class="kx-ico${ilus ? ' ilus-box' : ''}" aria-hidden="true">${ilus ? emoji(ilus, 'ilus') : icon(ico)}</span>
+    <div class="kx-top"><small>${esc(label)}</small></div>
+    <strong${texto ? '' : ' data-cifra'} title="${esc(valor)}">${esc(valor)}</strong><span class="kx-desc">${esc(desc)}</span>
+    ${barra !== null ? `<span class="kx-barra" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, barra))}%"></i></span>` : ''}
+    ${go ? `<span class="kx-go">Ver detalle ${icon('arrow-right')}</span>` : ''}</div>`;
+}
+// Las cifras cuentan desde 0 (1,832 · 95.0% · 6.4%), una vez por montaje. Sin animación si el usuario la reduce.
+export function animarCifras(raiz) {
+  if (!raiz || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // Si la pestaña está oculta, requestAnimationFrame no corre: se usa un temporizador
+  const cuadro = (fn) => (document.hidden ? setTimeout(() => fn(performance.now()), 16) : requestAnimationFrame(fn));
+  raiz.querySelectorAll('[data-cifra]').forEach((el) => {
+    const m = el.textContent.trim().match(/^([\d,]+)(\.\d+)?(%?)$/);
+    if (!m) return;
+    const fin = Number(`${m[1].replace(/,/g, '')}${m[2] || ''}`), dec = m[2] ? m[2].length - 1 : 0, suf = m[3];
+    if (!fin) return;
+    const fmt = new Intl.NumberFormat('es-MX', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    const t0 = performance.now(), dur = 900;
+    const paso = (t) => {
+      const k = Math.min(1, (t - t0) / dur), e = 1 - (1 - k) ** 3;
+      el.textContent = `${fmt.format(fin * e)}${suf}`;
+      if (k < 1 && el.isConnected) cuadro(paso);
+    };
+    cuadro(paso);
+  });
+}
 export function refreshIcons() { try { window.lucide?.createIcons(); } catch { /* sin íconos */ } }
 
 export function sanitizeSearch(q) { return String(q || '').replace(/[%,()*\\"'`;:]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60); }
@@ -321,11 +358,18 @@ export function bindCounters(root) {
 }
 
 // ---------- Estados vacíos ----------
+// Ilustración a color de cada estado vacío según el ícono que pide el módulo
+const ILUS_VACIO = {
+  inbox: 'paquete', 'search-x': 'paquete', calendar: 'calendario', 'calendar-off': 'sin_servicio', 'calendar-x': 'cita_cancelada',
+  history: 'n_bitacora', 'pie-chart': 'grafica', 'bar-chart-3': 'grafica', pill: 'pastilla', 'shield-check': 'apto', stethoscope: 'estetoscopio',
+  users: 'n_colaboradores', 'building-2': 'personas', 'clipboard-check': 'n_examenes', layers: 'paquete', 'arrow-left-right': 'n_inventario', 'user-cog': 'n_usuarios',
+};
 export function emptyState({ ico = 'inbox', title, text = '', action = '' }) {
-  return `<div class="empty"><div class="empty-ico">${icon(ico)}</div><b>${esc(title)}</b>${text ? `<p>${esc(text)}</p>` : ''}${action}</div>`;
+  const il = ILUS_VACIO[ico];
+  return `<div class="empty"><div class="empty-ico${il ? ' ilus' : ''}">${il ? emoji(il) : icon(ico)}</div><b>${esc(title)}</b>${text ? `<p>${esc(text)}</p>` : ''}${action}</div>`;
 }
 export function errorState(err, retryAction = 'retry') {
-  return `<div class="empty error"><div class="empty-ico">${icon('wifi-off')}</div><b>No se pudo cargar la información</b><p>${esc(errMsg(err))}</p>
+  return `<div class="empty error"><div class="empty-ico ilus">${emoji('n_alerta')}</div><b>No se pudo cargar la información</b><p>${esc(errMsg(err))}</p>
     <button class="btn secondary" data-action="${retryAction}">${icon('refresh-cw')} Reintentar</button></div>`;
 }
 
@@ -462,28 +506,35 @@ const etiquetasDatos = {
         const v = Number(ds.data[i]);
         if (!v || el.hidden) return;
         const label = fmtN(v);
+        ctx.font = `800 ${zoom ? 15 : 11}px ${FUENTE}`;
+        ctx.textAlign = 'center';
+        let x, y, dentro = true;
         if (tipo === 'bar') {
-          ctx.font = `700 ${zoom ? 14 : 11}px ${FUENTE}`;
+          // Dentro de la barra (blanco con sombra) si cabe; si no, una píldora junto al extremo
           const p = el.getProps(['x', 'y', 'base'], true);
-          const w = ctx.measureText(label).width;
-          if (horiz) {
-            // a la derecha del extremo; si no cabe, dentro de la barra en blanco
-            const fuera = p.x + 6 + w <= area.right + 34;
-            ctx.textAlign = fuera ? 'left' : 'right';
-            ctx.fillStyle = fuera ? (cssVar('--text') || '#172431') : '#FFFFFF';
-            ctx.fillText(label, fuera ? p.x + 6 : p.x - 6, p.y);
-          } else {
-            ctx.textAlign = 'center';
-            ctx.fillStyle = cssVar('--text') || '#172431';
-            ctx.fillText(label, p.x, p.y - (zoom ? 12 : 9));
-          }
+          const ancho = ctx.measureText(label).width + 10;
+          const largo = horiz ? Math.abs(p.x - p.base) : Math.abs(p.base - p.y);
+          dentro = largo >= (horiz ? ancho + 4 : 20);
+          if (dentro) { x = horiz ? p.x - ancho / 2 - 2 : p.x; y = horiz ? p.y : p.y + 11; }
+          else { x = horiz ? Math.min(p.x + ancho / 2 + 8, area.right + 30) : p.x; y = horiz ? p.y : p.y - 13; }
         } else {
           if (el.circumference < 0.35) return;
-          const { x, y } = el.tooltipPosition(true);
-          ctx.font = `700 ${zoom ? 14 : 11}px ${FUENTE}`;
-          ctx.textAlign = 'center';
+          ({ x, y } = el.tooltipPosition(true));
+        }
+        if (dentro) {
+          ctx.shadowColor = 'rgba(9, 13, 18, .45)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1;
           ctx.fillStyle = '#FFFFFF';
           ctx.fillText(label, x, y);
+          ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+        } else {
+          // Píldora del color de la tarjeta con borde del color de la barra
+          const w = ctx.measureText(label).width + 12, h = zoom ? 22 : 18;
+          const col = baseDe(ds.medBase, i);
+          ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2);
+          ctx.fillStyle = cssVar('--card') || '#FFFFFF'; ctx.fill();
+          ctx.lineWidth = 1.5; ctx.strokeStyle = typeof col === 'string' ? col : '#94A3B8'; ctx.stroke();
+          ctx.fillStyle = cssVar('--text') || '#172431';
+          ctx.fillText(label, x, y + 0.5);
         }
       });
     });
@@ -548,11 +599,15 @@ export function makeChart(canvas, config) {
   // Marcas: barras con extremo redondeado (la base queda recta), separación
   // entre barras y segmentos de dona separados por una línea del color de fondo
   (config.data?.datasets || []).forEach((d) => {
-    if (config.type === 'bar' && !d.type) Object.assign(d, { borderRadius: 5, borderSkipped: 'start', categoryPercentage: varias ? 0.72 : 0.78, barPercentage: varias ? 0.86 : 0.9 });
-    if (dona) Object.assign(d, { borderWidth: 2, borderColor: card, hoverOffset: 6, borderRadius: 4 });
+    if (config.type === 'bar' && !d.type) Object.assign(d, { borderRadius: d.stack ? 4 : 8, borderSkipped: 'start', categoryPercentage: varias ? 0.72 : 0.78, barPercentage: varias ? 0.86 : 0.9 });
+    // Separación entre segmentos del color de la tarjeta (nunca bordes blancos en oscuro)
+    if (dona) Object.assign(d, { borderWidth: 3, borderColor: card, hoverOffset: 8, borderRadius: config.type === 'doughnut' ? 6 : 0 });
   });
-  const ejeValor = { grid: { color: line, drawTicks: false, tickBorderDash: [3, 4] }, border: { display: false, dash: [3, 4] }, ticks: { color: muted, precision: 0, padding: 8, font: { size: 11 } }, beginAtZero: true, grace: '8%' };
-  const ejeCategoria = { grid: { display: false }, border: { display: false }, ticks: { color: horiz ? text : muted, padding: 6, font: { size: horiz ? 12 : 11, weight: horiz ? '600' : '500' } } };
+  // Móvil: menos marcas y letra compacta
+  const chico = (canvas.parentElement?.clientWidth || canvas.clientWidth || 600) < 420;
+  const fTick = { size: chico ? 10.5 : 11, weight: '500' };
+  const ejeValor = { grid: { color: line, drawTicks: false, lineWidth: 1 }, border: { display: false, dash: [3, 5] }, ticks: { color: muted, precision: 0, padding: chico ? 6 : 8, maxTicksLimit: chico ? 5 : 8, font: fTick }, beginAtZero: true, grace: '8%' };
+  const ejeCategoria = { grid: { display: false }, border: { display: false }, ticks: { color: horiz ? text : muted, padding: 6, font: horiz ? { size: chico ? 11 : 12, weight: '600' } : fTick } };
   const { legend: legendCfg, ...otrosPlugins } = config.options?.plugins || {};
   const data = config.type !== 'bar' ? config.data : {
     ...config.data,
@@ -564,21 +619,23 @@ export function makeChart(canvas, config) {
     plugins: [...(config.plugins || []), sombraMarcas, etiquetasDatos],
     options: {
       responsive: true, maintainAspectRatio: false,
-      animation: { duration: 650, easing: 'easeOutQuart' },
+      animation: { duration: 750, easing: 'easeOutCubic' },
+      transitions: { active: { animation: { duration: 160 } } },
       interaction: { mode: dona ? 'point' : 'index', intersect: dona, axis: horiz ? 'y' : 'x' },
-      layout: { padding: dona ? 6 : horiz ? { right: 34, top: 4 } : { top: 20 } },
+      layout: { padding: dona ? 6 : horiz ? { top: 12, right: 34, bottom: 2, left: 4 } : { top: 22, right: 10, bottom: 2, left: 4 } },
       plugins: {
         ...otrosPlugins,
         legend: {
           display: dona || varias,
           position: dona ? 'bottom' : 'top', align: dona ? 'center' : 'end',
-          labels: { color: text, boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: dona ? 'circle' : 'rectRounded', padding: 14, font: { size: 12, weight: '600' } },
+          labels: { color: text, boxWidth: 8, boxHeight: 8, usePointStyle: true, pointStyle: 'circle', padding: chico ? 12 : 16, font: { size: chico ? 11 : 12, weight: '600' } },
           ...(legendCfg || {}),
         },
         tooltip: {
-          backgroundColor: '#0B2235', borderColor: 'rgba(255,255,255,.08)', borderWidth: 1,
-          padding: { x: 12, y: 10 }, cornerRadius: 10, caretSize: 6, boxPadding: 6, usePointStyle: true,
-          titleFont: { size: 12.5, weight: '700' }, bodyFont: { size: 12 }, titleMarginBottom: 6,
+          backgroundColor: 'rgba(10, 26, 39, .96)', borderColor: 'rgba(255, 255, 255, .14)', borderWidth: 1,
+          titleColor: '#FFFFFF', bodyColor: '#D7E1EA', footerColor: '#93A5B3',
+          padding: { x: 12, y: 10 }, cornerRadius: 10, caretSize: 5, caretPadding: 8, boxPadding: 5, usePointStyle: true, animation: { duration: 140 },
+          titleFont: { size: 12, weight: '700' }, bodyFont: { size: 12, weight: '500' }, titleMarginBottom: 6, bodySpacing: 4,
           callbacks: dona ? {
             label: (ctx) => {
               const tot = ctx.dataset.data.reduce((s, n) => s + (Number(n) || 0), 0);
@@ -598,13 +655,22 @@ export function makeChart(canvas, config) {
         y: { ...(horiz ? ejeCategoria : ejeValor), ...(config.options?.scales?.y || {}) },
       },
       ...(config.options?.indexAxis ? { indexAxis: config.options.indexAxis } : {}),
-      ...(dona ? { cutout: '68%' } : {}),
+      ...(dona ? { cutout: '66%' } : {}),
     },
   });
   charts.add(c);
   chartConfigs.set(c, config);
+  // El recuadro de información se oculta al salir de la gráfica (no se queda fijo)
+  const ocultar = () => { try { c.setActiveElements([]); c.tooltip?.setActiveElements([], { x: 0, y: 0 }); c.update('none'); } catch { /* gráfica destruida */ } };
+  canvas.addEventListener('mouseleave', ocultar);
+  canvas.addEventListener('pointerleave', ocultar);
+  canvas.addEventListener('blur', ocultar);
   return c;
 }
+// Paleta categórica (validada para daltonismo en claro y oscuro): siempre en este orden, nunca cíclica
+const PALETA_CAT = { claro: ['#2A78D6', '#EB6834', '#1BAF7A', '#EDA100', '#E87BA4', '#008300', '#6250D6', '#E34948'], oscuro: ['#3987E5', '#D95926', '#199E70', '#C98500', '#D55181', '#008300', '#9085E9', '#E66767'] };
+export const temaOscuro = () => { const t = document.documentElement.dataset.theme; return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
+export const paletaCat = () => PALETA_CAT[temaOscuro() ? 'oscuro' : 'claro'];
 // Cambio de tema inmediato: re-colorea las gráficas sin volver a consultar datos
 export function restyleCharts() {
   const muted = cssVar('--muted'), line = cssVar('--line'), text = cssVar('--text'), card = cssVar('--card');

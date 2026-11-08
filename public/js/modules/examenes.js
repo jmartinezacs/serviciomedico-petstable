@@ -13,6 +13,7 @@ import {
   sb, state, esc, icon, refreshIcons, toast, errMsg, openModal, confirmDialog, checkForm, formValues,
   nullIfEmpty, bindCounters, todayISO, fmtDate, fmtTime, fmtDateTime, fmtLongDate, pill, DataTable, paged,
   sanitizeSearch, debounce, getAreas, must, avisarExamen, getPuestos, puestoOptionsHTML, permitirNuevoPuesto,
+  emoji,
 } from '../core.js';
 import { colaboradorPicker } from './citas.js';
 
@@ -32,7 +33,9 @@ const CON_TEXTO = ['apto_restricciones', 'apto_restricciones_sin_interferencia',
 const ESTADOS = { pendiente: ['Pendiente', 'warn'], confirmado: ['Confirmado', 'info'], realizado: ['Realizado', 'ok'], cancelado: ['Cancelado', 'gray'] };
 const TIPO = { ingreso: 'Examen de ingreso', egreso: 'Examen de egreso' };
 const estadoPill = (e) => pill(ESTADOS[e]?.[0] || e, ESTADOS[e]?.[1] || 'gray');
-const resultadoPill = (r) => (r ? pill(RESULTADOS[r].titulo, RESULTADOS[r].tono) : '<span class="muted">—</span>');
+// Ilustración del resultado (solo el dato que ya muestra la etiqueta)
+const ILUS_RESULTADO = { apto: 'apto', no_apto: 'no_apto', apto_restricciones: 'n_alerta', apto_restricciones_sin_interferencia: 'apto', sin_hallazgos: 'apto', con_hallazgos: 'n_alerta' };
+const resultadoPill = (r) => (r ? `<span class="pill ${RESULTADOS[r].tono} con-ilus">${emoji(ILUS_RESULTADO[r], 'pill-ilus')}${esc(RESULTADOS[r].titulo)}</span>` : '<span class="muted">—</span>');
 const cuando = (x) => `${fmtDate(x.fecha)} · ${fmtTime(x.hora)} h`;
 // Folio por tipo: EX-IN-001 (ingreso) y EX-EG-001 (egreso), igual que v_examenes_med
 const folioTxt = (tipo, folio) => `EX-${tipo === 'egreso' ? 'EG' : 'IN'}-${String(folio).padStart(3, '0')}`;
@@ -53,8 +56,8 @@ export default {
         </div>
       </section>
       <div class="tabs" role="tablist">
-        <button role="tab" data-tab="ingreso" class="${tipoActual === 'ingreso' ? 'active' : ''}">${icon('user-round-plus')} Ingreso <span class="tab-count hidden" data-count="ingreso" title="Por confirmar"></span></button>
-        <button role="tab" data-tab="egreso" class="${tipoActual === 'egreso' ? 'active' : ''}">${icon('user-round-minus')} Egreso <span class="tab-count hidden" data-count="egreso" title="Por confirmar"></span></button>
+        <button role="tab" data-tab="ingreso" class="${tipoActual === 'ingreso' ? 'active' : ''}">${emoji('examen_ingreso', 'tab-ilus')} Ingreso <span class="tab-count hidden" data-count="ingreso" title="Por confirmar"></span></button>
+        <button role="tab" data-tab="egreso" class="${tipoActual === 'egreso' ? 'active' : ''}">${emoji('examen_egreso', 'tab-ilus')} Egreso <span class="tab-count hidden" data-count="egreso" title="Por confirmar"></span></button>
       </div>
       <div class="card">
         <div class="toolbar">

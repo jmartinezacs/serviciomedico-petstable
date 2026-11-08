@@ -44,7 +44,7 @@ async function mostrar(d) {
     body: d.body || '',
     icon: await iconoConFoto(d.foto),
     // Android pinta la insignia de la barra de estado como silueta: debe ser blanca sobre transparente
-    badge: '/notif-badge.png',
+    badge: '/notif/badge-96.png',
     tag: d.tag || `med-${Date.now()}`,
     renotify: true,
     requireInteraction: true,

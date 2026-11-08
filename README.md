@@ -90,6 +90,14 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v2.9 · Sistema visual de Ruta de calidad (solo diseño; sin cambios en datos, cálculos ni flujos):**
+  - **Ilustraciones propias a todo color** (`public/emoji/*.svg`, generadas desde `fuentes/ilustraciones.src` con `perl tools/gen-ilustraciones.pl fuentes/ilustraciones.src public/emoji`) en el menú, el dock, los encabezados de cada vista, las pestañas, los KPI, las tarjetas del Panel, las etiquetas de estado de cita, los estados vacíos y Mi perfil. Los botones de acción y los campos conservan sus íconos de línea.
+  - **Dock móvil flotante** (≤ 720 px) con píldora activa: administrador Panel, Citas, Inventario y Perfil; usuario Panel, Mis citas y Perfil.
+  - **KPI** con el componente único `kpiHTML` (`.kx`): ilustración, cifra que cuenta desde 0, «Ver detalle» y dos por fila en celular.
+  - **Gráficas:** etiquetas dentro de la barra o en píldora, ayuda emergente oscura que se oculta al salir, entrada de 750 ms y paleta categórica validada para daltonismo.
+  - **Mi perfil:** tarjeta de identidad, mosaicos, notificaciones en tarjeta `.avisos`, correos de prueba, sistema y versión y créditos «Desarrollado por» con firma.
+  - **Notificaciones:** insignia de Android con la silueta del logotipo de Pet's Table (`/notif/badge-96.png`; también reemplaza `notif-badge.png`), ícono monocromático de 192 en el manifiesto, íconos de 192 y 512 y `apple-touch-icon` opaco de 180 × 180.
+  - **Movimiento:** entrada de cada vista, tarjetas escalonadas, barra de carga bajo el encabezado y microinteracciones; todo se apaga con «reducir movimiento».
 - **v2.8:**
   - **Panel:** anillo de horarios libres en SVG (degradado, una marca por horario, brillo y llenado animado solo la primera vez). KPI con barra lateral, ícono y tinte del mismo color: azul, naranja, verde y rojo (clases `k-azul`, `k-naranja`, `k-verde`, `k-rojo`).
   - **Gráficas:** en departamento, motivo y padecimiento cada categoría tiene su color, asignado por nombre en orden alfabético (no cambia si sube o baja de lugar). Todas las barras llevan degradado y sombra suave (`degradadoBarra` y `sombraMarcas` en core.js).

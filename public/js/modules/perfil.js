@@ -2,8 +2,15 @@
 // Perfil del usuario: datos, cambio de contraseña, tema e instalación.
 // =====================================================================
 import {
-  sb, state, esc, icon, refreshIcons, toast, errMsg, checkForm, prefs, fmtDateTime, APP_VERSION, avatarHTML, push, pill, openModal,
+  sb, state, esc, icon, refreshIcons, toast, errMsg, checkForm, prefs, fmtDateTime, APP_VERSION, avatarHTML, push, pill, openModal, emoji,
 } from '../core.js';
+
+// Créditos de autoría (mismo diseño de reconocimiento que Ruta de calidad)
+const AUTOR = { nombre: 'Javier Martínez González', correo: 'javier.martinez@petstable.mx' };
+// Mosaico de información con ilustración
+const fila = (ilus, label, valor) => `<div class="pf-t"><span class="pf-ico">${emoji(ilus)}</span><div><small>${esc(label)}</small><b>${esc(valor)}</b></div></div>`;
+// Insignia de cuenta verificada
+const VERIFICADO = `<svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="pf-v" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3EA2FF"/><stop offset="1" stop-color="#1565E0"/></linearGradient></defs><g fill="url(#pf-v)">${Array.from({ length: 12 }, (_, i) => { const a = (i / 12) * Math.PI * 2; return `<circle cx="${(16 + 11.2 * Math.cos(a)).toFixed(2)}" cy="${(16 + 11.2 * Math.sin(a)).toFixed(2)}" r="4.4"/>`; }).join('')}<circle cx="16" cy="16" r="12.4"/></g><path d="M10.4 16.4l3.7 3.7 7.6-7.8" fill="none" stroke="#FFF" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 // Estado y control de las notificaciones push de este dispositivo
 async function pintarNotificaciones(box) {
@@ -12,20 +19,23 @@ async function pintarNotificaciones(box) {
   const quien = state.isAdmin
     ? (state.profile.recibe_avisos !== false ? 'Recibirás avisos de nuevas citas si tu usuario tiene activada la opción “Recibe avisos”, y de los cambios en las citas que solicites.' : 'Recibirás avisos de los cambios en las citas que solicites.')
     : 'Recibirás un aviso cuando Servicio Médico confirme, cancele o reprograme tus citas.';
+  // [clase de la tarjeta .avisos, ilustración, título, etiqueta, texto, botones, contenido adicional]
   const txt = {
-    activo: [pill('Activadas', 'ok'), `${quien} Quedan activas en este dispositivo aunque cierres sesión o entres con otra cuenta; los avisos llegan a la última cuenta que inició sesión aquí.`, `<div class="page-actions" style="justify-content:flex-start">
+    activo: ['on', 'n_avisos', 'Notificaciones activadas', pill('Activadas', 'ok'), `${quien} Quedan activas en este dispositivo aunque cierres sesión o entres con otra cuenta; los avisos llegan a la última cuenta que inició sesión aquí.`, `
         <button class="btn primary" data-n="test">${icon('bell-ring')} Enviar aviso de prueba</button>
-        <button class="btn secondary" data-n="off">${icon('bell-off')} Desactivar en este dispositivo</button></div>
-      <details class="notif-ajustes"><summary>${icon('smartphone')} ¿No suena o no aparece en la pantalla bloqueada?</summary>
+        <button class="btn secondary" data-n="off">${icon('bell-off')} Desactivar</button>`,
+      `<details class="notif-ajustes"><summary>${icon('smartphone')} ¿No suena o no aparece en la pantalla bloqueada?</summary>
         <p><b>Android (Chrome):</b> mantén presionado el aviso de prueba → Configuración, o ve a Ajustes → Aplicaciones → Chrome → Notificaciones → busca este sitio y activa <b>Mostrar en pantalla emergente</b>, <b>Sonido</b> y <b>Pantalla de bloqueo</b>. Revisa también que “No molestar” esté apagado.</p>
         <p><b>iPhone:</b> Ajustes → Notificaciones → Servicio médico → activa <b>Permitir notificaciones</b>, <b>Pantalla bloqueada</b>, <b>Tiras</b> (estilo “Persistente”) y <b>Sonidos</b>. Revisa que el modo Concentración no lo silencie.</p>
       </details>`],
-    inactivo: [pill('Desactivadas', 'gray'), quien, `<button class="btn primary" data-n="on">${icon('bell')} Activar notificaciones</button>`],
-    bloqueado: [pill('Bloqueadas', 'bad'), 'Las notificaciones están bloqueadas para este sitio. Permítelas desde la configuración del navegador (ícono del candado junto a la dirección) y vuelve a intentarlo.', ''],
-    instalar: [pill('Requiere instalar', 'warn'), 'En iPhone/iPad las notificaciones solo funcionan con la app instalada: toca Compartir → “Agregar a pantalla de inicio”, ábrela desde ese ícono y regresa aquí para activarlas.', ''],
-    'no-soportado': [pill('No disponibles', 'gray'), 'Este navegador no admite notificaciones web. Usa Chrome, Edge o Safari actualizados.', ''],
+    inactivo: ['pend', 'n_avisos', 'Activa las notificaciones', pill('Desactivadas', 'gray'), quien, `<button class="btn primary" data-n="on">${icon('bell')} Activar notificaciones</button>`, ''],
+    bloqueado: ['off', 'n_alerta', 'Notificaciones bloqueadas', pill('Bloqueadas', 'bad'), 'Las notificaciones están bloqueadas para este sitio. Permítelas desde la configuración del navegador (ícono del candado junto a la dirección) y vuelve a intentarlo.', '', ''],
+    instalar: ['info', 'instalar', 'Instala la app para recibir avisos', pill('Requiere instalar', 'warn'), 'En iPhone/iPad las notificaciones solo funcionan con la app instalada: toca Compartir → “Agregar a pantalla de inicio”, ábrela desde ese ícono y regresa aquí para activarlas.', '', ''],
+    'no-soportado': ['off', 'celular', 'Notificaciones no disponibles', pill('No disponibles', 'gray'), 'Este navegador no admite notificaciones web. Usa Chrome, Edge o Safari actualizados.', '', ''],
   }[est];
-  box.innerHTML = `<p style="margin:0 0 8px">${txt[0]}</p><p class="hint" style="margin:0 0 10px">${esc(txt[1])}</p>${txt[2]}`;
+  box.innerHTML = `<div class="avisos ${txt[0]}"><span class="avisos-ico">${emoji(txt[1])}</span>
+      <div class="avisos-txt"><b>${esc(txt[2])} ${txt[3]}</b><p>${esc(txt[4])}</p></div>
+      ${txt[5] ? `<div class="avisos-acc">${txt[5]}</div>` : ''}</div>${txt[6]}`;
   refreshIcons();
   box.querySelector('[data-n="test"]')?.addEventListener('click', async () => {
     // Aviso local con las mismas opciones que los avisos reales (vibración, permanece en pantalla)
@@ -37,7 +47,7 @@ async function pintarNotificaciones(box) {
         return;
       }
       await reg.showNotification('Aviso de prueba · Servicio Médico', {
-        body: 'Así se verán los avisos de citas en este dispositivo.', icon: '/notif-icon.png', badge: '/notif-badge.png', actions: [{ action: 'ver', title: 'Ver ahora' }],
+        body: 'Así se verán los avisos de citas en este dispositivo.', icon: '/notif-icon.png', badge: '/notif/badge-96.png', actions: [{ action: 'ver', title: 'Ver ahora' }],
         tag: `prueba-${Date.now()}`, renotify: true, requireInteraction: true, silent: false, vibrate: [300, 120, 300, 120, 500], data: { url: '/#/perfil' },
       });
     } catch (err) { toast(errMsg(err), 'error'); }
@@ -105,28 +115,49 @@ export default {
     const user = state.session?.user;
     const theme = prefs.get('med.theme') || 'system';
     const standalone = push.instalada();
+    const admin = p.rol === 'admin';
     el.innerHTML = `
       <section class="page-intro"><div><span class="eyebrow">Cuenta</span><h1>Mi perfil</h1><p>Tus datos de acceso y preferencias.</p></div></section>
-      <section class="profile-hero">
-        <div class="access-photo">${avatarHTML(p.nombre, p.foto_url, 'xl')}<span class="access-check">${icon('badge-check')}</span></div>
-        <div>
-          <span class="access-badge">${icon(p.rol === 'admin' ? 'crown' : 'user')} ${p.rol === 'admin' ? 'Administrador' : 'Usuario'}</span>
+      <div class="pf">
+        <section class="pf-id">
+          <div class="pf-foto">${avatarHTML(p.nombre, p.foto_url, 'xl')}<span class="pf-verif" role="img" aria-label="Cuenta identificada de Pet's Table" title="Cuenta identificada de Pet's Table">${VERIFICADO}</span></div>
+          <span class="pf-rol ${admin ? 'admin' : ''}">${icon(admin ? 'crown' : 'user-round')} ${admin ? 'Administrador' : 'Usuario'}</span>
           <h2>${esc(p.nombre)}</h2>
-          <p class="puesto">${esc(p.puesto || 'Puesto no registrado')}</p>
-          <span class="mail">${icon('mail')} ${esc(p.email)}</span>
+          <p class="pf-puesto">${esc(p.puesto || 'Puesto no registrado')}</p>
+          <span class="pf-mail">${icon('mail')} ${esc(p.email)}</span>
+        </section>
+        <div class="pf-info">
+          <section class="pf-bloque"><h3 class="pf-sec">${icon('briefcase')} Información laboral</h3>
+            <div class="pf-tiles t2">${fila('gafete', 'Puesto', p.puesto || 'Sin puesto registrado')}${fila('personas', 'Área', p.area || 'Sin área')}</div></section>
+          <section class="pf-bloque"><h3 class="pf-sec">${icon('shield-check')} Acceso</h3>
+            <div class="pf-tiles t3">${fila('llave', 'Permisos', admin ? 'Gestión completa de citas, inventario y usuarios' : 'Solicitar y consultar sus citas; registrar colaboradores')}${fila('reloj', 'Último acceso', fmtDateTime(user?.last_sign_in_at))}${fila('correo', 'Correo', p.email)}</div></section>
+          <section class="pf-bloque"><h3 class="pf-sec">${icon('bell')} Notificaciones en este dispositivo</h3>
+            <div id="notif-box"><div class="skeleton" style="height:64px"></div></div></section>
+          <section class="pf-sistema"><span class="brand-logo pf-logo" aria-hidden="true"></span>
+            <div><small>Sistema</small><b>Servicio Médico<i>·</i><span>Salud laboral</span></b></div>
+            <span class="pf-ver"><small>Versión</small><b>${esc(APP_VERSION)}</b></span></section>
         </div>
-      </section>
-      <div class="profile-tiles mt">
-        <div class="p-tile"><span class="ti">${icon('briefcase')}</span><small>Puesto</small><b>${esc(p.puesto || 'Sin puesto registrado')}</b></div>
-        <div class="p-tile"><span class="ti">${icon('building-2')}</span><small>Área</small><b>${esc(p.area || 'Sin área')}</b></div>
-        <div class="p-tile"><span class="ti">${icon('shield-check')}</span><small>Permisos</small><b>${p.rol === 'admin' ? 'Gestión completa de citas, inventario y usuarios' : 'Solicitar y consultar sus citas; registrar colaboradores'}</b></div>
-        <div class="p-tile"><span class="ti">${icon('clock')}</span><small>Último acceso</small><b>${fmtDateTime(user?.last_sign_in_at)}</b></div>
-        <div class="p-tile"><span class="ti">${icon('mail')}</span><small>Correo</small><b>${esc(p.email)}</b></div>
-        <div class="p-tile"><span class="ti">${icon('info')}</span><small>Versión del sistema</small><b>${esc(APP_VERSION)}</b></div>
       </div>
+      ${state.isAdmin ? `<section class="pf-bloque mt pf-correos"><h3 class="pf-sec">${icon('mail')} Correos del servicio médico</h3>
+        <div class="avisos info"><span class="avisos-ico">${emoji('correo')}</span>
+          <div class="avisos-txt"><b>Correos de citas</b><p>Revisa cómo se ven los correos que reciben quien solicitó la cita y su área cuando Servicio Médico la confirma, la reprograma o la cancela.</p></div>
+          <div class="avisos-acc">
+            <select id="mail-tipo" aria-label="Tipo de correo">
+              <option value="confirmada">Cita confirmada</option>
+              <option value="reprogramada">Cita reprogramada</option>
+              <option value="cancelada">Cita cancelada</option>
+            </select>
+            <button class="btn secondary" data-mail="vista">${icon('eye')} Ver vista previa</button>
+            <button class="btn primary" data-mail="enviar">${icon('send')} Enviarme un correo de prueba</button></div></div>
+        <div class="avisos info mt-s"><span class="avisos-ico">${emoji('grafica')}</span>
+          <div class="avisos-txt"><b>Resumen mensual por correo</b><p>Cada día 1, a las 08:00 h, se envía el resumen del mes anterior al Supervisor de seguridad, salud y ambiente, al Gerente y al Ingeniero de procesos y mejora continua. Solo datos agregados, sin nombres de colaboradores.</p></div>
+          <div class="avisos-acc">
+            <button class="btn secondary" data-mail="vista" data-resumen>${icon('eye')} Ver resumen del mes anterior</button>
+            <button class="btn primary" data-mail="enviar" data-resumen>${icon('send')} Enviármelo de prueba</button></div></div>
+      </section>` : ''}
       <div class="grid grid-2 mt">
         <div class="card">
-          <div class="card-head"><div><h3>Cambiar contraseña</h3><p>Aplica a todas las aplicaciones de Pet's Table que usan esta cuenta.</p></div></div>
+          <div class="card-head"><div class="ch-con-ilus"><span class="ch-ilus" aria-hidden="true">${emoji('candado')}</span><h3>Cambiar contraseña</h3><p>Aplica a todas las aplicaciones de Pet's Table que usan esta cuenta.</p></div></div>
           <form id="pw-form" novalidate>
             <div class="field"><label for="pw1">Nueva contraseña <span class="req">*</span></label>
               <div class="pw-wrap"><input id="pw1" name="p1" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
@@ -139,30 +170,13 @@ export default {
           </form>
         </div>
         <div class="card">
-          <div class="card-head"><div><h3>Apariencia</h3><p>Se guarda en este dispositivo.</p></div></div>
+          <div class="card-head"><div class="ch-con-ilus"><span class="ch-ilus" aria-hidden="true">${emoji('tema')}</span><h3>Apariencia</h3><p>Se guarda en este dispositivo.</p></div></div>
           <div class="seg" role="radiogroup" aria-label="Tema">
             <button data-theme-opt="light" class="${theme === 'light' ? 'active' : ''}">${icon('sun')} Claro</button>
             <button data-theme-opt="dark" class="${theme === 'dark' ? 'active' : ''}">${icon('moon')} Oscuro</button>
             <button data-theme-opt="system" class="${theme === 'system' ? 'active' : ''}">${icon('monitor-smartphone')} Sistema</button>
           </div>
-          <div class="section-title" style="margin-top:22px">${icon('bell-ring')} Notificaciones en este dispositivo</div>
-          <div id="notif-box"><div class="skeleton" style="height:36px"></div></div>
-          ${state.isAdmin ? `<div class="section-title" style="margin-top:22px">${icon('mail')} Correos de citas</div>
-          <p class="hint" style="margin:0 0 10px">Revisa cómo se ven los correos que reciben quien solicitó la cita y su área cuando Servicio Médico la confirma, la reprograma o la cancela.</p>
-          <div class="toolbar" style="justify-content:flex-start">
-            <select id="mail-tipo" aria-label="Tipo de correo" style="flex:0 1 220px">
-              <option value="confirmada">Cita confirmada</option>
-              <option value="reprogramada">Cita reprogramada</option>
-              <option value="cancelada">Cita cancelada</option>
-            </select>
-            <button class="btn secondary" data-mail="vista">${icon('eye')} Ver vista previa</button>
-            <button class="btn primary" data-mail="enviar">${icon('send')} Enviarme un correo de prueba</button></div>
-          <div class="section-title" style="margin-top:22px">${icon('bar-chart-3')} Resumen mensual por correo</div>
-          <p class="hint" style="margin:0 0 10px">Cada día 1, a las 08:00 h, se envía el resumen del mes anterior al Supervisor de seguridad, salud y ambiente, al Gerente y al Ingeniero de procesos y mejora continua. Solo datos agregados, sin nombres de colaboradores.</p>
-          <div class="page-actions" style="justify-content:flex-start">
-            <button class="btn secondary" data-mail="vista" data-resumen>${icon('eye')} Ver resumen del mes anterior</button>
-            <button class="btn primary" data-mail="enviar" data-resumen>${icon('send')} Enviármelo de prueba</button></div>` : ''}
-          <div class="section-title" style="margin-top:22px">${icon('smartphone')} Instalar en la pantalla de inicio</div>
+          <div class="section-title pf-instalar" style="margin-top:22px">${emoji('instalar', 'sm')} Instalar en la pantalla de inicio</div>
           ${standalone ? `<p class="hint">${icon('check-circle-2')} Ya estás usando la aplicación instalada.</p>` : `
           <button class="btn secondary hidden" id="install-btn">${icon('download')} Instalar aplicación</button>
           <p class="hint" style="margin:10px 0 6px"><b>iPhone / iPad (Safari):</b></p>
@@ -170,8 +184,26 @@ export default {
           <p class="hint" style="margin:10px 0 6px"><b>Android (Chrome):</b></p>
           <ol class="steps"><li>Abre el menú <b>⋮</b>.</li><li>Elige <b>Instalar aplicación</b> o <b>Agregar a pantalla principal</b>.</li></ol>`}
         </div>
-      </div>`;
+      </div>
+      <section class="cr mt" aria-labelledby="cr-t">
+        <div class="cr-foto" id="cr-foto">${avatarHTML(AUTOR.nombre, String(p.email).toLowerCase() === AUTOR.correo ? p.foto_url : null, 'xl')}</div>
+        <div class="cr-cuerpo">
+          <span class="cr-eyebrow">${icon('sparkles')} Desarrollado por</span>
+          <h3 id="cr-t">${esc(AUTOR.nombre)}</h3>
+          <p class="cr-rol">Creador y desarrollador de la plataforma</p>
+          <p class="cr-txt">Concibió, diseñó, desarrolló e implementó Servicio Médico · Salud laboral: la agenda de citas en bloques de 20 minutos, el inventario de medicamentos, los exámenes médicos, la base de datos y sus permisos, los avisos y correos, y la experiencia en escritorio y móvil.</p>
+          <ul class="cr-etapas" aria-label="Participación"><li>Conceptualización</li><li>Diseño</li><li>Desarrollo</li><li>Implementación</li></ul>
+        </div>
+        <figure class="cr-firma"><span class="cr-firma-img" role="img" aria-label="Firma de ${esc(AUTOR.nombre)}"></span>
+          <figcaption><b>${esc(AUTOR.nombre)}</b><small>Autor de la plataforma</small></figcaption></figure>
+      </section>`;
     refreshIcons();
+    // Foto del autor (si su cuenta tiene fotografía y es visible para este usuario)
+    if (String(p.email).toLowerCase() !== AUTOR.correo) {
+      sb.from('usuarios_med').select('foto_url').eq('email', AUTOR.correo).maybeSingle()
+        .then(({ data }) => { const caja = el.querySelector('#cr-foto'); if (data?.foto_url && caja) caja.innerHTML = avatarHTML(AUTOR.nombre, data.foto_url, 'xl'); })
+        .catch(() => { /* sin foto: se muestran las iniciales */ });
+    }
 
     el.querySelectorAll('[data-theme-opt]').forEach((b) => b.addEventListener('click', () => {
       window.__medSetTheme?.(b.dataset.themeOpt);

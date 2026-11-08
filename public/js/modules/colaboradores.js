@@ -8,6 +8,7 @@ import {
   DataTable, paged, sanitizeSearch, debounce, getAreas, invalidateAreas, pill, must, fmtNum,
   fmtDate, fmtTime, estadoPill, MOTIVOS, cantUnidad, refreshIcons, ganchos, permitirNuevaArea,
   getPuestos, puestoOptionsHTML, permitirNuevoPuesto, invalidatePuestos,
+  emoji,
 } from '../core.js';
 
 let root, table, areasTable;
@@ -26,8 +27,8 @@ export default {
         </div>
       </section>
       ${admin ? `<div class="tabs" role="tablist">
-        <button role="tab" class="active" data-tab="col">${icon('users')} Colaboradores</button>
-        <button role="tab" data-tab="areas">${icon('building-2')} Áreas</button></div>` : ''}
+        <button role="tab" class="active" data-tab="col">${emoji('n_colaboradores', 'tab-ilus')} Colaboradores</button>
+        <button role="tab" data-tab="areas">${emoji('personas', 'tab-ilus')} Áreas</button></div>` : ''}
       <div id="tab-col" class="card">
         <div class="toolbar">
           <div class="search">${icon('search')}<input type="search" id="k-q" placeholder="Buscar por nombre" aria-label="Buscar"></div>

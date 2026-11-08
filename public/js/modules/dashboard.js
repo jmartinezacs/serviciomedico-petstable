@@ -7,7 +7,7 @@ import {
   sb, state, esc, icon, refreshIcons, todayISO, addDays, fmtDate, fmtTime, fmtDateTime, fmtNum,
   MOTIVOS, ESTADOS, estadoPill, pill, makeChart, destroyCharts, emptyState, errorState, navigate,
   monthShort, prefs, must, avatarHTML, cantUnidad, nowHHMM, isWeekday, fmtLongDate, SLOTS, push, toast, errMsg,
-  getBloqueos, bloqueoDe, getAreas, slotDe,
+  getBloqueos, bloqueoDe, getAreas, slotDe, emoji, kpiHTML, animarCifras, urgentePill,
 } from '../core.js';
 import { openCitaForm, openDetalle } from './citas.js';
 import { openEntrada } from './inventario.js';
@@ -15,7 +15,7 @@ import { openColaboradorForm } from './colaboradores.js';
 import { openExamenForm } from './examenes.js';
 import { describir } from './bitacora.js';
 
-let root, token = 0;
+let root, token = 0, cifrasAnimadas = false;
 
 function periodRange(p, desde, hasta) {
   const hoy = todayISO();
@@ -34,7 +34,7 @@ function periodRange(p, desde, hasta) {
 
 export default {
   async render(el) {
-    root = el;
+    root = el; cifrasAnimadas = false;
     const p = state.profile;
     const per = prefs.get('med.dash.period') || 'mes';
     el.innerHTML = `
@@ -189,12 +189,12 @@ async function notifHTML() {
   if (prefs.get('med.notif.omitir') === '1') return '';
   const est = await push.estado().catch(() => 'no-soportado');
   if (est === 'inactivo') {
-    return `<div class="notif-banner"><span class="nb-ico">${icon('bell-ring')}</span><div class="nb-txt"><b>Activa las notificaciones</b>
+    return `<div class="notif-banner"><span class="nb-ico ilus">${emoji('n_avisos')}</span><div class="nb-txt"><b>Activa las notificaciones</b>
       <span>${state.isAdmin ? 'Recibe un aviso cuando se solicite una nueva cita.' : 'Recibe un aviso cuando Servicio Médico confirme o cancele tus citas.'}</span></div>
       <button class="btn primary" data-dash="notif-on">${icon('bell')} Activar</button><button class="icon-btn" data-dash="notif-x" aria-label="Ocultar aviso">${icon('x')}</button></div>`;
   }
   if (est === 'instalar') {
-    return `<div class="notif-banner"><span class="nb-ico">${icon('smartphone')}</span><div class="nb-txt"><b>Instala la app para recibir avisos</b>
+    return `<div class="notif-banner"><span class="nb-ico ilus">${emoji('instalar')}</span><div class="nb-txt"><b>Instala la app para recibir avisos</b>
       <span>En iPhone: toca Compartir → “Agregar a pantalla de inicio”, abre la app desde ahí y activa las notificaciones.</span></div>
       <button class="icon-btn" data-dash="notif-x" aria-label="Ocultar aviso">${icon('x')}</button></div>`;
   }
@@ -212,7 +212,7 @@ async function load() {
     body.innerHTML = emptyState({ ico: 'calendar-x', title: 'Periodo inválido', text: 'La fecha final debe ser igual o posterior a la inicial.' });
     refreshIcons(); return;
   }
-  if (!body.children.length) body.innerHTML = `<div class="grid grid-4">${'<div class="kpi"><div class="skeleton" style="width:60%"></div><div class="skeleton" style="height:30px;width:40%"></div></div>'.repeat(4)}</div>`;
+  if (!body.children.length) body.innerHTML = `<div class="grid grid-4 kx-grid">${'<div class="kx kx-esqueleto"><div class="skeleton" style="width:55%"></div><div class="skeleton" style="height:34px;width:38%"></div><div class="skeleton" style="width:70%"></div></div>'.repeat(4)}</div>`;
   const hoy = todayISO();
   try {
     const reqs = [
@@ -244,6 +244,8 @@ async function load() {
       + (state.isAdmin ? adminHTML(k, prox, lotes, stock, act, pad) : userHTML(k, prox)) + quickHTML() + accesoHTML();
     refreshIcons();
     drawCharts(k, pad);
+    // Las cifras cuentan desde 0 solo en el primer pintado de la vista (no en cada filtro)
+    if (!cifrasAnimadas) { cifrasAnimadas = true; animarCifras(body); }
   } catch (err) {
     if (t !== token) return;
     console.error(err);
@@ -252,32 +254,34 @@ async function load() {
   }
 }
 
-const kpi = (cls, ico, label, value, desc, go = '') =>
-  `<div class="kpi ${cls} ${go ? 'clickable' : ''}" ${go ? `data-dash="${go}" role="link" tabindex="0"` : ''}>
-    <div class="kpi-head"><span class="kpi-ico">${icon(ico)}</span><small>${esc(label)}</small></div>
-    <strong>${fmtNum(value)}</strong>
-    <span class="desc">${esc(desc)}</span></div>`;
+// Indicador con el componente único .kx (mismos datos y destinos que antes)
+const kpi = (tono, ilus, label, value, desc, go = '', extra = '') =>
+  kpiHTML({ tono, ilus, label, valor: fmtNum(value), desc, go, extra });
 
-const statusCard = (cls, title, desc, n, go = '') =>
+const statusCard = (cls, title, desc, n, go = '', ilus = '') =>
   `<div class="status-card ${go ? 'clickable' : ''}" ${go ? `data-dash="${go}" role="link" tabindex="0"` : ''}>
-    <div class="status-head"><span class="dot blinking ${cls}"></span><b>${esc(title)}</b></div><p>${esc(desc)}</p><span class="num">${fmtNum(n)}</span></div>`;
+    ${ilus ? `<span class="sc-ilus" aria-hidden="true">${emoji(ilus)}</span>` : ''}
+    <div class="status-head"><span class="dot blinking ${cls}"></span><b>${esc(title)}</b></div><p>${esc(desc)}</p><span class="num" data-cifra>${fmtNum(n)}</span></div>`;
 
-const cardHead = (title, sub = '', btn = '') =>
-  `<div class="card-head center"><div><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}</div>${btn}</div>`;
+const cardHead = (title, sub = '', btn = '', ilus = '') =>
+  `<div class="card-head center"><div>${ilus ? `<span class="ch-ilus" aria-hidden="true">${emoji(ilus)}</span>` : ''}<h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}</div>${btn}</div>`;
 
 function proximasHTML(prox) {
   if (!prox.length) return emptyState({ ico: 'calendar', title: 'Sin citas próximas', text: 'No hay citas pendientes ni confirmadas a partir de hoy.' });
   return `<div class="list">${prox.map((c) => `
     <button class="list-item" data-dash="cita" data-id="${esc(c.id)}" style="text-align:left;cursor:pointer;color:inherit">
       <div class="date-chip"><small>${esc(monthShort(c.fecha))}</small><b>${esc(c.fecha.slice(8, 10))}</b></div>
-      <div class="li-main"><b>${esc(c.colaborador)}${c.tipo === 'urgente' ? ` ${pill('Urgente', 'bad')}` : ''}</b><span>${c.hora ? fmtTime(c.hora) : 'Horario por asignar'} · ${esc(MOTIVOS[c.motivo] || c.motivo)} · ${esc(c.area)}</span></div>
+      <div class="li-main"><b>${esc(c.colaborador)}${c.tipo === 'urgente' ? ` ${urgentePill()}` : ''}</b><span>${c.hora ? fmtTime(c.hora) : 'Horario por asignar'} · ${esc(MOTIVOS[c.motivo] || c.motivo)} · ${esc(c.area)}</span></div>
       ${estadoPill(c.estado)}
     </button>`).join('')}</div>`;
 }
 
+// Ilustración de cada gráfica junto a su título
+const ILUS_GRAFICA = { 'ch-serie': 'grafica', 'ch-estado': 'n_citas', 'ch-area': 'personas', 'ch-motivo': 'libro', 'ch-top': 'pastilla' };
 function chartCard(id, title, sub, cls = '', total = null, label = 'Total de consultas') {
   const tb = total === null ? '' : `<span class="total-badge">${esc(label)}: <b>${fmtNum(total)}</b></span>`;
-  return `<div class="card"><div class="card-head center"><div><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}${tb}</div></div>
+  const il = ILUS_GRAFICA[id] ? `<span class="ch-ilus" aria-hidden="true">${emoji(ILUS_GRAFICA[id])}</span>` : '';
+  return `<div class="card chart-card"><div class="card-head center"><div>${il}<h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}${tb}</div></div>
     <div tabindex="0" title="Ampliar gráfica" class="chart-box ${cls}"><canvas id="${id}" role="img" aria-label="${esc(title)}"></canvas></div></div>`;
 }
 
@@ -290,11 +294,11 @@ function padecimientosHTML(pad) {
   }
   const alto = (n) => `style="height:${Math.max(180, 46 + n * 30)}px"`;
   return `${head}
-    <div class="card"><div class="card-head center"><div><h3>Toda la empresa</h3><p>Consultas atendidas en el periodo, por padecimiento</p>
+    <div class="card chart-card"><div class="card-head center"><div><span class="ch-ilus" aria-hidden="true">${emoji('estetoscopio')}</span><h3>Toda la empresa</h3><p>Consultas atendidas en el periodo, por padecimiento</p>
       <span class="total-badge">Total de consultas: <b>${fmtNum(pad.total)}</b></span></div></div>
       <div tabindex="0" title="Ampliar gráfica" class="chart-box" ${alto(pad.general.length)}><canvas id="ch-pad-gen" role="img" aria-label="Consultas por padecimiento en toda la empresa"></canvas></div></div>
     <div class="section-label">Por departamento</div>
-    <div class="dept-grid">${pad.por_area.map((a, i) => `<div class="card"><div class="card-head center"><div><h3>${esc(a.area)}</h3>
+    <div class="dept-grid">${pad.por_area.map((a, i) => `<div class="card chart-card"><div class="card-head center"><div><span class="ch-ilus" aria-hidden="true">${emoji('personas')}</span><h3>${esc(a.area)}</h3>
       <span class="total-badge">Total de consultas: <b>${fmtNum(a.total)}</b></span></div></div>
       <div tabindex="0" title="Ampliar gráfica" class="chart-box" ${alto(a.items.length)}><canvas id="ch-pad-a${i}" role="img" aria-label="Consultas por padecimiento en ${esc(a.area)}"></canvas></div></div>`).join('')}</div>`;
 }
@@ -311,16 +315,16 @@ function adminHTML(k, prox, lotes, stock, act, pad) {
       ${pill(s.estado_stock === 'agotado' ? 'Agotado' : 'Bajo mínimo', s.estado_stock === 'agotado' ? 'bad' : 'warn')}</div>`),
   ];
   return `
-    <div class="grid grid-4">
-      ${kpi('k-azul', 'calendar-clock', 'Citas de hoy', k.citas_hoy, 'Programadas y atendidas hoy', '#/citas?vista=agenda')}
-      ${kpi('k-naranja', 'hourglass', 'Por confirmar', k.pendientes, 'Pendientes a partir de hoy', '#/citas?estado=pendiente')}
-      ${kpi('k-verde', 'check-circle-2', 'Atendidas', pe.atendida || 0, 'En el periodo seleccionado', '#/citas?estado=atendida')}
-      ${kpi(k.bajo_minimo > 0 ? 'danger k-rojo' : 'k-rojo', 'package-x', 'Stock bajo mínimo', k.bajo_minimo, `De ${fmtNum(k.medicamentos_activos)} medicamentos activos`, '#/inventario?estado=alerta')}
+    <div class="grid grid-4 kx-grid">
+      ${kpi('blue', 'kpi_hoy', 'Citas de hoy', k.citas_hoy, 'Programadas y atendidas hoy', '#/citas?vista=agenda')}
+      ${kpi('orange', 'cita_pendiente', 'Por confirmar', k.pendientes, 'Pendientes a partir de hoy', '#/citas?estado=pendiente')}
+      ${kpi('green', 'cita_atendida', 'Atendidas', pe.atendida || 0, 'En el periodo seleccionado', '#/citas?estado=atendida')}
+      ${kpi('red', 'stock_bajo', 'Stock bajo mínimo', k.bajo_minimo, `De ${fmtNum(k.medicamentos_activos)} medicamentos activos`, '#/inventario?estado=alerta', k.bajo_minimo > 0 ? 'alerta' : '')}
     </div>
     <div class="grid grid-3 mt">
-      ${statusCard(k.por_caducar ? 'warn' : '', 'Lotes por caducar', `Caducan en ${k.dias_alerta} días o menos`, k.por_caducar, '#/inventario?cad=por_caducar')}
-      ${statusCard(k.caducados ? 'bad' : '', 'Lotes caducados con existencia', 'Retirar del inventario', k.caducados, '#/inventario?cad=caducado')}
-      ${statusCard('', 'Citas confirmadas próximas', 'A partir de hoy', k.confirmadas_proximas, '#/citas?estado=confirmada')}
+      ${statusCard(k.por_caducar ? 'warn' : '', 'Lotes por caducar', `Caducan en ${k.dias_alerta} días o menos`, k.por_caducar, '#/inventario?cad=por_caducar', 'caducado')}
+      ${statusCard(k.caducados ? 'bad' : '', 'Lotes caducados con existencia', 'Retirar del inventario', k.caducados, '#/inventario?cad=caducado', 'n_alerta')}
+      ${statusCard('', 'Citas confirmadas próximas', 'A partir de hoy', k.confirmadas_proximas, '#/citas?estado=confirmada', 'cita_confirmada')}
     </div>
     ${k.total ? `
     <div class="grid grid-main mt">
@@ -333,8 +337,8 @@ function adminHTML(k, prox, lotes, stock, act, pad) {
     </div>` : `<div class="card mt">${emptyState({ ico: 'bar-chart-3', title: 'Sin citas en el periodo', text: 'Cuando se registren citas en estas fechas verás aquí sus gráficas.' })}</div>`}
     ${padecimientosHTML(pad)}
     <div class="grid grid-2 mt">
-      <div class="card">${cardHead('Próximas citas', 'Pendientes y confirmadas', `<button class="btn secondary" data-dash="#/citas?vista=agenda">${icon('calendar-range')} Ver agenda</button>`)}${proximasHTML(prox)}</div>
-      <div class="card">${cardHead('Alertas de inventario', 'Caducidades y stock mínimo', `<button class="btn secondary" data-dash="#/inventario">${icon('pill')} Inventario</button>`)}
+      <div class="card">${cardHead('Próximas citas', 'Pendientes y confirmadas', `<button class="btn secondary" data-dash="#/citas?vista=agenda">${icon('calendar-range')} Ver agenda</button>`, 'calendario')}${proximasHTML(prox)}</div>
+      <div class="card">${cardHead('Alertas de inventario', 'Caducidades y stock mínimo', `<button class="btn secondary" data-dash="#/inventario">${icon('pill')} Inventario</button>`, 'n_alerta')}
         ${alertas.length ? `<div class="list">${alertas.join('')}</div>` : emptyState({ ico: 'shield-check', title: 'Sin alertas', text: 'No hay lotes por caducar ni medicamentos bajo su stock mínimo.' })}</div>
     </div>
     <div class="grid grid-2 mt">
@@ -345,17 +349,17 @@ function adminHTML(k, prox, lotes, stock, act, pad) {
 
 function quickHTML() {
   const items = state.isAdmin
-    ? [['nueva-cita', 'calendar-plus', 'Nueva cita', 'Agendar para un colaborador'],
-       ['entrada', 'package-plus', 'Registrar entrada', 'Ingresar medicamento por lote'],
-       ['colaborador', 'user-plus', 'Nuevo colaborador', 'Alta en el catálogo'],
-       ['#/citas?vista=agenda', 'calendar-range', 'Agenda de hoy', 'Bloques de 20 minutos']]
-    : [['nueva-cita', 'calendar-plus', 'Solicitar cita', 'Para ti o un colaborador'],
-       ['colaborador', 'user-plus', 'Registrar colaborador', 'Si no aparece en el catálogo'],
-       ['#/citas', 'list', 'Mis solicitudes', 'Consulta su estado'],
-       ['#/citas?vista=agenda', 'calendar-range', 'Disponibilidad', 'Horarios libres']];
-  return `<section class="card mt quick-section">${cardHead('Accesos rápidos', 'Las acciones más utilizadas')}
+    ? [['nueva-cita', 'n_citas', 'Nueva cita', 'Agendar para un colaborador'],
+       ['entrada', 'paquete', 'Registrar entrada', 'Ingresar medicamento por lote'],
+       ['colaborador', 'n_colaboradores', 'Nuevo colaborador', 'Alta en el catálogo'],
+       ['#/citas?vista=agenda', 'reloj', 'Agenda de hoy', 'Bloques de 20 minutos']]
+    : [['nueva-cita', 'n_citas', 'Solicitar cita', 'Para ti o un colaborador'],
+       ['colaborador', 'n_colaboradores', 'Registrar colaborador', 'Si no aparece en el catálogo'],
+       ['#/citas', 'libro', 'Mis solicitudes', 'Consulta su estado'],
+       ['#/citas?vista=agenda', 'calendario', 'Disponibilidad', 'Horarios libres']];
+  return `<section class="card mt quick-section">${cardHead('Accesos rápidos', 'Las acciones más utilizadas', '', 'n_ayuda')}
     <div class="quick-grid">
-      ${items.map(([a, ic, t, s]) => `<button class="quick-action" data-dash="${a}"><span class="qi">${icon(ic)}</span><b>${esc(t)}</b><span>${esc(s)}</span></button>`).join('')}
+      ${items.map(([a, ic, t, s]) => `<button class="quick-action" data-dash="${a}"><span class="qi ilus">${emoji(ic)}</span><b>${esc(t)}</b><span>${esc(s)}</span></button>`).join('')}
     </div></section>`;
 }
 
@@ -389,7 +393,7 @@ function hace(ts) {
   return fmtDateTime(ts);
 }
 function actividadHTML(act) {
-  return `<div class="card">${cardHead('Actividad reciente', 'Últimos cambios registrados en la bitácora', `<button class="btn secondary" data-dash="#/bitacora">${icon('history')} Bitácora</button>`)}
+  return `<div class="card">${cardHead('Actividad reciente', 'Últimos cambios registrados en la bitácora', `<button class="btn secondary" data-dash="#/bitacora">${icon('history')} Bitácora</button>`, 'n_bitacora')}
     ${act?.length ? `<div class="list act-list">${act.map((b) => `<div class="list-item act-item">
       ${b.usuario_email ? `<span class="act-photo">${avatarHTML(b.actor_nombre || b.usuario_email, b.actor_foto, 'sm')}</span>` : `<span class="act-photo user-photo bit-sistema">${icon('cpu')}</span>`}
       <div class="li-main"><span class="act-desc">${describir(b)}</span>
@@ -400,14 +404,14 @@ function actividadHTML(act) {
 function userHTML(k, prox) {
   const pe = k.por_estado || {};
   return `
-    <div class="grid grid-4">
-      ${kpi('k-azul', 'calendar-check', 'Confirmadas próximas', k.confirmadas_proximas, 'A partir de hoy', '#/citas?estado=confirmada')}
-      ${kpi('k-naranja', 'hourglass', 'Pendientes', k.pendientes, 'Esperando confirmación', '#/citas?estado=pendiente')}
-      ${kpi('k-verde', 'check-circle-2', 'Atendidas', pe.atendida || 0, 'En el periodo seleccionado')}
-      ${kpi('k-rojo', 'x-circle', 'Canceladas', pe.cancelada || 0, 'En el periodo seleccionado')}
+    <div class="grid grid-4 kx-grid">
+      ${kpi('blue', 'cita_confirmada', 'Confirmadas próximas', k.confirmadas_proximas, 'A partir de hoy', '#/citas?estado=confirmada')}
+      ${kpi('orange', 'cita_pendiente', 'Pendientes', k.pendientes, 'Esperando confirmación', '#/citas?estado=pendiente')}
+      ${kpi('green', 'cita_atendida', 'Atendidas', pe.atendida || 0, 'En el periodo seleccionado')}
+      ${kpi('red', 'cita_cancelada', 'Canceladas', pe.cancelada || 0, 'En el periodo seleccionado')}
     </div>
     <div class="grid grid-2 mt">
-      <div class="card">${cardHead('Mis próximas citas', 'Pendientes y confirmadas', `<button class="btn primary" data-dash="nueva-cita">${icon('calendar-plus')} Solicitar cita</button>`)}${proximasHTML(prox)}</div>
+      <div class="card">${cardHead('Mis próximas citas', 'Pendientes y confirmadas', `<button class="btn primary" data-dash="nueva-cita">${icon('calendar-plus')} Solicitar cita</button>`, 'calendario')}${proximasHTML(prox)}</div>
       ${k.total ? chartCard('ch-estado', 'Mis citas por estado', `${fmtNum(k.total)} en el periodo`, 'sm') : `<div class="card">${cardHead('Mis citas por estado')}${emptyState({ ico: 'pie-chart', title: 'Sin citas en el periodo', text: 'Solicita una cita para verla aquí.' })}</div>`}
     </div>
     ${k.total ? `<div class="mt">${chartCard('ch-serie', 'Mis citas en el periodo', k.serie_por_dia ? 'Por día' : 'Por mes', 'sm')}</div>` : ''}`;
@@ -416,7 +420,7 @@ function userHTML(k, prox) {
 const ESTADO_COLOR = { pendiente: '#FFB020', confirmada: '#1BC7C7', atendida: '#1BB56F', cancelada: '#9AAAB6', no_asistio: '#E0464E' };
 // Cada categoría con su color. Se asigna por nombre en orden alfabético (no por
 // lugar en la gráfica), así una categoría no cambia de color cuando sube o baja.
-const COLORES = ['#F58020', '#0FA3A6', '#2563EB', '#16A34A', '#7C3AED', '#DB2777', '#E8890C', '#0891B2', '#65A30D', '#DC2626', '#9333EA', '#0D9488', '#CA8A04', '#4F46E5', '#BE185D', '#64748B'];
+const COLORES = ['#2A78D6', '#EB6834', '#1BAF7A', '#EDA100', '#E87BA4', '#008300', '#6250D6', '#E34948', '#0891B2', '#7C3AED', '#CA8A04', '#0D9488', '#DB2777', '#4F46E5', '#65A30D', '#64748B'];
 const coloresPorNombre = (nombres) => new Map([...new Set(nombres)].sort((a, b) => a.localeCompare(b, 'es')).map((n, i) => [n, COLORES[i % COLORES.length]]));
 const COLOR_TOP = '#7A5BE6';
 function drawPadecimientos(pad) {

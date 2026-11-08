@@ -81,6 +81,20 @@ Other frontend files:
   - The login is always dark because its tokens are scoped under `.login`.
 - `sw.js` and `manifest.webmanifest` must stay separate files, because Web Push and iOS require it.
 
+### Visual system (v2.9, copied from «Ruta de calidad»; design only)
+
+- **Illustrations:** own full-color SVGs in `public/emoji/<slug>.svg` (viewBox 64×64). Edit `fuentes/ilustraciones.src`, never the SVGs, then run `perl tools/gen-ilustraciones.pl fuentes/ilustraciones.src public/emoji` (Git Bash).
+  - Each block starts with `@@slug`. Macros: `%V(id,light,dark)` vertical gradient, `%D` diagonal, `%R` radial, `%S` shadow filter, `%H` highlight. The filter id `sh` is reserved.
+  - Style: two-tone gradient (light top, dark bottom), 1–1.4 px outline in the dark tone, `%S` only on the main silhouette, discreet highlight. Never Unicode emoji or third-party images.
+  - Use `emoji(slug, cls)` from `core.js` (`<img loading="lazy" alt="" aria-hidden>`). They go in the menu and dock (`ROUTES[].ilus`), view headers (added by the router), tabs, card heads, KPIs, status pills (`estadoPill`, `urgentePill`), empty states (`ILUS_VACIO` in `emptyState`) and Mi perfil. Action buttons, inputs and table actions keep lucide.
+  - The build copies `public/emoji` and `public/notif` to the published root.
+- **KPIs:** a single helper `kpiHTML({ tono, ilus, label, valor, desc, go, extra })` renders `.kx` (tones orange, green, red, blue, violet). `go` becomes `data-dash` for the Panel handler. `animarCifras(root)` counts `[data-cifra]` from 0 once per mount.
+- **Charts:** `makeChart` gives labels inside the bar (white) or in a pill, the dark tooltip that hides on leave, 750 ms entry and compact ticks under 420 px. `paletaCat()` returns the colorblind-safe categorical palette for light or dark; entities with a business color keep it.
+- **Surfaces:** `--hero-*` tokens (light cream/orange, dark navy) for Mi perfil identity, «Sistema y versión», the credits (`.cr`) and the Panel access card. Defined on `:root`, `[data-theme=dark]` and the `prefers-color-scheme` fallback.
+- **Router:** each view gets a fresh `#view` element with class `entra`; `body.cargando` shows a 2 px loading bar under the header.
+- **Dock (≤ 720 px):** routes with `mobile: true`; admin Panel, Citas, Inventario, Perfil; user Panel, Mis citas, Perfil. `corto` holds the short label.
+- **Notifications:** the Android badge is the Pet's Table logo silhouette (`/notif/badge-96.png`; `notif-badge.png` holds the same image). The manifest has `/notif/icono-192.png`, `/notif/icono-512.png` and `/notif/badge-192.png` (monochrome). `apple-touch-icon` is the opaque `/notif/apple-180.png`.
+
 ### Single-file build (`tools/build-single.ps1`)
 
 - **Modules:** it regex-converts `import`/`export` into an IIFE module map `__m`.

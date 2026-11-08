@@ -11,6 +11,7 @@ import {
   sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, DataTable, paged,
   sanitizeSearch, debounce, getAreas, pill, must, fmtDateTime, avatarHTML, prepararFoto, subirFoto,
   borrarFotoPropia, refreshIcons, fieldError, permitirNuevaArea, olvidarComida, fmtTime,
+  emoji,
 } from '../core.js';
 
 let root, table, cuentas = new Map();
@@ -27,8 +28,8 @@ export default {
         ${adm ? `<div class="page-actions"><button class="btn primary" data-u="nuevo">${icon('user-plus')} Nuevo usuario</button></div>` : ''}
       </section>
       <div class="tabs ${adm ? '' : 'hidden'}" role="tablist">
-        <button role="tab" class="active" data-tab="usuarios">${icon('users')} Usuarios</button>
-        <button role="tab" data-tab="config">${icon('settings')} Configuración</button>
+        <button role="tab" class="active" data-tab="usuarios">${emoji('n_usuarios', 'tab-ilus')} Usuarios</button>
+        <button role="tab" data-tab="config">${emoji('n_catalogos', 'tab-ilus')} Configuración</button>
       </div>
       <div data-pane="usuarios">
         <div class="card">
@@ -449,9 +450,9 @@ async function renderConfig() {
       <div class="form-error" role="alert"></div>
       <button type="submit" class="btn primary">${icon('save')} Guardar</button>
     </form>
-    <div class="section-title" style="margin-top:22px">${icon('clock')} Horario de citas</div>
+    <div class="section-title" style="margin-top:22px">${emoji('reloj', 'st-ilus')} Horario de citas</div>
     <p class="hint" style="margin:0">Lunes a viernes de 09:00 a 18:00, en bloques de 20 minutos (última cita a las 17:40), sin citas durante la hora de comida; el médico puede agendar a cualquier hora; las citas de urgencia no usan bloques; un horario solo puede tener una cita activa. Los festivos y ausencias se registran en Citas → Días sin servicio. Las citas confirmadas que no se atendieron se marcan como inasistencia a las 19:05 (se pueden reabrir). Estas reglas se validan en la base de datos.</p>
-    <div class="section-title" style="margin-top:22px">${icon('stethoscope')} Catálogo de padecimientos</div>
+    <div class="section-title" style="margin-top:22px">${emoji('estetoscopio', 'st-ilus')} Catálogo de padecimientos</div>
     <div id="pad-box"><div class="skeleton" style="height:36px"></div></div>`;
   refreshIcons();
   renderPadecimientos(card.querySelector('#pad-box'));

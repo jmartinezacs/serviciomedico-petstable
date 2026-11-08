@@ -10,6 +10,7 @@ import {
   DataTable, paged, sanitizeSearch, debounce, pill, must, fmtNum, fmtDate, fmtDateTime, todayISO, addDays,
   dayStartTs, dayEndTs, plural, cantUnidad, equivEmpaque, existenciaHTML,
   emptyState, errorState, refreshIcons, toCSV, descargar,
+  emoji,
 } from '../core.js';
 
 let root, tStock, tLotes, tMovs, tab = 'stock';
@@ -25,6 +26,8 @@ const EMPAQUES = ['Caja', 'Frasco', 'Bote', 'Blíster', 'Tubo', 'Sobre', 'Bolsa'
 const mayus = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 const CATEGORIAS = { medicamento: 'Medicamento', insumo: 'Insumo médico', equipo: 'Equipo y mobiliario' };
+// Ilustración de cada categoría en la tabla de existencias
+const ILUS_CATEGORIA = { medicamento: 'pastilla', insumo: 'insumo', equipo: 'equipo' };
 const NIVELES = { 100: 'Lleno', 75: '¾', 50: '½', 25: '¼' };
 const nivelTxt = (n) => (n ? `abierto, queda ${NIVELES[n] === 'Lleno' ? 'lleno' : NIVELES[n]}` : '');
 const envase = (m) => m?.control === 'envase';
@@ -83,10 +86,10 @@ export default {
         </div>
       </section>
       <div class="tabs" role="tablist">
-        <button role="tab" data-tab="stock">${icon('boxes')} Existencias</button>
-        <button role="tab" data-tab="lotes">${icon('layers')} Lotes y caducidades</button>
-        <button role="tab" data-tab="movs">${icon('arrow-left-right')} Movimientos</button>
-        <button role="tab" data-tab="reabasto">${icon('shopping-cart')} Reabasto</button>
+        <button role="tab" data-tab="stock">${emoji('paquete', 'tab-ilus')} Existencias</button>
+        <button role="tab" data-tab="lotes">${emoji('caducado', 'tab-ilus')} Lotes y caducidades</button>
+        <button role="tab" data-tab="movs">${emoji('n_inventario', 'tab-ilus')} Movimientos</button>
+        <button role="tab" data-tab="reabasto">${emoji('stock_bajo', 'tab-ilus')} Reabasto</button>
       </div>
       <div class="card hidden" data-pane="reabasto"><div id="reabasto-box"></div></div>
       <div class="card" data-pane="stock">
@@ -198,7 +201,7 @@ function stockTable() {
     sort: { key: 'nombre', asc: true },
     columns: [
       { label: 'Clave', sort: 'clave', render: (m) => `<span class="mono cell-main">${esc(m.clave)}</span>` },
-      { label: 'Artículo', sort: 'nombre', render: (m) => `<div class="cell-main">${esc(m.nombre)}</div><div class="cell-sub">${esc([CATEGORIAS[m.categoria], m.presentacion].filter(Boolean).join(' · '))}</div>` },
+      { label: 'Artículo', sort: 'nombre', render: (m) => `<div class="art-cell">${emoji(ILUS_CATEGORIA[m.categoria] || 'pastilla', 'art-ilus')}<div><div class="cell-main">${esc(m.nombre)}</div><div class="cell-sub">${esc([CATEGORIAS[m.categoria], m.presentacion].filter(Boolean).join(' · '))}</div></div></div>` },
       { label: 'Existencia vigente', cls: 'num', sort: 'existencia_vigente', render: (m) => `${existenciaHTML(m.existencia_vigente, m)}${envase(m) && m.nivel_abierto ? `<div class="cell-sub">1 ${esc(m.unidad)} ${esc(nivelTxt(m.nivel_abierto))}</div>` : ''}${m.existencia_caducada ? `<div class="cell-sub" style="color:var(--bad)">${esc(cantUnidad(m.existencia_caducada, m.unidad))} caducadas</div>` : ''}` },
       { label: 'Mínimo', cls: 'num', sort: 'stock_minimo', render: (m) => (m.stock_minimo ? esc(cantUnidad(m.stock_minimo, m.unidad)) : '<span class="cell-sub">Sin alerta</span>') },
       { label: 'Próx. caducidad', sort: 'proxima_caducidad', render: (m) => (m.proxima_caducidad ? fmtDate(m.proxima_caducidad) : '<span class="cell-sub">—</span>') },

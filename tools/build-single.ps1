@@ -49,6 +49,9 @@ if ($bundleJs -match '</script') { throw 'El código contiene </script>' }
 $css = Read-Text('css/app.css')
 $logo = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $Src 'img/logo-petstable.webp')))
 $css = $css.Replace("url('/img/logo-petstable.webp')", "url('data:image/webp;base64,$logo')")
+# Firma de los créditos (máscara CSS en Mi perfil)
+$firma = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $Src 'img/firma.png')))
+$css = $css.Replace("url('/img/firma.png')", "url('data:image/png;base64,$firma')")
 if ($css.Contains('/img/')) { throw 'Quedó una referencia a /img/ en el CSS' }
 $themeJs = (Read-Text('js/theme-init.js')).Trim()
 $configJs = (Read-Text('js/config.js')).Trim()
@@ -73,13 +76,15 @@ Swap '  <link rel="icon" href="/favicon.ico?v=1" sizes="any">' "  <meta http-equ
 Swap "  <link rel=`"icon`" type=`"image/png`" sizes=`"32x32`" href=`"/icons/favicon-32.png?v=1`">`n" ''
 Swap '<img class="app-icon" src="/img/app-icon-128.png"' "<img class=`"app-icon`" src=`"$icon128`""
 # El manifiesto se publica como archivo aparte (necesario para notificaciones en iPhone)
-Swap '<link rel="manifest" href="/manifest.webmanifest?v=1">' '<link rel="manifest" href="/manifest.webmanifest">'
+Swap '<link rel="manifest" href="/manifest.webmanifest?v=2">' '<link rel="manifest" href="/manifest.webmanifest?v=2">'
 Swap '  <link rel="stylesheet" href="/css/app.css?v=1.0.0">' "  <style>`n$css</style>"
 Swap '  <script src="/js/theme-init.js"></script>' "  <script>$themeJs</script>"
 Swap '  <script src="/js/config.js?v=1.0.0"></script>' "  <script>$configJs</script>"
 Swap '  <script type="module" src="/js/app.js?v=1.0.0"></script>' "  <script>$bundleJs</script>"
+# Las imágenes incrustadas (base64) pueden contener por azar textos como /js/: se revisa sin ellas
+$sinDatos = [regex]::Replace($html, 'data:[a-z/+.-]+;base64,[A-Za-z0-9+/=]+', '')
 foreach ($ref in @('/css/', '/js/', '/img/', '/icons/', 'favicon.ico')) {
-  if ($html.Contains($ref)) { throw "Quedó una referencia externa a $ref" }
+  if ($sinDatos.Contains($ref)) { throw "Quedó una referencia externa a $ref" }
 }
 $html = "<!-- Servicio Médico · Pet's Table — archivo generado por tools/build-single.ps1. Edita las fuentes en public/ y vuelve a generar. -->`n" + $html
 [IO.File]::WriteAllText((Join-Path $Out 'index.html'), $html, $utf8)
@@ -92,6 +97,11 @@ Copy-Item (Join-Path $Src 'img/notif-badge.png') (Join-Path $Out 'notif-badge.pn
 Copy-Item (Join-Path $Src 'img/notif-icon.png') (Join-Path $Out 'notif-icon.png') -Force
 # Logotipo para los correos (notificar_med lo descarga e incrusta; también la vista previa)
 Copy-Item (Join-Path $Src 'img/logo-correo.png') (Join-Path $Out 'logo-correo.png') -Force
+# Ilustraciones propias (SVG cacheables, no incrustadas) e íconos de la app y de notificaciones
+New-Item -ItemType Directory -Force (Join-Path $Out 'emoji') | Out-Null
+Copy-Item (Join-Path $Src 'emoji\*.svg') (Join-Path $Out 'emoji') -Force
+New-Item -ItemType Directory -Force (Join-Path $Out 'notif') | Out-Null
+Copy-Item (Join-Path $Src 'notif\*.png') (Join-Path $Out 'notif') -Force
 # Versión publicada: la app la consulta para ofrecer "Actualizar" cuando cambia
 if ($configJs -notmatch 'APP_VERSION:\s*["'']([^"'']+)["'']') { throw 'No se encontró APP_VERSION en config.js' }
 [IO.File]::WriteAllText((Join-Path $Out 'version.json'), "{`"version`":`"$($Matches[1])`"}`n", $utf8)

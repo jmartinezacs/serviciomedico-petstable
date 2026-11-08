@@ -10,6 +10,7 @@ import {
   fmtLongDate, fmtNum, SLOTS, MOTIVOS, ESTADOS, estadoPill, pill, DataTable, paged, sanitizeSearch,
   debounce, emptyState, errorState, getAreas, must, fieldError, cantUnidad, plural, avisar,
   getBloqueos, bloqueoDe, bloqueoTxt, isoDow, ganchos, slotDe,
+  emoji, urgentePill,
 } from '../core.js';
 import { openColaboradorForm } from './colaboradores.js';
 import { nivelesHTML, openMedicamentoForm } from './inventario.js';
@@ -32,9 +33,9 @@ export default {
         </div>
       </section>
       <div class="tabs" role="tablist">
-        <button role="tab" data-tab="lista" class="${vista === 'lista' ? 'active' : ''}">${icon('list')} Lista</button>
-        <button role="tab" data-tab="agenda" class="${vista === 'agenda' ? 'active' : ''}">${icon('calendar-range')} Agenda del día</button>
-        <button role="tab" data-tab="semana" class="${vista === 'semana' ? 'active' : ''}">${icon('calendar-days')} Semana</button>
+        <button role="tab" data-tab="lista" class="${vista === 'lista' ? 'active' : ''}">${emoji('libro', 'tab-ilus')} Lista</button>
+        <button role="tab" data-tab="agenda" class="${vista === 'agenda' ? 'active' : ''}">${emoji('reloj', 'tab-ilus')} Agenda del día</button>
+        <button role="tab" data-tab="semana" class="${vista === 'semana' ? 'active' : ''}">${emoji('calendario', 'tab-ilus')} Semana</button>
       </div>
       <div id="tab-lista" class="${vista === 'lista' ? '' : 'hidden'}">
         <div class="card">
@@ -94,7 +95,7 @@ function columns() {
     { label: 'Fecha', sort: 'fecha', render: (c) => `<div class="cell-main">${fmtDate(c.fecha)}</div><div class="cell-sub mono">${horaTxt(c)}</div>` },
     { label: 'Colaborador', sort: 'colaborador', render: (c) => `<div class="cell-main">${esc(c.colaborador)}</div><div class="cell-sub">${esc([c.num_empleado, c.area].filter(Boolean).join(' · '))}</div>` },
     { label: 'Motivo', render: (c) => esc(MOTIVOS[c.motivo] || c.motivo) },
-    { label: 'Estado', sort: 'estado', render: (c) => `${estadoPill(c.estado)}${c.tipo === 'urgente' ? ` ${pill('Urgente', 'bad')}` : ''}` },
+    { label: 'Estado', sort: 'estado', render: (c) => `${estadoPill(c.estado)}${c.tipo === 'urgente' ? ` ${urgentePill()}` : ''}` },
   ];
   cols.push({ label: 'Solicitó', render: (c) => `<span class="cell-sub">${c.solicitado_por === state.profile.id && !state.isAdmin ? 'Tú' : esc(c.solicitante)}</span>` });
   cols.push({ label: 'Acciones', cls: 'actions', render: (c) => actionsHTML(c) });
@@ -358,10 +359,10 @@ async function renderAgenda() {
     const total = agendaRows.filter((c) => c.estado !== 'no_asistio').length;
     // Urgencias y citas que el médico agendó fuera de los bloques de la agenda
     const urgentes = agendaRows.filter((c) => c.tipo === 'urgente' || !SLOTS.includes(slotDe(fmtTime(c.hora))));
-    const urgHTML = urgentes.length ? `<div class="section-title" style="margin-top:0">${icon('siren')} Citas de urgencia / extraordinarias</div>
+    const urgHTML = urgentes.length ? `<div class="section-title" style="margin-top:0">${emoji('urgente', 'st-ilus')} Citas de urgencia / extraordinarias</div>
       <div class="agenda" style="margin-bottom:14px">${urgentes.map((c) => `<div class="agenda-slot urg">
         <span class="hora">${c.hora ? fmtTime(c.hora) : '—'}</span>
-        <div class="who"><b>${esc(c.colaborador)} ${estadoPill(c.estado)} ${c.tipo === 'urgente' ? pill('Urgente', 'bad') : ''}</b>
+        <div class="who"><b>${esc(c.colaborador)} ${estadoPill(c.estado)} ${c.tipo === 'urgente' ? urgentePill() : ''}</b>
           <span>${esc(c.folio_txt)} · ${esc(c.hora ? 'Horario especial' : 'Horario por asignar')} · ${esc(c.area)}${state.isAdmin || c.solicitado_por !== state.profile.id ? ` · Solicitó ${esc(c.solicitante)}` : ''}</span></div>
         ${actionsHTML(c)}</div>`).join('')}</div>` : '';
     const bloqHTML = bloqueos.length ? `<div class="notice warn">${icon('calendar-off')}<span><b>Sin servicio:</b> ${bloqueos.map((b) => `${esc(bloqueoTxt(b))} · ${esc(b.motivo)}`).join('; ')}</span></div>` : '';
@@ -478,7 +479,7 @@ async function openBloqueos() {
           <input id="bq-motivo" name="motivo" required maxlength="120" placeholder="Ej. vacaciones, curso, junta"></div>
       </div>
       <div class="notice" id="bq-aviso" hidden></div>
-      <div class="section-title">${icon('calendar-off')} Próximos</div>
+      <div class="section-title">${emoji('sin_servicio', 'st-ilus')} Próximos</div>
       <div id="bq-lista"></div>`,
     onOpen: ({ form }) => {
       const cont = form.querySelector('#bq-lista');
@@ -809,7 +810,7 @@ export async function openDetalle(id) {
       ${box('Folio', `<span class="mono">${esc(c.folio_txt)}</span>`)}
       ${box('Estado', estadoPill(c.estado))}
       ${box('Fecha', esc(fmtLongDate(c.fecha)))}
-      ${box('Horario', `${horaTxt(c)}${c.tipo === 'urgente' ? ` ${pill('Urgente', 'bad')}` : ''}`)}
+      ${box('Horario', `${horaTxt(c)}${c.tipo === 'urgente' ? ` ${urgentePill()}` : ''}`)}
       ${box('Colaborador', `${esc(c.colaborador)}<div class="cell-sub">${esc([c.num_empleado, c.area].filter(Boolean).join(' · '))}</div>`)}
       ${box('Motivo', esc(MOTIVOS[c.motivo] || c.motivo))}
       ${c.descripcion ? box('Descripción', esc(c.descripcion), true) : ''}
@@ -818,7 +819,7 @@ export async function openDetalle(id) {
       ${c.estado === 'cancelada' ? box('Cancelación', `${esc(c.motivo_cancelacion || '')}<div class="cell-sub">Por ${esc(c.cancelado_por_nombre || '—')}</div>`, true) : ''}
     </div>
     ${state.isMedico && c.estado === 'atendida' ? `
-      <div class="section-title">${icon('stethoscope')} Atención</div>
+      <div class="section-title">${emoji('estetoscopio', 'st-ilus')} Atención</div>
       <div class="detail-grid">
         ${box('Padecimiento', esc(at?.padecimiento?.nombre || 'Sin clasificar'), !at?.edad)}
         ${at?.edad ? box('Edad en la consulta', `${esc(at.edad)} años`) : ''}
@@ -826,7 +827,7 @@ export async function openDetalle(id) {
         ${box('Nota de atención', esc(at?.nota || 'Sin registro'), true)}
         ${box('Atendió', `${esc(at?.atendido?.nombre || '—')}<div class="cell-sub">${fmtDateTime(at?.atendido_at)}</div>`, true)}
       </div>
-      <div class="section-title">${icon('pill')} Medicamentos e insumos entregados</div>
+      <div class="section-title">${emoji('pastilla', 'st-ilus')} Medicamentos e insumos entregados</div>
       ${meds.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>Medicamento</th><th>Lote</th><th>Caducidad</th><th class="num">Cantidad</th></tr></thead><tbody>
         ${meds.map((m) => `<tr><td>${esc(m.medicamento)}</td><td class="mono">${esc(m.lote)}</td><td>${fmtDate(m.caducidad)}</td><td class="num">${esc(m.tipo === 'uso' ? m.motivo : cantUnidad(-m.cantidad, m.unidad))}</td></tr>`).join('')}
         </tbody></table></div>` : '<p class="hint">No se entregaron medicamentos.</p>'}` : ''}
