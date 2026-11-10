@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Brand colors:** `#F58020`, `#1BC7C7` and navy/near-black.
 - **Frontend:** vanilla JS ES modules, with no npm and no framework. Libraries load from jsdelivr at pinned versions: supabase-js 2.45.4, lucide 0.453.0 and chart.js 4.4.4.
 - **Backend:** Supabase project `domumnsezocubigfqwry`, which provides Postgres, Auth, RLS, Storage, Edge Functions, pg_cron and pg_net. It is managed through the Supabase MCP tools.
-- **Repo and hosting:** the private GitHub repo is `https://github.com/jmartinezacs/serviciomedico-petstable.git`. The local clone is this folder.
+- **Repo and hosting:** the private GitHub repo is `https://github.com/jmartinezacs/serviciomedico-petstable.git`. The local clone is this folder. Vercel publishes `main` at https://serviciomedico-petstable.vercel.app.
 
 ## Repository layout and publishing
 
