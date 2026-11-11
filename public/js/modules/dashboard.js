@@ -16,6 +16,11 @@ import { openExamenForm } from './examenes.js';
 import { describir } from './bitacora.js';
 
 let root, token = 0, cifrasAnimadas = false;
+// Saludo según la hora de Ciudad de México: mañana de 5:00 a 11:59, tarde de 12:00 a 18:59
+function saludo() {
+  const h = Number(nowHHMM().slice(0, 2));
+  return h >= 5 && h < 12 ? 'Buenos días' : h >= 12 && h < 19 ? 'Buenas tardes' : 'Buenas noches';
+}
 
 function periodRange(p, desde, hasta) {
   const hoy = todayISO();
@@ -41,7 +46,7 @@ export default {
       <section class="page-intro">
         <div>
           <span class="eyebrow">Panel general</span>
-          <h1 class="hello">Hola, ${state.isMedico ? 'Dr. ' : ''}${esc(p.nombre.split(' ')[0])} ${emoji('huella', 'hello-ilus')}</h1>
+          <h1 class="hello"><span class="hello-txt">${saludo()}, ${state.isMedico ? 'Dr. ' : ''}${esc(p.nombre.split(' ')[0])}</span> <button type="button" class="hello-huella" data-dash="huella" aria-label="Huellita" title="¡Hola!">${emoji('huella', 'hello-ilus')}</button></h1>
           <p>${state.isAdmin ? 'Resumen de citas e inventario del servicio médico.' : 'Resumen de las citas que has solicitado.'}</p>
         </div>
         <div class="toolbar" style="margin:0">
@@ -96,6 +101,23 @@ async function onClick(e) {
   if (!a) return;
   const act = a.dataset.dash;
   if (act === 'retry') return load();
+  if (act === 'huella') {
+    // Microanimación al tocar la huellita: salta, gira y suelta tres huellas pequeñas
+    a.classList.remove('salta'); void a.offsetWidth; a.classList.add('salta');
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      for (let i = 0; i < 3; i++) {
+        const h = document.createElement('span');
+        h.className = 'huella-mini'; h.setAttribute('aria-hidden', 'true');
+        h.style.setProperty('--dx', `${(i - 1) * 26 + Math.round(Math.random() * 10 - 5)}px`);
+        h.style.setProperty('--rot', `${(i - 1) * 22}deg`);
+        h.style.animationDelay = `${i * 90}ms`;
+        h.innerHTML = emoji('huella');
+        a.appendChild(h);
+        setTimeout(() => h.remove(), 1300);
+      }
+    }
+    return;
+  }
   if (act === 'nueva-cita') { if (await openCitaForm()) load(); return; }
   if (act === 'entrada') { if (await openEntrada()) load(); return; }
   if (act === 'colaborador') { await openColaboradorForm(); return; }
@@ -166,7 +188,7 @@ function estadosDe(fecha, libres, bloqueos, esHoy) {
     if (lib.has(s)) return { s, e: 'libre' };
     const b = bloqueoDe(bloqueos, fecha, s);
     if (b) return { s, e: b.tipo === 'comida' ? 'comida' : 'nd' };
-    if (esHoy && s <= now) return { s, e: 'nd' };
+    if (esHoy && s <= now) return { s, e: 'pasado' };
     return { s, e: 'ocupado' };
   });
 }
@@ -206,11 +228,11 @@ function contarAnillo(raiz) {
   el.textContent = a;
   cuadro(paso);
 }
-const ESTADO_SLOT = { libre: 'Disponible', ocupado: 'Ocupado', nd: 'No disp.', comida: 'Comida' };
+const ESTADO_SLOT = { libre: 'Disponible', ocupado: 'Ocupado', nd: 'No disp.', comida: 'Comida', pasado: 'Pasado' };
 const VISIBLES = 12;
 function slotsHTML(d) {
   const est = d.estados || [];
-  const cuenta = (e) => est.filter((x) => x.e === e || (e === 'nd' && x.e === 'comida')).length;
+  const cuenta = (e) => est.filter((x) => x.e === e || (e === 'nd' && (x.e === 'comida' || x.e === 'pasado'))).length;
   // Ventana visible: a partir del primer horario libre (dos antes para contexto)
   const i0 = Math.max(0, Math.min(est.findIndex((x) => x.e === 'libre') - 2, est.length - VISIBLES));
   const chip = (x, i) => {

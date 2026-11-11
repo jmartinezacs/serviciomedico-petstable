@@ -90,6 +90,13 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
 - El inventario se lleva siempre en una sola unidad: tableta, cápsula, pieza, etc. Los artículos por envase se cuentan en envases.
 - La clave se genera sola por categoría (`MED-045`, `INS-034`, `EQ-028`) y no cambia al editar.
 - Al dar de alta un artículo se puede registrar su existencia inicial.
+- **v2.13 · Encabezado móvil y Panel (solo presentación):**
+  - **Encabezado en celular** igual que Ruta de calidad: logotipo, «Servicio Médico» y «Pet's Table S.A. de C.V.»; el selector de modo claro/oscuro pasa al menú lateral (sección Apariencia). En escritorio no cambia.
+  - **Cifra del anillo** sin recortes: el degradado del número cubre todo el dígito (antes se cortaban los que terminan en 0, 5, 6, 7 u 8).
+  - **Saludo según la hora** de Ciudad de México: «Buenos días» (5:00–11:59), «Buenas tardes» (12:00–18:59) o «Buenas noches», con el nombre del usuario.
+  - **Huellita interactiva:** al tocarla salta y suelta tres huellas pequeñas.
+  - Los títulos de las vistas ya no llevan ilustración; se conserva en el menú y el dock.
+  - Los horarios de hoy que ya pasaron se marcan «Pasado» en vez de «No disp.».
 - **v2.11 · Paleta de acciones y Panel (solo presentación):**
   - **Paleta unificada** (bloque v2.11 de app.css): principal en naranja Pet's Table (#F7892B → #D9590B), secundaria en superficie con borde, urgencia y peligro en rojo #DC2626, positiva en verde #16A34A y neutra de marca en azul marino #1E3A55. En el Panel solo «Nueva cita» va rellena; urgencia y exámenes van en tarjeta con tinte de su color.
   - **Anillo** sin marcas exteriores y más grande (268 px en escritorio, hasta 280 px en celular), con la misma animación.

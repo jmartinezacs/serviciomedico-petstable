@@ -76,7 +76,7 @@
         <div class="brand-logo top-logo" role="img" aria-label="Pet's Table"></div>
         <div class="top-title">
           <h2>Servicio Médico</h2>
-          <p>Salud laboral - Pet's Table S.A. de C.V.</p>
+          <p><span class="top-sub-area">Salud laboral - </span>Pet's Table S.A. de C.V.</p>
         </div>
         <button class="menu-btn" data-action="toggle-menu" aria-label="Abrir menú" aria-controls="sidebar" aria-expanded="false"><i data-lucide="menu"></i></button>
       </div>
@@ -106,6 +106,13 @@
       </div>
       <nav class="nav" id="nav"></nav>
       <div class="side-foot">
+        <div class="side-tema" role="group" aria-label="Apariencia">
+          <span>Apariencia</span>
+          <div class="side-tema-sel">
+            <button type="button" data-action="set-theme" data-tema="light" aria-pressed="false"><i data-lucide="sun"></i> Claro</button>
+            <button type="button" data-action="set-theme" data-tema="dark" aria-pressed="false"><i data-lucide="moon"></i> Oscuro</button>
+          </div>
+        </div>
         <a class="side-logout side-portal portal-btn" href="/"><i data-lucide="layout-grid"></i> Volver al portal</a>
         <small id="app-version"></small>
         <button class="side-logout" data-action="logout"><i data-lucide="log-out"></i> Cerrar sesión</button>

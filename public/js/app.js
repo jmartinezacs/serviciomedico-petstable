@@ -211,16 +211,6 @@ function buildNav() {
   refreshIcons();
 }
 
-// Ilustración de la sección junto al título de cada vista (el Panel conserva su saludo)
-function ilustrarEncabezado(view, r) {
-  const intro = view.querySelector('.page-intro');
-  const h1 = intro?.querySelector('h1');
-  if (!r.ilus || !h1 || r === ROUTES.panel || intro.querySelector('.intro-ilus')) return;
-  const box = h1.parentElement;
-  box.classList.add('intro-con-ilus');
-  box.insertAdjacentHTML('afterbegin', `<span class="intro-ilus" aria-hidden="true">${emoji(r.ilus)}</span>`);
-}
-
 function parseHash() {
   const raw = location.hash.replace(/^#\/?/, '');
   const [path, qs] = raw.split('?');
@@ -261,7 +251,6 @@ async function route() {
     document.body.classList.add('cargando');
     window.scrollTo(0, 0);
     await r.mod.render(view, params);
-    ilustrarEncabezado(view, r);
     refreshIcons();
   } catch (err) {
     console.error(err);
@@ -284,6 +273,7 @@ function bindGlobalEvents() {
       case 'toggle-menu': toggleMenu(); break;
       case 'close-menu': closeMenu(); break;
       case 'toggle-theme': cycleTheme(); break;
+      case 'set-theme': setTheme(a.dataset.tema); break;
       case 'go-profile': navigate('#/perfil'); break;
       case 'go-home': navigate('#/panel'); break;
       case 'fab-cita': {
@@ -377,6 +367,12 @@ function updateThemeButton() {
   const btn = document.querySelector('.theme-toggle');
   btn.classList.toggle('is-dark', dark);
   btn.setAttribute('aria-label', dark ? 'Modo oscuro activo. Cambiar a modo claro' : 'Modo claro activo. Cambiar a modo oscuro');
+  // Selector del menú lateral (celular)
+  document.querySelectorAll('.side-tema [data-tema]').forEach((b) => {
+    const on = (b.dataset.tema === 'dark') === dark;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
 }
 
 // ---------------- Autenticación ----------------
