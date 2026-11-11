@@ -13,7 +13,7 @@ while ($l.IsListening) {
   $ctx = $l.GetContext()
   try {
     $path = [Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath)
-    if ($path -eq '/') { $path = '/index.html' }
+    if ($path.EndsWith('/')) { $path += 'index.html' }
     $file = [IO.Path]::GetFullPath((Join-Path $Root $path.TrimStart('/')))
     if (-not $file.StartsWith($Root) -or -not (Test-Path $file -PathType Leaf)) {
       $ctx.Response.StatusCode = 404; $b = [Text.Encoding]::UTF8.GetBytes('404')

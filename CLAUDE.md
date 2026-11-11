@@ -29,6 +29,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - Git for Windows is installed. In a fresh shell, refresh `PATH` first: `$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')`.
   - Authentication goes through Git Credential Manager, where the user signs in. Never type credentials.
 
+## Portal Pet's Table (one deployment, two addresses)
+
+The app is used on its own at https://serviciomedico-petstable.vercel.app and also inside the portal at https://portal-petstable.vercel.app/servicio-medico/. The portal (repo `portal-petstable`, folder `Sitio web - Portal Pet's Table`) keeps no copy: it rewrites `/servicio-medico/` to this deployment, so every change published here shows up at both addresses. Publishing never requires touching the portal. To keep the portal version working:
+
+- **Paths are always relative** to the app's location: `emoji/x.svg`, `notif/…`, `notif-icon.png`, `notif-badge.png`, `logo-correo.png`, `sw.js`, `version.json`, `manifest.webmanifest`. Never `/emoji/…`, `/sw.js`, `/version.json`, `/notif-icon.png` or `fetch('/…')`: inside the portal they would point at the portal's root. Exceptions: what the build inlines (`/css/`, `/js/`, `/img/`, `/icons/`) and the `/manifest.webmanifest` that `theme-init.js` sets on purpose inside the portal.
+- **Keys and portal mode:** use `BASE`, `EN_PORTAL`, `K_REMEMBER` and `K_THEME` from `core.js` (detected by `theme-init.js`: `APP_BASE`, `APP_PORTAL` and the `.en-portal` class). Never write `'med.theme'`, `'med.remember'` or `'med-auth'` outside those definitions: inside the portal the session, "Mantener sesión" and theme are the portal's (`portal-auth`, `portal.remember`, `portal.theme`), so people sign in only once.
+- **Service worker:** registered with `register('sw.js', { scope: './' })`; find it with `registroPropio()` from `core.js` (it compares the scope; `getRegistration` could return the portal's). In `sw.js` everything resolves against `self.registration.scope` (`enAlcance`), including notification click URLs. `notificar_med` and `recordatorios_med` send paths like `'/#/citas'` and the service worker opens them inside its scope.
+- **Behaviour inside the portal:** "Volver al portal" button (`.portal-btn`, hidden outside the portal); without access it goes back to `/#/inicio?sin=servicio-medico` without signing out; Salir signs out of the portal and goes to `/`; password reset returns to `location.origin + BASE`.
+- **Check when publishing** a change that touches paths, session, theme, service worker, manifest or header: it must work at both addresses. Without credentials: build with `-Prueba` into `<temp>\servicio-medico` and serve `<temp>` (so the app sits at `/servicio-medico/`) besides the usual test at `/`.
+
 ## Commands (Windows PowerShell 5.1, run from the repo root)
 
 Build the single-file `index.html` at the repo root. This also copies `sw.js`, the manifest and the icon:

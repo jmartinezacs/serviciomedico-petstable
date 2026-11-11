@@ -1954,3 +1954,8 @@ body.cargando .top::after { content: ""; position: absolute; left: 0; bottom: -1
 @media (max-width: 720px) { .fab { width: 54px; height: 54px; } .fab svg { width: 24px; height: 24px; } }
 
 @media (prefers-reduced-motion: reduce) { .fab, .fab-cita::after, .slot-chip { animation: none !important; transition: none !important; } }
+
+/* ---------- Portal Pet's Table (theme-init.js pone .en-portal) ---------- */
+.portal-btn { text-decoration: none; }
+html:not(.en-portal) .portal-btn { display: none !important; }
+.side-portal { margin-bottom: 8px; background: rgba(27, 199, 199, .1); color: #7FE3E3; }

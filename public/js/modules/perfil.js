@@ -2,7 +2,7 @@
 // Perfil del usuario: datos, cambio de contraseña, tema e instalación.
 // =====================================================================
 import {
-  sb, state, esc, icon, refreshIcons, toast, errMsg, checkForm, prefs, fmtDateTime, APP_VERSION, avatarHTML, push, pill, openModal, emoji,
+  sb, state, esc, icon, refreshIcons, toast, errMsg, checkForm, prefs, fmtDateTime, APP_VERSION, avatarHTML, push, pill, openModal, emoji, K_THEME,
 } from '../core.js';
 
 // Créditos de autoría (mismo diseño de reconocimiento que Ruta de calidad)
@@ -47,7 +47,7 @@ async function pintarNotificaciones(box) {
         return;
       }
       await reg.showNotification('Aviso de prueba · Servicio Médico', {
-        body: 'Así se verán los avisos de citas en este dispositivo.', icon: '/notif-icon.png', badge: '/notif/badge-96.png', actions: [{ action: 'ver', title: 'Ver ahora' }],
+        body: 'Así se verán los avisos de citas en este dispositivo.', icon: 'notif-icon.png', badge: 'notif/badge-96.png', actions: [{ action: 'ver', title: 'Ver ahora' }],
         tag: `prueba-${Date.now()}`, renotify: true, requireInteraction: true, silent: false, vibrate: [300, 120, 300, 120, 500], data: { url: '/#/perfil' },
       });
     } catch (err) { toast(errMsg(err), 'error'); }
@@ -81,7 +81,7 @@ async function correoPrueba(btn) {
       // El logotipo se publica con el sitio; se incrusta como data URI para la vista previa
       let logo = '';
       try {
-        const b = await (await fetch('/logo-correo.png')).blob();
+        const b = await (await fetch('logo-correo.png')).blob();
         logo = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(b); });
       } catch { /* sin logo: se muestra el nombre en texto */ }
       const html = String(data.html).replace('__LOGO__', /^data:image\/png/.test(logo) ? logo : '');
@@ -113,7 +113,7 @@ export default {
   async render(el) {
     const p = state.profile;
     const user = state.session?.user;
-    const theme = prefs.get('med.theme') || 'system';
+    const theme = prefs.get(K_THEME) || 'system';
     const standalone = push.instalada();
     const admin = p.rol === 'admin';
     el.innerHTML = `

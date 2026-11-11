@@ -4,6 +4,12 @@
 const cfg = window.MED_CONFIG || {};
 export const TZ = 'America/Mexico_City';
 export const APP_VERSION = cfg.APP_VERSION || '1.0.0';
+// Dentro del Portal Pet's Table (theme-init.js lo detecta) la app vive en /servicio-medico/ y comparte
+// con el portal la sesión, «Mantener sesión» y el tema; sola, en /, conserva sus llaves de siempre.
+export const BASE = window.APP_BASE || '/';
+export const EN_PORTAL = !!window.APP_PORTAL;
+export const K_REMEMBER = EN_PORTAL ? 'portal.remember' : 'med.remember';
+export const K_THEME = EN_PORTAL ? 'portal.theme' : 'med.theme';
 
 // ---------- Almacenamiento de sesión ("Mantener sesión") ----------
 function safe(fn, fallback) { try { return fn(); } catch { return fallback; } }
@@ -14,7 +20,7 @@ export const prefs = {
 };
 const memory = new Map();
 function activeStore() {
-  const remember = prefs.get('med.remember') !== '0';
+  const remember = prefs.get(K_REMEMBER) !== '0';
   return safe(() => (remember ? window.localStorage : window.sessionStorage), null);
 }
 const authStorage = {
@@ -27,7 +33,7 @@ if (!window.supabase || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
   throw new Error('Configuración de Supabase no disponible.');
 }
 export const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: authStorage, storageKey: 'med-auth' },
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: authStorage, storageKey: EN_PORTAL ? 'portal-auth' : 'med-auth' },
 });
 
 export const state = { session: null, profile: null, isAdmin: false, isMedico: false };
@@ -121,7 +127,7 @@ export const ESTADOS = {
 export const pill = (text, cls = 'gray') => `<span class="pill ${cls}">${esc(text)}</span>`;
 export const icon = (name, cls = '') => `<i data-lucide="${name}"${cls ? ` class="${cls}"` : ''}></i>`;
 // Ilustración a color propia (fuentes/ilustraciones.src → public/emoji), decorativa
-export const emoji = (slug, cls = '') => `<img class="emoji ${cls}" src="/emoji/${slug}.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">`;
+export const emoji = (slug, cls = '') => `<img class="emoji ${cls}" src="emoji/${slug}.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">`;
 // Ilustración de cada estado de cita (etiquetas de estado y KPI)
 export const ILUS_ESTADO = { pendiente: 'cita_pendiente', confirmada: 'cita_confirmada', atendida: 'cita_atendida', cancelada: 'cita_cancelada', no_asistio: 'cita_no_asistio' };
 export const estadoPill = (e) => `<span class="pill ${ESTADOS[e]?.cls || 'gray'} con-ilus">${ILUS_ESTADO[e] ? emoji(ILUS_ESTADO[e], 'pill-ilus') : ''}${esc(ESTADOS[e]?.label || e)}</span>`;
@@ -1204,6 +1210,12 @@ function b64uToUint8(s) {
   const raw = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/'));
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
+// Registro del service worker de esta app (alcance / sola, /servicio-medico/ en el portal). getRegistration
+// devolvería el del portal si el de la app aún no existe, por eso se compara el alcance.
+export async function registroPropio() {
+  const reg = await navigator.serviceWorker.getRegistration(BASE);
+  return reg && reg.scope === location.origin + BASE ? reg : null;
+}
 export const push = {
   soportado: () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && window.isSecureContext,
   esIOS: () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
@@ -1211,7 +1223,7 @@ export const push = {
   instalada: () => window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || window.navigator.standalone === true,
   async suscripcion() {
     if (!push.soportado()) return null;
-    const reg = await navigator.serviceWorker.getRegistration('/');
+    const reg = await registroPropio();
     return reg ? reg.pushManager.getSubscription() : null;
   },
   // 'no-soportado' | 'instalar' (iOS sin instalar) | 'bloqueado' | 'activo' | 'inactivo'
@@ -1238,7 +1250,7 @@ export const push = {
   },
   // Suscribe el dispositivo (sin volver a pedir permiso si ya se concedió)
   async suscribir() {
-    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    const reg = await navigator.serviceWorker.register('sw.js', { scope: './' });
     await navigator.serviceWorker.ready;
     let { data: pub } = await sb.rpc('med_vapid_publica');
     if (!pub) {
