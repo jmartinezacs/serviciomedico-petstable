@@ -1213,6 +1213,7 @@ function b64uToUint8(s) {
 // Registro del service worker de esta app (alcance / sola, /servicio-medico/ en el portal). getRegistration
 // devolvería el del portal si el de la app aún no existe, por eso se compara el alcance.
 export async function registroPropio() {
+  if (EN_PORTAL) return registroEnPortal; // dentro del portal: puente del portal
   const reg = await navigator.serviceWorker.getRegistration(BASE);
   return reg && reg.scope === location.origin + BASE ? reg : null;
 }
@@ -1250,8 +1251,8 @@ export const push = {
   },
   // Suscribe el dispositivo (sin volver a pedir permiso si ya se concedió)
   async suscribir() {
-    const reg = await navigator.serviceWorker.register('sw.js', { scope: './' });
-    await navigator.serviceWorker.ready;
+    const reg = EN_PORTAL ? registroEnPortal : await navigator.serviceWorker.register('sw.js', { scope: './' });
+    if (!EN_PORTAL) await navigator.serviceWorker.ready;
     let { data: pub } = await sb.rpc('med_vapid_publica');
     if (!pub) {
       const r = await sb.functions.invoke('notificar_med', { body: { accion: 'init' } });
@@ -1288,3 +1289,86 @@ export const push = {
 };
 
 export function navigate(hash) { if (location.hash !== hash) location.hash = hash; else window.dispatchEvent(new HashChangeEvent('hashchange')); }
+
+// ---------- Notificaciones dentro del Portal Pet's Table ----------
+// Dentro del portal el dispositivo tiene UNA sola suscripción push: la del service worker del portal
+// (/sw.js, alcance /), que funciona aunque solo esté instalado el portal (también en iPhone). Esta app
+// pide al portal un «puente» (función notificar_portal) y lo guarda en su propia tabla como si fuera
+// una suscripción normal: su función de envío no cambia y el portal reenvía el aviso a /<app>/#/….
+// registroPropio() devuelve registroEnPortal, que ofrece las mismas operaciones de pushManager.
+const PORTAL_APP = BASE.replace(/\//g, '');
+const K_PUENTE = `portal.push.${PORTAL_APP}`;
+const ptB64 = (b) => btoa(String.fromCharCode(...new Uint8Array(b instanceof ArrayBuffer ? b : b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const ptBytes = (s) => { const p = '='.repeat((4 - (s.length % 4)) % 4); return Uint8Array.from(atob((s + p).replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)); };
+async function registroDelPortal() {
+  let reg = await navigator.serviceWorker.getRegistration('/');
+  if (!reg || reg.scope !== `${location.origin}/`) reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  if (!reg.active) {
+    await new Promise((ok) => {
+      const w = reg.installing || reg.waiting;
+      if (!w) { ok(); return; }
+      w.addEventListener('statechange', () => { if (w.state === 'activated') ok(); });
+      setTimeout(ok, 8000);
+    });
+  }
+  return reg;
+}
+function suscripcionPuente(p) {
+  return {
+    endpoint: p.endpoint,
+    options: { applicationServerKey: ptBytes(p.clave).buffer },
+    toJSON: () => ({ endpoint: p.endpoint, keys: { p256dh: p.p256dh, auth: p.auth } }),
+    unsubscribe: async () => { prefs.del(K_PUENTE); return true; },
+  };
+}
+async function puenteActual() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return null;
+  let p = null;
+  try { p = JSON.parse(prefs.get(K_PUENTE) || 'null'); } catch { p = null; }
+  if (!p?.endpoint) return null;
+  const reg = await navigator.serviceWorker.getRegistration('/');
+  const sub = reg && reg.scope === `${location.origin}/` ? await reg.pushManager.getSubscription() : null;
+  return sub && sub.endpoint === p.raiz ? suscripcionPuente(p) : null;
+}
+async function crearPuente(applicationServerKey) {
+  const claveApp = ptB64(applicationServerKey);
+  const reg = await registroDelPortal();
+  let clave = (await sb.rpc('portal_push_clave')).data;
+  if (!clave) {
+    const r = await sb.functions.invoke('notificar_portal', { body: { accion: 'init' } });
+    if (r.error) throw r.error;
+    clave = r.data?.publica;
+  }
+  if (!clave) throw new Error('No se pudo obtener la clave de notificaciones del portal. Intenta más tarde.');
+  let sub = await reg.pushManager.getSubscription();
+  if (sub && sub.options?.applicationServerKey && ptB64(sub.options.applicationServerKey) !== clave) { await sub.unsubscribe(); sub = null; }
+  sub ||= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: ptBytes(clave) });
+  const j = sub.toJSON();
+  const ua = navigator.userAgent;
+  const plataforma = `${/iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'iOS' : /android/i.test(ua) ? 'Android' : 'Escritorio'} · portal`;
+  const g = await sb.rpc('portal_push_guardar', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_plataforma: plataforma });
+  if (g.error) throw g.error;
+  const r = await sb.functions.invoke('notificar_portal', { body: { accion: 'puente', app: PORTAL_APP, endpoint: j.endpoint, clave_app: claveApp } });
+  if (r.error || !r.data?.endpoint) throw new Error('No se pudieron activar las notificaciones en el portal. Intenta más tarde.');
+  const p = { endpoint: r.data.endpoint, p256dh: r.data.p256dh, auth: r.data.auth, clave: claveApp, raiz: j.endpoint };
+  prefs.set(K_PUENTE, JSON.stringify(p));
+  return suscripcionPuente(p);
+}
+export const registroEnPortal = {
+  scope: `${location.origin}${BASE}`,
+  pushManager: { getSubscription: puenteActual, subscribe: (o) => crearPuente(o.applicationServerKey) },
+};
+// Aviso de prueba del portal en este dispositivo (sirve para todas las apps)
+export async function probarEnPortal() {
+  const { data, error } = await sb.functions.invoke('notificar_portal', { body: { accion: 'prueba' } });
+  if (error) throw error;
+  return data;
+}
+// Sola, la app registra su service worker; dentro del portal solo trabaja el del portal (el de la app
+// que registraron versiones anteriores en /<app>/ se retira para que no intercepte los avisos).
+export function registrarServiceWorker() {
+  if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
+  if (!EN_PORTAL) { navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {}); return; }
+  navigator.serviceWorker.getRegistration(BASE).then((r) => { if (r && r.scope === `${location.origin}${BASE}`) r.unregister(); }).catch(() => {});
+  navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+}

@@ -2019,3 +2019,6 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 /* Horarios de hoy que ya pasaron: mismo trato que «no disponible», con su propia etiqueta */
 .slot-chip.s-pasado { background: transparent; border: 1px dashed color-mix(in srgb, var(--muted) 40%, transparent); color: var(--muted); opacity: .5; }
 .slot-chip.s-pasado b { color: var(--muted); font-weight: 600; }
+
+/* Volver al portal: botón flotante (mismo tamaño y comportamiento que los demás; solo dentro del portal) */
+.fab-portal { background: linear-gradient(135deg, #0FA3A6, #1BC7C7); text-decoration: none; }
