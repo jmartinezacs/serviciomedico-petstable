@@ -2020,5 +2020,19 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 .slot-chip.s-pasado { background: transparent; border: 1px dashed color-mix(in srgb, var(--muted) 40%, transparent); color: var(--muted); opacity: .5; }
 .slot-chip.s-pasado b { color: var(--muted); font-weight: 600; }
 
-/* Volver al portal: botón flotante (mismo tamaño y comportamiento que los demás; solo dentro del portal) */
-.fab-portal { background: linear-gradient(135deg, #0FA3A6, #1BC7C7); text-decoration: none; }
+/* Volver al portal (Kaizen 360): botón flotante con el lenguaje de los demás botones flotantes
+   (mismo tamaño, posición y área segura de .fabs; solo visible dentro del portal) */
+.fab-portal { position: relative; isolation: isolate; color: #fff; text-decoration: none; border: 0;
+  background: radial-gradient(circle at 32% 24%, rgba(255, 255, 255, .26), transparent 50%), linear-gradient(160deg, #26384A, #0B131B);
+  box-shadow: inset 0 0 0 2px rgba(245, 128, 32, .9), 0 14px 28px -10px rgba(2, 10, 18, .6);
+  animation: fabPortalEntra .55s .25s cubic-bezier(.3, 1.4, .5, 1) backwards; }
+.fab-portal::after { content: ""; position: absolute; z-index: -1; inset: -4px; border-radius: 50%; border: 2px solid rgba(245, 128, 32, .6); opacity: 0;
+  animation: fabPortalHalo 2.6s 1.1s ease-out 2; pointer-events: none; }
+.fab-portal svg { color: #FFB066; transition: transform .35s cubic-bezier(.3, 1.4, .5, 1), color .2s; }
+.fab-portal:hover, .fab-portal:focus-visible { box-shadow: inset 0 0 0 2px #F58020, 0 0 0 6px rgba(245, 128, 32, .22), 0 18px 32px -10px rgba(245, 128, 32, .55) !important; }
+.fab-portal:hover svg, .fab-portal:focus-visible svg { color: #fff; transform: rotate(90deg) scale(1.08); }
+.fab-portal:active { transform: scale(.92); }
+.fab-portal .fab-tip { background: #0B131B; border: 1px solid rgba(245, 128, 32, .45); }
+@keyframes fabPortalEntra { from { opacity: 0; transform: translateY(18px) scale(.6); } }
+@keyframes fabPortalHalo { 0% { opacity: .9; transform: scale(.92); } 100% { opacity: 0; transform: scale(1.4); } }
+@media (prefers-reduced-motion: reduce) { .fab-portal, .fab-portal::after, .fab-portal svg { animation: none !important; transition: none !important; } }
