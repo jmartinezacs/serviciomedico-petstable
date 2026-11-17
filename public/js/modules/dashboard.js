@@ -550,7 +550,7 @@ function drawCharts(k, pad) {
       labels: serie.map((s) => fmtPeriodo(s.periodo)),
       datasets: [
         // Barras agrupadas: citas solicitadas (sin canceladas) y atendidas, lado a lado
-        { label: 'Citas', data: serie.map((s) => s.total), backgroundColor: '#F58020', maxBarThickness: 26 },
+        { label: 'Citas', data: serie.map((s) => s.total), backgroundColor: '#C8102E', maxBarThickness: 26 },
         { label: 'Atendidas', data: serie.map((s) => s.atendidas), backgroundColor: '#1BB56F', maxBarThickness: 26 },
       ],
     },

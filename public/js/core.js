@@ -488,7 +488,7 @@ export function paged(q, { from, to, sort }, extraOrder = []) {
 const charts = new Set();
 const chartConfigs = new WeakMap();
 export function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-export const PALETTE = ['#F58020', '#1BC7C7', '#0B2235', '#1BB56F', '#7A5BE6', '#E0464E', '#FFB020', '#5B8DEF'];
+export const PALETTE = ['#C8102E', '#1BC7C7', '#0B2235', '#1BB56F', '#7A5BE6', '#F58020', '#FFB020', '#5B8DEF'];
 // Etiquetas de datos (se dibujan en el canvas, así que también aparecen al
 // guardar la imagen): en barras, el valor junto al extremo de la barra en color
 // de texto; en dona, el valor dentro de los segmentos grandes y el total al centro.
