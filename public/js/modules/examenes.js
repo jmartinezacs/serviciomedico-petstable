@@ -49,7 +49,7 @@ export default {
     el.innerHTML = `
       <section class="page-intro">
         <div><span class="eyebrow">Salud ocupacional</span><h1>Exámenes médicos</h1>
-          <p>Exámenes de ingreso de candidatos y de egreso de colaboradores. Solo los ven Servicio Médico, Procesos y Mejora continua y Recursos Humanos.</p></div>
+          <p>Exámenes de ingreso y egreso. Solo los ven Servicio Médico, Procesos y Mejora continua y Recursos Humanos.</p></div>
         <div class="page-actions ex-acts">
           <button class="btn ex-btn ex-ingreso" data-ex="nuevo" data-tipo="ingreso">${icon('user-round-plus')} Examen de ingreso</button>
           <button class="btn ex-btn ex-egreso" data-ex="nuevo" data-tipo="egreso">${icon('user-round-minus')} Examen de egreso</button>

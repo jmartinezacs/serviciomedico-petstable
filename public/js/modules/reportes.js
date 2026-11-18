@@ -42,7 +42,7 @@ export default {
       </div>
       <div class="card">
         <div class="card-head"><div><h3>${icon('database-backup')} Respaldo completo</h3>
-          <p>Descarga en un archivo JSON todos los catálogos, citas, atenciones, inventario, bitácora y configuración de Servicio Médico. Útil para conservar una copia o migrar.</p></div>
+          <p>Descarga en JSON catálogos, citas, atenciones, inventario, bitácora y configuración, para respaldo o migración.</p></div>
           <button class="btn primary" data-exp="respaldo">${icon('download')} Descargar respaldo</button></div>
         <div class="notice warn">${icon('shield-alert')}<span>El respaldo incluye <b>datos de salud</b> (sintomatología y notas). Guárdalo en un lugar seguro, con acceso restringido, y no lo envíes por correo ni chat.</span></div>
       </div>`;

@@ -476,3 +476,11 @@ setTimeout(async () => {
     if (!data.session) showLogin();
   }
 }, 2500);
+
+// Transición suave al cambiar entre modo claro y oscuro (la misma del portal; estilos en el bloque de marca)
+new MutationObserver(() => {
+  const h = document.documentElement;
+  h.classList.add('tema-cambia');
+  clearTimeout(window.__temaCambia);
+  window.__temaCambia = setTimeout(() => h.classList.remove('tema-cambia'), 520);
+}).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });

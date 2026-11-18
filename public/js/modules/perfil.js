@@ -140,7 +140,7 @@ export default {
       </div>
       ${state.isAdmin ? `<section class="pf-bloque mt pf-correos"><h3 class="pf-sec">${icon('mail')} Correos del servicio médico</h3>
         <div class="avisos info"><span class="avisos-ico">${emoji('correo')}</span>
-          <div class="avisos-txt"><b>Correos de citas</b><p>Revisa cómo se ven los correos que reciben quien solicitó la cita y su área cuando Servicio Médico la confirma, la reprograma o la cancela.</p></div>
+          <div class="avisos-txt"><b>Correos de citas</b><p>Vista previa de los correos de cita confirmada, reprogramada o cancelada.</p></div>
           <div class="avisos-acc">
             <select id="mail-tipo" aria-label="Tipo de correo">
               <option value="confirmada">Cita confirmada</option>
