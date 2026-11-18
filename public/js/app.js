@@ -87,6 +87,10 @@ async function loadProfileAndStart() {
 function hideSplash() { $('#splash')?.classList.add('hidden'); }
 
 function showLogin(message) {
+  // El aviso de acceso denegado se conserva aunque enseguida llegue el evento de cierre de sesión
+  if (!message) message = tomarErrorGoogle() || (Date.now() - (window.__avisoLogin?.t || 0) < 3000 ? window.__avisoLogin.m : message);
+  if (message) window.__avisoLogin = { t: Date.now(), m: message };
+  revisarGoogle();
   hideSplash();
   current?.mod?.destroy?.(); current = null; destroyCharts();
   $('#app').classList.add('hidden');
@@ -299,6 +303,7 @@ function bindGlobalEvents() {
       case 'update-later': $('#update-bar').classList.add('hidden'); break;
       case 'toggle-pw': togglePw(a); break;
       case 'forgot': await forgotPassword(); break;
+      case 'login-google': await loginGoogle(a); break;
       default: break;
     }
   });
@@ -386,6 +391,45 @@ function updateThemeButton() {
     b.setAttribute('aria-pressed', String(on));
   });
 }
+
+// ---------------- Inicio de sesión con Google (Supabase Auth) ----------------
+// Google solo identifica a la persona. La cuenta debe existir (el servidor impide altas nuevas:
+// disparador portal_bloquear_alta_oauth) y, igual que con contraseña, después se revisa que esté
+// activa y con acceso en la tabla de usuarios de esta app; si no, se cierra la sesión con un aviso.
+async function loginGoogle(btn) {
+  const msg = $('#login-msg');
+  msg.className = 'login-msg hidden';
+  prefs.set(K_REMEMBER, $('#login-remember').checked ? '1' : '0');
+  btn.disabled = true;
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: `${location.origin}${location.pathname}`, queryParams: { prompt: 'select_account', hd: 'petstable.mx' } },
+  });
+  if (error) { btn.disabled = false; msg.textContent = 'No se pudo abrir Google. Intenta de nuevo.'; msg.className = 'login-msg error'; }
+}
+// El botón aparece solo cuando el proveedor Google está activo en Supabase (configuración pública
+// de Auth); mientras no lo esté, el inicio de sesión se ve como siempre.
+var googleRevisado = null;
+function revisarGoogle() {
+  googleRevisado ||= fetch(`${sb.supabaseUrl}/auth/v1/settings`, { headers: { apikey: sb.supabaseKey } })
+    .then((r) => (r.ok ? r.json() : null)).then((s) => !!s?.external?.google).catch(() => false);
+  googleRevisado.then((ok) => document.querySelectorAll('.login-o, .btn-google').forEach((el) => el.classList.toggle('hidden', !ok)));
+}
+
+
+// Error que Google o Supabase devuelven en la dirección (#error=… o ?error=…): se muestra una vez
+// en el inicio de sesión y se limpia la dirección.
+function tomarErrorGoogle() {
+  const p = new URLSearchParams(location.hash.slice(1)), q = new URLSearchParams(location.search);
+  const desc = p.get('error_description') || q.get('error_description') || '';
+  const code = p.get('error') || q.get('error') || '';
+  if (!desc && !code) return '';
+  history.replaceState(history.state, '', location.pathname);
+  if (/saving new user|portal_sin_registro|not allowed|signup/i.test(desc)) return 'Tu cuenta de Google no está registrada en Pet\'s Table. Pide tu acceso a un administrador.';
+  if (code === 'access_denied') return 'Se canceló el inicio de sesión con Google.';
+  return `No se pudo entrar con Google${desc ? `: ${desc}` : '.'}`;
+}
+
 
 // ---------------- Autenticación ----------------
 async function login(e) {
