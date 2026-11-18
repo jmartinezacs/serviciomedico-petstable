@@ -2041,22 +2041,24 @@ html:not(.en-portal) .portal-btn { display: none !important; }
    Marca Pet's Table — bloque común de identidad institucional (v1)
    Fuente única: el archivo marca.css de la carpeta Branding del portal. Se copia igual al final del CSS de cada app
    (antes del bloque «Volver al portal»). Si lo cambias, cámbialo en todas.
-   - El acento es el color del área de cada app (var(--orange)); el naranja de marca y la ola
-     turquesa del sitio oficial son comunes a todas.
+   - El acento es el color del área de cada app (var(--orange)); el naranja de marca es común a todas.
    - Petrus se sirve una sola vez desde el portal (/Branding/web/) y lo comparten todas las apps.
    - Nada aquí cambia la lógica: solo pantallas de carga, inicio de sesión, estados vacíos,
      confirmaciones y menú lateral.
    ===================================================================== */
 :root {
   --pt-marca: #F58020;            /* naranja institucional (logotipo) */
-  --pt-turquesa: #2FBCAF;         /* ola del sitio oficial */
+  --pt-turquesa: #2FBCAF;         /* turquesa del sitio oficial */
   --pt-teal: #027B71;             /* verde azulado del sitio oficial */
   --pt-petrus-busto: url('https://portal-petstable.vercel.app/Branding/web/petrus-busto-384.png');
   --pt-petrus-busto-sm: url('https://portal-petstable.vercel.app/Branding/web/petrus-busto-192.png');
   --pt-petrus-sentado: url('https://portal-petstable.vercel.app/Branding/web/petrus-sentado-540.png');
   --pt-logo: url('https://portal-petstable.vercel.app/Branding/logotipos/logo-petstable.webp');
+  --pt-petrus-saluda: url('https://portal-petstable.vercel.app/Branding/web/petrus-saludando-360.png');
+  --pt-petrus-pensando: url('https://portal-petstable.vercel.app/Branding/web/petrus-pensando-240.png');
+  --pt-cafe: #8A5A3B;
+  --pt-huella-cafe: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-13 -13 26 26'%3E%3Cdefs%3E%3CradialGradient id='c' cx='.4' cy='.3' r='.8'%3E%3Cstop offset='0' stop-color='%23B98563'/%3E%3Cstop offset='1' stop-color='%236B4226'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cg fill='url(%23c)'%3E%3Cpath d='M0 0.5c3.6 0 7 3 7 6.4 0 2.6-2 3.6-4 3.2-1.2-.2-2-.8-3-.8s-1.8.6-3 .8c-2 .4-4-.6-4-3.2C-7 3.5-3.6.5 0 .5Z'/%3E%3Cellipse cx='-7.6' cy='-2.6' rx='2.5' ry='3.2' transform='rotate(-18 -7.6 -2.6)'/%3E%3Cellipse cx='-3' cy='-7.4' rx='2.6' ry='3.4' transform='rotate(-6 -3 -7.4)'/%3E%3Cellipse cx='3' cy='-7.4' rx='2.6' ry='3.4' transform='rotate(6 3 -7.4)'/%3E%3Cellipse cx='7.6' cy='-2.6' rx='2.5' ry='3.2' transform='rotate(18 7.6 -2.6)'/%3E%3C/g%3E%3Cg fill='%23fff' fill-opacity='.28'%3E%3Cellipse cx='-1.8' cy='4' rx='2' ry='1.1'/%3E%3Cellipse cx='-3.6' cy='-8.6' rx='.9' ry='1.2'/%3E%3Cellipse cx='2.4' cy='-8.6' rx='.9' ry='1.2'/%3E%3C/g%3E%3C/svg%3E");
   --pt-huella: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Cg fill='%2394A3B8' fill-opacity='0.5'%3E%3Cellipse cx='0' cy='5' rx='6.4' ry='5.2'/%3E%3Cellipse cx='-6.6' cy='-3' rx='2.1' ry='2.8'/%3E%3Cellipse cx='-2.4' cy='-7.4' rx='2.1' ry='2.9'/%3E%3Cellipse cx='2.4' cy='-7.4' rx='2.1' ry='2.9'/%3E%3Cellipse cx='6.6' cy='-3' rx='2.1' ry='2.8'/%3E%3C/g%3E%3C/svg%3E");
-  --pt-ola: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' preserveAspectRatio='none' viewBox='0 0 719 187' height='187' width='719'%3E%3Cpath fill-opacity='0.5' fill='%232FBCAF' d='M510.037 231.467C494.283 190.279 447.656 168.537 405.977 182.943C364.299 197.349 317.672 175.606 301.917 134.419C286.162 93.2313 239.535 71.4888 197.857 85.8948C156.179 100.301 109.552 78.5583 93.7968 37.3708C78.0421 -3.81677 32.1669 -25.8192 -9.51154 -11.4131L-7.86849 387.47L718.107 384.48L717.904 335.047C717.884 330.237 717.087 325.42 714.972 321.1C696.986 284.361 653.461 266.385 614.098 279.991C572.419 294.397 525.792 272.655 510.037 231.467Z'%3E%3C/path%3E%3C/svg%3E");
   --pt-huellas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='%23ffffff' fill-opacity='0.045'%3E%3Cg transform='translate(22 26) rotate(-18)'%3E%3Cellipse cx='0' cy='9' rx='8' ry='6.5'/%3E%3Cellipse cx='-8' cy='-2' rx='2.6' ry='3.4'/%3E%3Cellipse cx='-3' cy='-7' rx='2.6' ry='3.6'/%3E%3Cellipse cx='3' cy='-7' rx='2.6' ry='3.6'/%3E%3Cellipse cx='8' cy='-2' rx='2.6' ry='3.4'/%3E%3C/g%3E%3Cg transform='translate(84 82) rotate(14)'%3E%3Cellipse cx='0' cy='9' rx='8' ry='6.5'/%3E%3Cellipse cx='-8' cy='-2' rx='2.6' ry='3.4'/%3E%3Cellipse cx='-3' cy='-7' rx='2.6' ry='3.6'/%3E%3Cellipse cx='3' cy='-7' rx='2.6' ry='3.6'/%3E%3Cellipse cx='8' cy='-2' rx='2.6' ry='3.4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 
@@ -2067,10 +2069,10 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 .splash .spinner::before { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .1); border-top-color: var(--orange); border-right-color: var(--pt-turquesa); animation: spin .9s linear infinite; }
 .splash .brand-logo { animation: none; }
 
-/* ---------- 2. Inicio de sesión: huellas sutiles, ola institucional y Petrus en computadora ---------- */
+/* ---------- 2. Inicio de sesión: huellas sutiles y Petrus en computadora (cierre limpio, sin ola) ---------- */
 .login::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: var(--pt-huellas) 0 0 / 120px 120px; }
-.login::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: clamp(70px, 14vh, 150px); z-index: 0; pointer-events: none; opacity: .55; background: var(--pt-ola) left bottom / 100% 100% no-repeat; }
 .login .login-wrap { z-index: 2; }
+.login .login-chips { display: none; } /* sin leyendas de áreas al pie del inicio de sesión */
 .pt-petrus-login { display: none; }
 @media (min-width: 1100px) and (min-height: 680px) {
   .login > .login-wrap::before { content: ""; position: fixed; z-index: 1; left: max(2vw, calc(50% - 600px)); bottom: 0; width: min(24vw, 300px); aspect-ratio: 3 / 4; pointer-events: none;
@@ -2079,7 +2081,7 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 .login-card .app-icon { box-shadow: 0 10px 24px -6px color-mix(in srgb, var(--orange) 55%, transparent); }
 
 /* ---------- 3. Estados vacíos: Petrus en lugar del ícono genérico ---------- */
-.empty .empty-ico:not(.ilus) { width: 84px; height: 84px; border-radius: 50%; background: var(--pt-petrus-busto-sm) center 60% / 88% no-repeat, radial-gradient(circle at 50% 60%, color-mix(in srgb, var(--orange) 14%, var(--soft)), var(--soft) 72%);
+.empty .empty-ico:not(.ilus) { width: 96px; height: 96px; border-radius: 50%; background: var(--pt-petrus-pensando) center 85% / auto 88% no-repeat, radial-gradient(circle at 50% 60%, color-mix(in srgb, var(--orange) 14%, var(--soft)), var(--soft) 72%);
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--orange) 22%, transparent); }
 .empty .empty-ico:not(.ilus) > svg { display: none; }
 .empty.error .empty-ico:not(.ilus) { background: var(--bad-bg); box-shadow: none; }
@@ -2093,8 +2095,7 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 .toast.success::before { content: ""; flex: 0 0 auto; width: 30px; height: 30px; margin: -4px 0 -4px -2px; border-radius: 50%;
   background: var(--pt-petrus-busto-sm) center 65% / 92% no-repeat, rgba(255, 255, 255, .1); box-shadow: 0 0 0 2px rgba(91, 227, 164, .55); }
 
-/* ---------- 5. Menú lateral: firma institucional y ola al pie ---------- */
-.side-foot { padding-bottom: 40px; background: var(--pt-ola) left bottom / 100% 40px no-repeat; }
+/* ---------- 5. Menú lateral: firma institucional al pie (sin ola) ---------- */
 .side-foot::before { content: "Pet's Table S.A. de C.V."; display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 12px 0 48px; font-size: 11.5px; font-weight: 700; color: #9FB2C0; letter-spacing: .01em;
   background: var(--pt-petrus-busto-sm) 10px center / 30px 30px no-repeat; }
 
@@ -2159,9 +2160,10 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 .btn:active:not(:disabled), .hbtn:active, .menu-btn:active, .icon-btn:active:not(:disabled), .chip:active, .seg button:active, .kx.go:active { transform: scale(.96); }
 .nav a:active, .mobile-nav a:active { transform: scale(.97); }
 
-/* ---------- 13. Cambio de tema claro / oscuro con transición (como el portal) ---------- */
-html.tema-cambia, html.tema-cambia *, html.tema-cambia *::before, html.tema-cambia *::after {
-  transition: background-color .5s ease, color .5s ease, border-color .5s ease, fill .5s ease, stroke .5s ease, box-shadow .5s ease !important; }
+/* ---------- 13. Cambio de tema claro / oscuro ----------
+   Fundido de la pantalla completa con View Transitions (lo hace el compositor: no recalcula la
+   transición de cada elemento, no bloquea y ningún texto queda a medio color). Sin soporte, cambia al instante. */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .26s; animation-timing-function: cubic-bezier(.4, 0, .2, 1); }
 
 /* ---------- 14. Encabezado en celular (referencia: Ruta de calidad y Servicio médico) ----------
    Logo y título a la izquierda; perfil, salir y menú a la derecha; el tema pasa al menú lateral.
@@ -2222,12 +2224,48 @@ html.tema-cambia, html.tema-cambia *, html.tema-cambia *::before, html.tema-camb
 .btn-google:focus-visible { outline: 3px solid rgba(66, 133, 244, .55); outline-offset: 2px; }
 .btn-google:disabled { opacity: .65; cursor: progress; }
 
+/* ---------- 17. Tarjeta de bienvenida del panel: saludo, huella y Petrus ----------
+   Componente común: en cada app, el encabezado del panel que tiene el saludo (.page-intro con .hello)
+   se convierte en esta tarjeta; el portal usa el mismo marcado. Petrus saluda a la derecha,
+   la huella es café y el periodo o los filtros de la app quedan dentro de la tarjeta. */
+.page-intro:has(.hello) {
+  --bv-pr: clamp(190px, 20vw, 270px);
+  position: relative; isolation: isolate; overflow: hidden; align-items: center; min-height: 190px; margin-bottom: 22px;
+  padding: 26px var(--bv-pr) 26px clamp(20px, 2.6vw, 34px); border-radius: 26px;
+  background: radial-gradient(420px 260px at calc(100% - 120px) 110%, color-mix(in srgb, var(--orange) 20%, transparent), transparent 70%),
+    var(--pt-huellas) 0 0 / 120px 120px,
+    linear-gradient(120deg, color-mix(in srgb, var(--orange) 9%, var(--card, #fff)) 0%, var(--card, #fff) 52%, color-mix(in srgb, var(--pt-turquesa) 9%, var(--card, #fff)) 100%);
+  border: 1px solid color-mix(in srgb, var(--orange) 18%, var(--line, #E5E7EB));
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 24px 48px -32px color-mix(in srgb, var(--orange) 55%, transparent); }
+.page-intro:has(.hello)::before { content: ""; position: absolute; z-index: -1; right: clamp(14px, 2.4vw, 44px); bottom: 0; height: min(94%, 236px); aspect-ratio: 439 / 480; pointer-events: none;
+  background: var(--pt-petrus-saluda) center bottom / contain no-repeat; filter: drop-shadow(0 16px 22px rgba(15, 23, 42, .22)); transform-origin: 50% 100%;
+  animation: ptEntra .7s .1s cubic-bezier(.2, .9, .3, 1) backwards; }
+.page-intro:has(.hello)::after { left: auto; right: calc(var(--bv-pr) * .18); bottom: -46px; width: calc(var(--bv-pr) * .82); height: 92px; border-radius: 50%; z-index: -2;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--orange) 30%, transparent), transparent); }
+.page-intro:has(.hello) .eyebrow::before { display: none; }
+.page-intro:has(.hello) .eyebrow { color: color-mix(in srgb, var(--orange) 80%, var(--text, #172431)); }
+.page-intro:has(.hello) h1.hello { font-size: clamp(26px, 3vw, 38px); font-weight: 900; letter-spacing: -.035em; line-height: 1.08; gap: 10px; }
+.page-intro:has(.hello) > div > p { max-width: 560px; font-size: 14.5px; }
+.page-intro:has(.hello) > .toolbar { position: relative; z-index: 1; }
+/* Huella café natural junto al nombre (imagen, ícono o botón según la app) */
+.hello .emoji.hello-ilus, .hello .kz-huella { content: var(--pt-huella-cafe); }
+.hello .paws svg { color: var(--pt-cafe) !important; fill: color-mix(in srgb, var(--pt-cafe) 85%, transparent) !important; }
+@media (max-width: 720px) {
+  .page-intro:has(.hello) { --bv-pr: 112px; min-height: 0; padding: 18px var(--bv-pr) 18px 18px; border-radius: 22px; align-items: flex-start; }
+  .page-intro:has(.hello)::before { top: 10px; bottom: auto; right: 6px; height: 128px; }
+  .page-intro:has(.hello)::after { right: 0; bottom: auto; top: 96px; width: 120px; height: 60px; }
+  .page-intro:has(.hello) > :not(:first-child) { margin-right: calc(18px - var(--bv-pr)); }
+  .page-intro:has(.hello) h1.hello { font-size: 24px; }
+  .page-intro:has(.hello) > div > p { font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) { .page-intro:has(.hello)::before { animation: none; } }
+
 /* ---------- Movimiento ---------- */
 @keyframes ptEntra { from { opacity: 0; transform: translateY(40px); } }
 @media (prefers-reduced-motion: reduce) {
   .content > *, .live::before { animation: none !important; }
   .kx:hover, .pf-t:hover, .tile:hover, .stat:hover, .btn:active, .hbtn:active, .kx.go:active { transform: none !important; }
-  html.tema-cambia, html.tema-cambia *, html.tema-cambia *::before, html.tema-cambia *::after { transition: none !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 @media (prefers-reduced-motion: reduce) { .splash .spinner::before { animation-duration: 2.4s; } .login > .login-wrap::before, .login .login-card::before { animation: none; } }
 /* Fin marca Pet's Table */

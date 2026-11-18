@@ -359,7 +359,18 @@ function startClock() {
 
 // ---------------- Tema ----------------
 function currentTheme() { return prefs.get(K_THEME) || 'system'; }
+// Cambio de tema: fundido de toda la pantalla con View Transitions (lo hace el compositor, sin
+// recalcular cada elemento ni dejar textos a medio color). Sin soporte o con movimiento reducido, al instante.
 export function setTheme(t) {
+  const ya = () => aplicarTema(t);
+  if (document.startViewTransition && document.visibilityState === 'visible' && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // Un cambio rápido cancela el fundido anterior: no es un error
+    const vt = document.startViewTransition(ya);
+    [vt.ready, vt.finished, vt.updateCallbackDone].forEach((p) => p.catch(() => {}));
+  }
+  else ya();
+}
+function aplicarTema(t) {
   if (t === 'light' || t === 'dark') { document.documentElement.setAttribute('data-theme', t); prefs.set(K_THEME, t); }
   else { document.documentElement.removeAttribute('data-theme'); prefs.del(K_THEME); }
   updateThemeButton();
@@ -521,10 +532,3 @@ setTimeout(async () => {
   }
 }, 2500);
 
-// Transición suave al cambiar entre modo claro y oscuro (la misma del portal; estilos en el bloque de marca)
-new MutationObserver(() => {
-  const h = document.documentElement;
-  h.classList.add('tema-cambia');
-  clearTimeout(window.__temaCambia);
-  window.__temaCambia = setTimeout(() => h.classList.remove('tema-cambia'), 520);
-}).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
