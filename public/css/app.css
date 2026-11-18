@@ -2036,3 +2036,67 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 @keyframes fabPortalEntra { from { opacity: 0; transform: translateY(18px) scale(.6); } }
 @keyframes fabPortalHalo { 0% { opacity: .9; transform: scale(.92); } 100% { opacity: 0; transform: scale(1.4); } }
 @media (prefers-reduced-motion: reduce) { .fab-portal, .fab-portal::after, .fab-portal svg { animation: none !important; transition: none !important; } }
+
+/* =====================================================================
+   Marca Pet's Table — bloque común de identidad institucional (v1)
+   Fuente única: el archivo marca.css de la carpeta Branding del portal. Se copia igual al final del CSS de cada app
+   (antes del bloque «Volver al portal»). Si lo cambias, cámbialo en todas.
+   - El acento es el color del área de cada app (var(--orange)); el naranja de marca y la ola
+     turquesa del sitio oficial son comunes a todas.
+   - Petrus se sirve una sola vez desde el portal (/Branding/web/) y lo comparten todas las apps.
+   - Nada aquí cambia la lógica: solo pantallas de carga, inicio de sesión, estados vacíos,
+     confirmaciones y menú lateral.
+   ===================================================================== */
+:root {
+  --pt-marca: #F58020;            /* naranja institucional (logotipo) */
+  --pt-turquesa: #2FBCAF;         /* ola del sitio oficial */
+  --pt-teal: #027B71;             /* verde azulado del sitio oficial */
+  --pt-petrus-busto: url('https://portal-petstable.vercel.app/Branding/web/petrus-busto-384.png');
+  --pt-petrus-busto-sm: url('https://portal-petstable.vercel.app/Branding/web/petrus-busto-192.png');
+  --pt-petrus-sentado: url('https://portal-petstable.vercel.app/Branding/web/petrus-sentado-540.png');
+  --pt-ola: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 719 187' height='187' width='719'%3E%3Cpath fill-opacity='0.5' fill='%232FBCAF' d='M510.037 231.467C494.283 190.279 447.656 168.537 405.977 182.943C364.299 197.349 317.672 175.606 301.917 134.419C286.162 93.2313 239.535 71.4888 197.857 85.8948C156.179 100.301 109.552 78.5583 93.7968 37.3708C78.0421 -3.81677 32.1669 -25.8192 -9.51154 -11.4131L-7.86849 387.47L718.107 384.48L717.904 335.047C717.884 330.237 717.087 325.42 714.972 321.1C696.986 284.361 653.461 266.385 614.098 279.991C572.419 294.397 525.792 272.655 510.037 231.467Z'%3E%3C/path%3E%3C/svg%3E");
+  --pt-huellas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='%23ffffff' fill-opacity='0.045'%3E%3Cg transform='translate(22 26) rotate(-18)'%3E%3Cellipse cx='0' cy='9' rx='8' ry='6.5'/%3E%3Cellipse cx='-8' cy='-2' rx='2.6' ry='3.4'/%3E%3Cellipse cx='-3' cy='-7' rx='2.6' ry='3.6'/%3E%3Cellipse cx='3' cy='-7' rx='2.6' ry='3.6'/%3E%3Cellipse cx='8' cy='-2' rx='2.6' ry='3.4'/%3E%3C/g%3E%3Cg transform='translate(84 82) rotate(14)'%3E%3Cellipse cx='0' cy='9' rx='8' ry='6.5'/%3E%3Cellipse cx='-8' cy='-2' rx='2.6' ry='3.4'/%3E%3Cellipse cx='-3' cy='-7' rx='2.6' ry='3.6'/%3E%3Cellipse cx='3' cy='-7' rx='2.6' ry='3.6'/%3E%3Cellipse cx='8' cy='-2' rx='2.6' ry='3.4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ---------- 1. Pantalla de carga: Petrus dentro del indicador, con el color del área ---------- */
+.splash { background: radial-gradient(520px 300px at 50% 115%, color-mix(in srgb, var(--pt-turquesa) 22%, transparent), transparent 70%), var(--pt-huellas) center / 120px 120px, var(--ink, #090D12); }
+.splash .spinner { position: relative; width: 96px; height: 96px; border: 0; border-radius: 50%; animation: none;
+  background: var(--pt-petrus-busto-sm) center / 84% no-repeat, radial-gradient(circle, rgba(255, 255, 255, .1), rgba(255, 255, 255, .03) 70%); }
+.splash .spinner::before { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .1); border-top-color: var(--orange); border-right-color: var(--pt-turquesa); animation: spin .9s linear infinite; }
+.splash .brand-logo { animation: none; }
+
+/* ---------- 2. Inicio de sesión: huellas sutiles, ola institucional y Petrus en computadora ---------- */
+.login::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: var(--pt-huellas) 0 0 / 120px 120px; }
+.login::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: clamp(70px, 14vh, 150px); z-index: 0; pointer-events: none; opacity: .55; background: var(--pt-ola) left bottom / 100% 100% no-repeat; }
+.login .login-wrap { z-index: 2; }
+.pt-petrus-login { display: none; }
+@media (min-width: 1100px) and (min-height: 680px) {
+  .login > .login-wrap::before { content: ""; position: fixed; z-index: 1; left: max(2vw, calc(50% - 600px)); bottom: 0; width: min(24vw, 300px); aspect-ratio: 3 / 4; pointer-events: none;
+    background: var(--pt-petrus-sentado) center bottom / contain no-repeat; filter: drop-shadow(0 24px 40px rgba(0, 0, 0, .45)); animation: ptEntra .7s .2s cubic-bezier(.2, .9, .3, 1) backwards; }
+}
+.login-card .app-icon { box-shadow: 0 10px 24px -6px color-mix(in srgb, var(--orange) 55%, transparent); }
+
+/* ---------- 3. Estados vacíos: Petrus en lugar del ícono genérico ---------- */
+.empty .empty-ico:not(.ilus) { width: 84px; height: 84px; border-radius: 50%; background: var(--pt-petrus-busto-sm) center 60% / 88% no-repeat, radial-gradient(circle at 50% 60%, color-mix(in srgb, var(--orange) 14%, var(--soft)), var(--soft) 72%);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--orange) 22%, transparent); }
+.empty .empty-ico:not(.ilus) > svg { display: none; }
+.empty.error .empty-ico:not(.ilus) { background: var(--bad-bg); box-shadow: none; }
+.empty.error .empty-ico:not(.ilus) > svg { display: block; }
+.empty:not(.error) .empty-ico.ilus { position: relative; }
+.empty:not(.error) .empty-ico.ilus::after { content: ""; position: absolute; right: -16px; bottom: -6px; width: 34px; height: 34px; border-radius: 50%;
+  background: var(--pt-petrus-busto-sm) center 62% / 94% no-repeat, color-mix(in srgb, var(--orange) 12%, var(--card, #fff)); box-shadow: 0 0 0 2px var(--card, #fff), 0 4px 10px -4px rgba(0, 0, 0, .3); }
+
+/* ---------- 4. Confirmaciones: Petrus acompaña los mensajes de éxito ---------- */
+.toast.success > svg:first-child { display: none; }
+.toast.success::before { content: ""; flex: 0 0 auto; width: 30px; height: 30px; margin: -4px 0 -4px -2px; border-radius: 50%;
+  background: var(--pt-petrus-busto-sm) center 65% / 92% no-repeat, rgba(255, 255, 255, .1); box-shadow: 0 0 0 2px rgba(91, 227, 164, .55); }
+
+/* ---------- 5. Menú lateral: firma institucional y ola al pie ---------- */
+.side-foot { padding-bottom: 40px; background: var(--pt-ola) left bottom / 100% 40px no-repeat; }
+.side-foot::before { content: "Pet's Table S.A. de C.V."; display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 12px 0 48px; font-size: 11.5px; font-weight: 700; color: #9FB2C0; letter-spacing: .01em;
+  background: var(--pt-petrus-busto-sm) 10px center / 30px 30px no-repeat; }
+
+/* ---------- Movimiento ---------- */
+@keyframes ptEntra { from { opacity: 0; transform: translateY(40px); } }
+@media (prefers-reduced-motion: reduce) { .splash .spinner::before { animation-duration: 2.4s; } .login > .login-wrap::before { animation: none; } }
+/* Fin marca Pet's Table */

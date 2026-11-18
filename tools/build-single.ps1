@@ -60,7 +60,7 @@ function Sha([string]$t) { 'sha256-' + [Convert]::ToBase64String([Security.Crypt
 $supa = 'https://domumnsezocubigfqwry.supabase.co'
 $csp = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net '$(Sha $themeJs)' '$(Sha $configJs)' '$(Sha $bundleJs)'; " +
        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; " +
-       "img-src 'self' data: blob: $supa; connect-src 'self' $supa wss://domumnsezocubigfqwry.supabase.co; " +
+       "img-src 'self' data: blob: https://portal-petstable.vercel.app $supa; connect-src 'self' $supa wss://domumnsezocubigfqwry.supabase.co; " +
        "manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
 $icon128 = 'data:image/png;base64,' + [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $Src 'img/app-icon-128.png')))
 $fav64 = 'data:image/png;base64,' + [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $Src 'img/favicon-64.png')))
