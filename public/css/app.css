@@ -2054,7 +2054,9 @@ html:not(.en-portal) .portal-btn { display: none !important; }
   --pt-petrus-busto: url('https://portal-petstable.vercel.app/Branding/web/petrus-busto-384.png');
   --pt-petrus-busto-sm: url('https://portal-petstable.vercel.app/Branding/web/petrus-busto-192.png');
   --pt-petrus-sentado: url('https://portal-petstable.vercel.app/Branding/web/petrus-sentado-540.png');
-  --pt-ola: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 719 187' height='187' width='719'%3E%3Cpath fill-opacity='0.5' fill='%232FBCAF' d='M510.037 231.467C494.283 190.279 447.656 168.537 405.977 182.943C364.299 197.349 317.672 175.606 301.917 134.419C286.162 93.2313 239.535 71.4888 197.857 85.8948C156.179 100.301 109.552 78.5583 93.7968 37.3708C78.0421 -3.81677 32.1669 -25.8192 -9.51154 -11.4131L-7.86849 387.47L718.107 384.48L717.904 335.047C717.884 330.237 717.087 325.42 714.972 321.1C696.986 284.361 653.461 266.385 614.098 279.991C572.419 294.397 525.792 272.655 510.037 231.467Z'%3E%3C/path%3E%3C/svg%3E");
+  --pt-logo: url('https://portal-petstable.vercel.app/Branding/logotipos/logo-petstable.webp');
+  --pt-huella: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Cg fill='%2394A3B8' fill-opacity='0.5'%3E%3Cellipse cx='0' cy='5' rx='6.4' ry='5.2'/%3E%3Cellipse cx='-6.6' cy='-3' rx='2.1' ry='2.8'/%3E%3Cellipse cx='-2.4' cy='-7.4' rx='2.1' ry='2.9'/%3E%3Cellipse cx='2.4' cy='-7.4' rx='2.1' ry='2.9'/%3E%3Cellipse cx='6.6' cy='-3' rx='2.1' ry='2.8'/%3E%3C/g%3E%3C/svg%3E");
+  --pt-ola: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' preserveAspectRatio='none' viewBox='0 0 719 187' height='187' width='719'%3E%3Cpath fill-opacity='0.5' fill='%232FBCAF' d='M510.037 231.467C494.283 190.279 447.656 168.537 405.977 182.943C364.299 197.349 317.672 175.606 301.917 134.419C286.162 93.2313 239.535 71.4888 197.857 85.8948C156.179 100.301 109.552 78.5583 93.7968 37.3708C78.0421 -3.81677 32.1669 -25.8192 -9.51154 -11.4131L-7.86849 387.47L718.107 384.48L717.904 335.047C717.884 330.237 717.087 325.42 714.972 321.1C696.986 284.361 653.461 266.385 614.098 279.991C572.419 294.397 525.792 272.655 510.037 231.467Z'%3E%3C/path%3E%3C/svg%3E");
   --pt-huellas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='%23ffffff' fill-opacity='0.045'%3E%3Cg transform='translate(22 26) rotate(-18)'%3E%3Cellipse cx='0' cy='9' rx='8' ry='6.5'/%3E%3Cellipse cx='-8' cy='-2' rx='2.6' ry='3.4'/%3E%3Cellipse cx='-3' cy='-7' rx='2.6' ry='3.6'/%3E%3Cellipse cx='3' cy='-7' rx='2.6' ry='3.6'/%3E%3Cellipse cx='8' cy='-2' rx='2.6' ry='3.4'/%3E%3C/g%3E%3Cg transform='translate(84 82) rotate(14)'%3E%3Cellipse cx='0' cy='9' rx='8' ry='6.5'/%3E%3Cellipse cx='-8' cy='-2' rx='2.6' ry='3.4'/%3E%3Cellipse cx='-3' cy='-7' rx='2.6' ry='3.6'/%3E%3Cellipse cx='3' cy='-7' rx='2.6' ry='3.6'/%3E%3Cellipse cx='8' cy='-2' rx='2.6' ry='3.4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 
@@ -2096,7 +2098,32 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 .side-foot::before { content: "Pet's Table S.A. de C.V."; display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 12px 0 48px; font-size: 11.5px; font-weight: 700; color: #9FB2C0; letter-spacing: .01em;
   background: var(--pt-petrus-busto-sm) 10px center / 30px 30px no-repeat; }
 
+/* ---------- 6. Encabezados de página: Petrus junto a la categoría y barra de marca ---------- */
+.page-intro { position: relative; padding-bottom: 14px; }
+.page-intro::after { content: ""; position: absolute; left: 0; bottom: 0; width: min(160px, 40%); height: 4px; border-radius: 4px; background: linear-gradient(90deg, var(--orange), var(--pt-turquesa)); }
+.page-intro .eyebrow { display: inline-flex; align-items: center; gap: 8px; }
+.page-intro .eyebrow::before { content: ""; flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--pt-petrus-busto-sm) center 62% / 96% no-repeat, color-mix(in srgb, var(--orange) 14%, var(--card, #fff)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--orange) 35%, transparent); }
+
+/* ---------- 7. Área de trabajo: Petrus en marca de agua y pie institucional ---------- */
+.content { position: relative; isolation: isolate; }
+.content::before { content: ""; position: fixed; z-index: -1; right: clamp(16px, 3vw, 48px); bottom: 0; width: clamp(150px, 16vw, 240px); aspect-ratio: 3 / 4; pointer-events: none; opacity: .07;
+  background: var(--pt-petrus-sentado) center bottom / contain no-repeat; }
+.content::after { content: "Pet's Table S.A. de C.V."; display: block; margin-top: 44px; padding: 50px 0 34px; text-align: center; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; color: var(--muted);
+  background: var(--pt-logo) center 6px / auto 34px no-repeat, var(--pt-ola) center bottom / 100% 24px no-repeat; }
+@media (max-width: 720px) { .content::before { display: none; } }
+
+/* ---------- 8. Indicadores: huella discreta en la esquina ---------- */
+.kx { background: var(--pt-huella) right 12px bottom 10px / 18px no-repeat, var(--card); }
+
+/* ---------- 9. Inicio de sesión en tableta y celular: Petrus se asoma sobre la tarjeta ---------- */
+@media (max-width: 1099px), (max-height: 679px) {
+  .login .login-card { position: relative; }
+  .login .login-card::before { content: ""; position: absolute; top: -38px; right: 18px; width: 64px; height: 64px; border-radius: 50%;
+    background: var(--pt-petrus-busto-sm) center 62% / 96% no-repeat, #0D1B26; box-shadow: 0 0 0 3px var(--orange), 0 10px 22px -8px rgba(0, 0, 0, .6); animation: ptEntra .6s .2s cubic-bezier(.2, .9, .3, 1) backwards; }
+}
+
 /* ---------- Movimiento ---------- */
 @keyframes ptEntra { from { opacity: 0; transform: translateY(40px); } }
-@media (prefers-reduced-motion: reduce) { .splash .spinner::before { animation-duration: 2.4s; } .login > .login-wrap::before { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .splash .spinner::before { animation-duration: 2.4s; } .login > .login-wrap::before, .login .login-card::before { animation: none; } }
 /* Fin marca Pet's Table */

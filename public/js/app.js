@@ -126,6 +126,18 @@ async function revisarVersion() {
       $('#update-ver').textContent = version;
       $('#update-bar').classList.remove('hidden');
       refreshIcons();
+      // Actualización obligatoria (como en el portal): se aplica sola; si la persona está
+      // escribiendo, espera a que deje el campo o la pantalla para no perder lo capturado.
+      $('#update-bar [data-action="update-later"]')?.remove();
+      const aplicar = () => { $('#update-bar span').textContent = `Actualizando a la versión ${version}…`; setTimeout(() => location.reload(), 1200); };
+      const escribiendo = () => document.activeElement?.matches?.('input, textarea, select, [contenteditable]') || !!document.querySelector('#modal-root .modal-box');
+      if (!escribiendo()) aplicar();
+      else {
+        const esperar = () => { if (escribiendo() && !document.hidden) return; document.removeEventListener('focusout', tarde); document.removeEventListener('visibilitychange', esperar); aplicar(); };
+        const tarde = () => setTimeout(esperar, 400);
+        document.addEventListener('focusout', tarde);
+        document.addEventListener('visibilitychange', esperar);
+      }
     }
   } catch { /* sin conexión o archivo no disponible */ }
 }
