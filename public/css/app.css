@@ -2284,3 +2284,52 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 }
 @media (prefers-reduced-motion: reduce) { .splash .spinner::before { animation-duration: 2.4s; } .login > .login-wrap::before, .login .login-card::before { animation: none; } }
 /* Fin marca Pet's Table */
+
+/* =====================================================================
+   Ecosistema Pet's Table · Acabado premium de indicadores e íconos (v1, nov-2026)
+   Mismo bloque en todas las apps (origen: Evaluación de proveedores 1.2.0).
+   Solo cambia el acabado: fondo, profundidad, luz, sombras, entrada y hover.
+   No cambia la estructura, el tamaño ni el contenido de los indicadores.
+   Las reglas llevan :root para aplicar sin importar el orden de las hojas.
+   ===================================================================== */
+:root { --pt3d-hl: rgba(255, 255, 255, .9); --pt3d-hl2: rgba(255, 255, 255, .5); --pt3d-s1: 0 1px 2px rgba(15, 23, 42, .05); --pt3d-ease: cubic-bezier(.2, .7, .2, 1); }
+:root[data-theme="dark"] { --pt3d-hl: rgba(255, 255, 255, .09); --pt3d-hl2: rgba(255, 255, 255, .04); --pt3d-s1: 0 1px 2px rgba(0, 0, 0, .35); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --pt3d-hl: rgba(255, 255, 255, .09); --pt3d-hl2: rgba(255, 255, 255, .04); --pt3d-s1: 0 1px 2px rgba(0, 0, 0, .35); } }
+
+/* Íconos HD con volumen: luz superior, sombra de contacto y profundidad (mismos colores y formas) */
+:root .emoji, :root .ilus { filter: drop-shadow(0 1px 0 var(--pt3d-hl2)) drop-shadow(0 2px 2px rgba(15, 35, 50, .18)) drop-shadow(0 7px 9px rgba(15, 35, 50, .13)); }
+:root .emoji.sm { filter: drop-shadow(0 1px 1.2px rgba(15, 35, 50, .25)); }
+:root[data-theme="dark"] .emoji, :root[data-theme="dark"] .ilus { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .5)) drop-shadow(0 8px 12px rgba(0, 0, 0, .32)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .emoji, :root:not([data-theme="light"]) .ilus { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .5)) drop-shadow(0 8px 12px rgba(0, 0, 0, .32)); } }
+
+/* Indicadores: fondo con luz del color del indicador, borde teñido, brillo superior y sombra con color */
+:root .kx { border-color: color-mix(in srgb, var(--ac) 18%, var(--line));
+  background: var(--pt-huella, none) right 14px bottom 12px / 18px no-repeat,
+    radial-gradient(260px 160px at 100% 0, color-mix(in srgb, var(--ac) 14%, transparent), transparent 70%),
+    radial-gradient(220px 140px at 0 100%, color-mix(in srgb, var(--ac) 6%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--card) 95%, var(--ac)), var(--card));
+  box-shadow: inset 0 1px 0 var(--pt3d-hl), var(--pt3d-s1), 0 16px 34px -24px color-mix(in srgb, var(--ac) 55%, rgba(15, 35, 50, .5));
+  animation: pt3dEntra .6s var(--pt3d-ease) both; }
+:root .grid > .kx:nth-child(2), :root .kpis > .kx:nth-child(2) { animation-delay: .07s; } :root .grid > .kx:nth-child(3), :root .kpis > .kx:nth-child(3) { animation-delay: .14s; }
+:root .grid > .kx:nth-child(4), :root .kpis > .kx:nth-child(4) { animation-delay: .21s; } :root .grid > .kx:nth-child(n+5), :root .kpis > .kx:nth-child(n+5) { animation-delay: .28s; }
+/* Anillo decorativo discreto en la esquina y barra superior con brillo */
+:root .kx::before { inset: auto -40px -60px auto; width: 170px; height: 170px; border-radius: 50%;
+  background: radial-gradient(closest-side, transparent 62%, color-mix(in srgb, var(--ac) 10%, transparent) 63%, color-mix(in srgb, var(--ac) 10%, transparent) 70%, transparent 71%); }
+:root .kx::after { left: 18%; right: 18%; height: 3px; border-radius: 0 0 4px 4px; background: linear-gradient(90deg, transparent, var(--ac), transparent); box-shadow: 0 2px 10px color-mix(in srgb, var(--ac) 55%, transparent); }
+/* Cifra con degradado sutil hacia el color del indicador */
+:root .kx strong { background: linear-gradient(180deg, var(--text) 55%, color-mix(in srgb, var(--text) 70%, var(--ac))); -webkit-background-clip: text; background-clip: text; color: transparent; }
+:root .kx-top small { font-weight: 800; }
+/* Barra de avance con relieve */
+:root .kx-barra { height: 8px; background: color-mix(in srgb, var(--ac) 12%, var(--soft, transparent)); box-shadow: inset 0 1px 2px rgba(15, 35, 50, .12); }
+:root .kx-barra i { box-shadow: 0 0 10px color-mix(in srgb, var(--ac) 50%, transparent); }
+/* Ícono del indicador: base de vidrio (íconos de línea) o sombra de contacto (ilustraciones HD) */
+:root .kx-ico:not(.ilus-box) { background: radial-gradient(120% 85% at 28% 10%, var(--pt3d-hl), transparent 58%), linear-gradient(155deg, color-mix(in srgb, var(--ac) 18%, var(--card)), color-mix(in srgb, var(--ac) 6%, var(--card)));
+  border: 1px solid color-mix(in srgb, var(--ac) 24%, var(--line)); box-shadow: inset 0 1px 0 var(--pt3d-hl), inset 0 -3px 8px -2px color-mix(in srgb, var(--ac) 18%, transparent), 0 8px 16px -10px color-mix(in srgb, var(--ac) 60%, transparent); }
+:root .kx-ico.ilus-box::after { content: ""; position: absolute; z-index: -1; left: 18%; right: 18%; bottom: -3px; height: 8px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--ac) 35%, rgba(15, 35, 50, .25)), transparent); }
+:root .kx-ico { transition: transform .3s cubic-bezier(.3, 1.4, .5, 1); }
+@media (hover: hover) and (pointer: fine) {
+  :root .kx:hover { transform: translateY(-4px); border-color: color-mix(in srgb, var(--ac) 38%, var(--line)); box-shadow: inset 0 1px 0 var(--pt3d-hl), var(--pt3d-s1), 0 24px 44px -22px color-mix(in srgb, var(--ac) 60%, rgba(15, 35, 50, .5)); }
+  :root .kx:hover .kx-ico { transform: translateY(-2px) rotate(-4deg) scale(1.05); }
+}
+@keyframes pt3dEntra { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { :root .kx { animation: none; } :root .kx:hover, :root .kx:hover .kx-ico { transform: none; } }
