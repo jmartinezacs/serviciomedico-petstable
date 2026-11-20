@@ -2076,8 +2076,10 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 .login .login-wrap { z-index: 2; }
 .login .login-chips { display: none; } /* sin leyendas de áreas al pie del inicio de sesión */
 .pt-petrus-login { display: none; }
-@media (min-width: 1100px) and (min-height: 680px) {
-  .login > .login-wrap::before { content: ""; position: fixed; z-index: 1; left: max(2vw, calc(50% - 600px)); bottom: 0; width: min(24vw, 300px); aspect-ratio: 3 / 4; pointer-events: none;
+/* Computadora: Petrus grande a la izquierda. Su alto se ajusta a la ventana (con el escalado de Windows
+   al 125–150 % la ventana mide menos de 680 px de alto en CSS y antes desaparecía). */
+@media (min-width: 1100px) and (min-height: 540px) {
+  .login > .login-wrap::before { content: ""; position: fixed; z-index: 1; left: max(2vw, calc(50% - 600px)); bottom: 0; height: min(66vh, 420px, 30vw); width: auto; aspect-ratio: 439 / 480; pointer-events: none;
     background: var(--pt-petrus-saluda) center bottom / contain no-repeat; filter: drop-shadow(0 24px 40px rgba(0, 0, 0, .45)); animation: ptEntra .7s .2s cubic-bezier(.2, .9, .3, 1) backwards; }
 }
 .login-card .app-icon { box-shadow: 0 10px 24px -6px color-mix(in srgb, var(--orange) 55%, transparent); }
@@ -2128,11 +2130,17 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 .kx { background: var(--pt-huella) right 12px bottom 10px / 18px no-repeat, var(--card); }
 
 /* ---------- 9. Inicio de sesión en tableta y celular: Petrus se asoma sobre la tarjeta ---------- */
-@media (max-width: 1099px), (max-height: 679px) {
+@media (max-width: 1099px), (max-height: 539px) {
   .login .login-card { position: relative; }
   .login .login-card::before { content: ""; position: absolute; top: -38px; right: 18px; width: 64px; height: 64px; border-radius: 50%;
     background: var(--pt-petrus-busto-sm) center 62% / 96% no-repeat, #0D1B26; box-shadow: 0 0 0 3px var(--orange), 0 10px 22px -8px rgba(0, 0, 0, .6); animation: ptEntra .6s .2s cubic-bezier(.2, .9, .3, 1) backwards; }
 }
+/* Tableta y celular: Petrus pequeño, echado, en la esquina inferior; queda detrás de la tarjeta y no la mueve */
+@media (max-width: 1099px) {
+  .login::after { content: ""; position: absolute; z-index: 1; right: max(8px, env(safe-area-inset-right, 0px)); bottom: max(6px, env(safe-area-inset-bottom, 0px)); height: 58px; aspect-ratio: 220 / 240; pointer-events: none;
+    background: var(--pt-petrus-echado) center bottom / contain no-repeat; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .45)); animation: ptEntra .7s .35s cubic-bezier(.2, .9, .3, 1) backwards; }
+}
+@media (max-width: 1099px) and (prefers-reduced-motion: reduce) { .login::after { animation: none; } }
 
 /* ---------- 10. Petrus en celular: encabezado de página con un busto más visible ---------- */
 @media (max-width: 720px) {
