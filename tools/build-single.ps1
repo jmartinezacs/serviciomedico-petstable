@@ -100,6 +100,12 @@ Copy-Item (Join-Path $Src 'img/logo-correo.png') (Join-Path $Out 'logo-correo.pn
 # Ilustraciones propias (SVG cacheables, no incrustadas) e íconos de la app y de notificaciones
 New-Item -ItemType Directory -Force (Join-Path $Out 'emoji') | Out-Null
 Copy-Item (Join-Path $Src 'emoji\*.svg') (Join-Path $Out 'emoji') -Force
+# Imágenes realistas (iconos3d): solo imágenes; el README se queda en public/iconos3d
+$ico3d = Get-ChildItem (Join-Path $Src 'iconos3d\*') -Include *.webp, *.png -ErrorAction SilentlyContinue
+if ($ico3d) {
+  New-Item -ItemType Directory -Force (Join-Path $Out 'iconos3d') | Out-Null
+  $ico3d | Copy-Item -Destination (Join-Path $Out 'iconos3d') -Force
+}
 New-Item -ItemType Directory -Force (Join-Path $Out 'notif') | Out-Null
 Copy-Item (Join-Path $Src 'notif\*.png') (Join-Path $Out 'notif') -Force
 # Versión publicada: la app la consulta para ofrecer "Actualizar" cuando cambia

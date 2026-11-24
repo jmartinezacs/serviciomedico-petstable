@@ -127,7 +127,21 @@ export const ESTADOS = {
 export const pill = (text, cls = 'gray') => `<span class="pill ${cls}">${esc(text)}</span>`;
 export const icon = (name, cls = '') => `<i data-lucide="${name}"${cls ? ` class="${cls}"` : ''}></i>`;
 // Ilustración a color propia (fuentes/ilustraciones.src → public/emoji), decorativa
-export const emoji = (slug, cls = '') => `<img class="emoji ${cls}" src="emoji/${slug}.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">`;
+// ---------------- Imágenes realistas (estándar Pet's Table, fase 2) ----------------
+// Las ilustraciones se pueden sustituir por imágenes realistas en public/iconos3d/<nombre>.webp
+// (256 × 256, fondo transparente; ver el README de esa carpeta). Solo se usan los nombres listados en
+// ICONOS_3D; los demás conservan su ilustración. Si una imagen no carga, vuelve sola a la ilustración.
+export const ICONOS_3D = new Set([]);
+const ICO3D_VER = '1';
+export function con3d(n) { return !!n && ICONOS_3D.has(n); }
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.classList.contains('ico3d') || !img.dataset.respaldo) return;
+  const r = img.dataset.respaldo; delete img.dataset.respaldo; img.classList.remove('ico3d'); img.src = r;
+}, true);
+export const emoji = (slug, cls = '') => (con3d(slug)
+  ? `<img class="emoji ico3d ${cls}" src="iconos3d/${slug}.webp?v=${ICO3D_VER}" data-respaldo="emoji/${slug}.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">`
+  : `<img class="emoji ${cls}" src="emoji/${slug}.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">`);
 // Ilustración de cada estado de cita (etiquetas de estado y KPI)
 export const ILUS_ESTADO = { pendiente: 'cita_pendiente', confirmada: 'cita_confirmada', atendida: 'cita_atendida', cancelada: 'cita_cancelada', no_asistio: 'cita_no_asistio' };
 export const estadoPill = (e) => `<span class="pill ${ESTADOS[e]?.cls || 'gray'} con-ilus">${ILUS_ESTADO[e] ? emoji(ILUS_ESTADO[e], 'pill-ilus') : ''}${esc(ESTADOS[e]?.label || e)}</span>`;
