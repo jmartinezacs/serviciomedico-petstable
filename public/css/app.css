@@ -2283,6 +2283,50 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 @media (max-width: 560px) { .page-intro.pt-festejo { padding-right: 92px; } .page-intro.pt-festejo::before { height: 96px; } }
 @media (prefers-reduced-motion: reduce) { .faq-hero-txt::after, .page-intro.pt-festejo::before { animation: none; } }
 
+/* ---------- 19. Paleta semántica: el color del área es acento de identidad, no la paleta entera ----------
+   Estándar para todas las apps actuales y futuras. El color del área (var(--orange) en cada app) se
+   queda en identidad: encabezado, opción activa del menú y la barra inferior, indicadores de selección,
+   casillas, foco, etiqueta y barra del encabezado de página, barra lateral de los indicadores.
+   Lo demás usa colores por significado:
+   - Confirmar / guardar (botón principal) → verde · Eliminar / rechazar → rojo · Advertencia → ámbar
+   - Información, íconos de títulos y mosaicos → azul y neutros, con variedad entre hermanos
+   - «Nuevo» (botón con ilustración) → neutro oscuro con «+» verde · Avatares de iniciales → naranja de marca
+   Los indicadores ya usan el tono de lo que miden (t-red, t-green…) y las gráficas su paleta propia. */
+:root {
+  --pt-ok: #16A34A; --pt-ok-2: #15803D; --pt-peligro: #DC2626; --pt-peligro-2: #B91C1C;
+  --pt-aviso: #D97706; --pt-info: #2563EB; --pt-teal: #0F766E; --pt-neutro: #475569; --pt-neutro-2: #334155;
+  --pt-ico-titulo: color-mix(in srgb, var(--text, #172431) 58%, var(--pt-info));
+}
+/* Botones por significado */
+:root .btn.primary { background: linear-gradient(135deg, #22A55B, var(--pt-ok-2)); color: #fff; border-color: transparent; box-shadow: 0 7px 16px -4px rgba(21, 128, 61, .35); }
+:root .btn.primary:hover:not(:disabled) { box-shadow: 0 10px 22px -6px rgba(21, 128, 61, .45); filter: brightness(1.04); }
+:root .btn.primary:focus-visible { outline: 3px solid rgba(34, 197, 94, .45); outline-offset: 2px; }
+:root .btn.danger { background: linear-gradient(135deg, #E5484D, var(--pt-peligro-2)); color: #fff; }
+:root .btn.primary.btn-ilus { background: linear-gradient(135deg, #3B4A5E, #1F2937); box-shadow: 0 7px 16px -6px rgba(15, 23, 42, .45); }
+:root .btn.primary.btn-ilus:hover:not(:disabled) { box-shadow: 0 10px 22px -8px rgba(15, 23, 42, .55); filter: brightness(1.12); }
+:root .btn-ilus .bi-mas { background: var(--pt-ok); color: #fff; }
+/* Marcas y etiquetas */
+:root .field label .req { color: var(--pt-peligro); }
+:root .pill.orange { background: #FEF3C7 !important; color: #92400E !important; border-color: #FCD34D !important; }
+:root[data-theme="dark"] .pill.orange { background: rgba(217, 119, 6, .2) !important; color: #FCD34D !important; border-color: rgba(252, 211, 77, .35) !important; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill.orange { background: rgba(217, 119, 6, .2) !important; color: #FCD34D !important; border-color: rgba(252, 211, 77, .35) !important; } }
+/* Íconos de títulos de tarjeta, secciones y formularios: neutro azulado en lugar del color del área */
+:root .card-head h3 svg, :root .panel-sec svg, :root .form-sec > h4 svg:not([style*="background"]) { color: var(--pt-ico-titulo); }
+:root .form-sec > h4 svg[style*="background"], :root .form-sec > h4 svg.chip { background: linear-gradient(135deg, var(--pt-neutro), var(--pt-neutro-2)) !important; color: #fff; }
+/* Mosaicos e íconos informativos: azul, verde, ámbar, petróleo y naranja, alternados */
+:root .report-ico, :root .faq-sec-ico, :root .p-tile .ti { --pt-v: var(--pt-info); background: color-mix(in srgb, var(--pt-v) 12%, var(--card, #fff)); color: var(--pt-v); }
+:root .p-tile:nth-child(5n+2) .ti, :root .faq-sec:nth-of-type(5n+2) .faq-sec-ico { --pt-v: var(--pt-ok); }
+:root .p-tile:nth-child(5n+3) .ti, :root .faq-sec:nth-of-type(5n+3) .faq-sec-ico { --pt-v: var(--pt-aviso); }
+:root .p-tile:nth-child(5n+4) .ti, :root .faq-sec:nth-of-type(5n+4) .faq-sec-ico { --pt-v: var(--pt-teal); }
+:root .p-tile:nth-child(5n) .ti, :root .faq-sec:nth-of-type(5n) .faq-sec-ico { --pt-v: #EA580C; }
+:root .quick-action .qi { background: linear-gradient(135deg, color-mix(in srgb, var(--pt-v, var(--pt-info)) 80%, #fff), var(--pt-v, var(--pt-info))); }
+:root .quick-action:nth-child(5n+2) .qi { --pt-v: var(--pt-ok); }
+:root .quick-action:nth-child(5n+3) .qi { --pt-v: var(--pt-aviso); }
+:root .quick-action:nth-child(5n+4) .qi { --pt-v: var(--pt-teal); }
+:root .quick-action:nth-child(5n) .qi { --pt-v: #EA580C; }
+/* Avatares de iniciales: naranja de la marca Pet's Table (no el color del área) */
+:root .avatar:not(.has-img):not(.kz-autor) { background: linear-gradient(135deg, #FF9A3C, #E8590C); }
+
 /* ---------- Movimiento ---------- */
 @keyframes ptEntra { from { opacity: 0; transform: translateY(40px); } }
 @media (prefers-reduced-motion: reduce) {
