@@ -3,7 +3,8 @@
 // push (Web Push) y, si está configurado, por correo. La invoca el sitio
 // después de crear o cambiar una cita o un examen; la función valida en la base
 // de datos que el evento sea real y no duplicado. Los avisos de cita dirigidos a
-// quien solicitó también llegan a los usuarios de su misma área. En citas, el
+// quien solicitó también llegan a los usuarios de su misma área, solo si es
+// Producción (las demás áreas no lo reciben). En citas, el
 // correo se envía al confirmar, reprogramar y cancelar (no en la solicitud
 // nueva); si la cita queda confirmada con horario, el correo lleva un archivo
 // .ics para agregarla al calendario.
@@ -454,12 +455,15 @@ Deno.serve(async (req) => {
       dest = data || [];
     }
     dest = dest.filter((d) => d.id !== yo.id);
-    // Compañeros del área de quien solicitó (p. ej. supervisores de otro turno):
-    // también se enteran de la confirmación, cancelación o reprogramación.
+    // Compañeros del área de quien solicitó (supervisores de otro turno): también
+    // se enteran de la confirmación, cancelación o reprogramación. Solo aplica al
+    // área de Producción; en las demás áreas el aviso va únicamente a quien solicitó.
     let area: Dest[] = [];
     if (!haciaMedico) {
-      const { data: sol } = await admin.from('usuarios_med').select('area_id').eq('id', c.solicitado_por).maybeSingle();
-      if (sol?.area_id) {
+      const { data: sol } = await admin.from('usuarios_med').select('area_id, area:areas_med(nombre)').eq('id', c.solicitado_por).maybeSingle();
+      const nombreArea = String((sol?.area as { nombre?: string } | null)?.nombre || '');
+      const esProduccion = nombreArea.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim() === 'produccion';
+      if (sol?.area_id && esProduccion) {
         const { data } = await admin.from('usuarios_med').select('id, email, nombre').eq('activo', true).eq('area_id', sol.area_id)
           .eq('es_medico', false).neq('id', c.solicitado_por);
         area = (data || []).filter((d) => d.id !== yo.id);
@@ -489,8 +493,8 @@ Deno.serve(async (req) => {
     const msgArea = `${msg} Solicitó: ${c.solicitante}.`;
     let push = await enviarPush(admin, dest, { ...payload, title, body: msg });
     if (area.length) push += await enviarPush(admin, area, { ...payload, title, body: msgArea });
-    // Correo al confirmar, reprogramar o cancelar (a quien corresponda el aviso y
-    // a los compañeros del área de quien solicitó); la solicitud nueva solo va por push.
+    // Correo al confirmar, reprogramar o cancelar (a quien corresponda el aviso y,
+    // si es de Producción, a sus compañeros de área); la solicitud nueva solo va por push.
     let correo = 0;
     if (evento !== 'nueva_cita') {
       const ruta = `#/citas?cita=${c.id}`;

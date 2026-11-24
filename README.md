@@ -131,7 +131,7 @@ Los productos que no se cuentan por pieza (geles, cremas, frascos gotero, aeroso
   - **Mi perfil:** la vista previa y el correo de prueba permiten elegir confirmada, reprogramada o cancelada.
 - **v2.2:**
   - **Citas del área:** cada usuario ve, en solo lectura, las citas solicitadas por usuarios de su misma área (`med_misma_area` en la política `citas_med_sel`); modificar o cancelar sigue siendo solo de quien la solicitó. Las atenciones (datos clínicos) siguen siendo solo del médico.
-  - **Avisos al área:** cuando el médico confirma, cancela o reprograma una cita, además de quien la solicitó se avisa a los demás usuarios activos de su área (p. ej. supervisores de otro turno), con "Solicitó: …".
+  - **Avisos al área (solo Producción):** cuando el médico confirma, cancela o reprograma una cita solicitada por un usuario del área de Producción, además de quien la solicitó se avisa (push y correo) a los demás usuarios activos de Producción (p. ej. supervisores de otro turno), con "Solicitó: …". En las demás áreas el aviso llega solo a quien solicitó.
   - **Correo al confirmar:** `notificar_med` envía correo desde una cuenta de Google Workspace por SMTP seguro (smtp.gmail.com:465) con los secretos `GMAIL_USER` y `GMAIL_APP_PASSWORD` (contraseña de aplicación); si no están, usa Resend si está configurado. En citas, el correo se envía solo al confirmar (a quien solicitó y a su área).
   - **Datos:** CM-00025 trasladada de "Heydi Castro" (Limpieza, duplicada) a "Heidy Castro" (Procesos y Mejora continua) y duplicada eliminada; se eliminaron CM-00019 y CM-00024 (el médico para sí mismo, sin medicamentos). CM-00021 se conserva (tiene medicamentos entregados; pendiente de aclarar).
 - **v2.1** (a partir de aquí la numeración pasa de 1.20 a 2.1):
