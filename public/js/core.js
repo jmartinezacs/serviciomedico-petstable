@@ -131,8 +131,16 @@ export const icon = (name, cls = '') => `<i data-lucide="${name}"${cls ? ` class
 // Las ilustraciones se pueden sustituir por imágenes realistas en public/iconos3d/<nombre>.webp
 // (256 × 256, fondo transparente; ver el README de esa carpeta). Solo se usan los nombres listados en
 // ICONOS_3D; los demás conservan su ilustración. Si una imagen no carga, vuelve sola a la ilustración.
-export const ICONOS_3D = new Set([]);
-const ICO3D_VER = '1';
+export const ICONOS_3D = new Set([ // Paquete de imágenes realistas (v1, 53 imágenes)
+  'activo', 'apto', 'caducado', 'calendario', 'camara', 'candado', 'celular', 'cita_atendida', 
+  'cita_cancelada', 'cita_confirmada', 'cita_no_asistio', 'cita_nueva', 'cita_pendiente', 'comida_medico', 
+  'corazon', 'correo', 'equipo', 'estetoscopio', 'examen_egreso', 'examen_ingreso', 'gafete', 'grafica', 
+  'huella', 'inactivo', 'instalar', 'insumo', 'kpi_hoy', 'libro', 'llave', 'monitor', 'n_alerta', 'n_avisos', 
+  'n_ayuda', 'n_bitacora', 'n_catalogos', 'n_citas', 'n_colaboradores', 'n_examenes', 'n_inventario', 
+  'n_panel', 'n_perfil', 'n_reportes', 'n_usuarios', 'no_apto', 'paquete', 'pastilla', 'personas', 'reloj', 
+  'sin_servicio', 'stock_bajo', 'tableta', 'tema', 'urgente',
+]);
+const ICO3D_VER = '2';
 export function con3d(n) { return !!n && ICONOS_3D.has(n); }
 document.addEventListener('error', (e) => {
   const img = e.target;
