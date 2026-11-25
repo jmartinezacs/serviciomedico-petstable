@@ -2327,6 +2327,66 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 /* Avatares de iniciales: naranja de la marca Pet's Table (no el color del área) */
 :root .avatar:not(.has-img):not(.kz-autor) { background: linear-gradient(135deg, #FF9A3C, #E8590C); }
 
+/* ---------- 20. Realce de bienvenida e indicadores (luz que recorre el borde, luz ambiental, profundidad) ----------
+   Se suma al «acabado premium» de los indicadores de cada app; no cambia contenido, tamaño ni estructura.
+   Rendimiento: solo opacidad, transform y un ángulo registrado (@property) que se anima UNA vez al aparecer
+   y otra al pasar el cursor; nada corre en bucle. Sin filtros de desenfoque. Movimiento reducido: todo quieto. */
+@property --pt-ang { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@property --pt-luz { syntax: '<number>'; inherits: false; initial-value: 0; }
+:root { --pt-filo: color-mix(in srgb, var(--pt-turquesa) 70%, #fff); --pt-filo-op: .9; --pt-amb: .55; }
+:root[data-theme="dark"] { --pt-filo: #FFFFFF; --pt-amb: .8; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --pt-filo: #FFFFFF; --pt-amb: .8; } }
+@keyframes ptGiro { from { --pt-ang: -40deg; --pt-luz: 1; } 70% { --pt-luz: 1; } to { --pt-ang: 320deg; --pt-luz: .5; } }
+@keyframes ptCifra { from { opacity: .25; transform: translateY(6px) scale(.97); } }
+
+/* — Bienvenida: profundidad, aurora de marca y un filo de luz que recorre el contorno al entrar — */
+:root .page-intro:has(.hello) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 1px 2px rgba(15, 23, 42, .05),
+    0 18px 40px -24px color-mix(in srgb, var(--orange) 45%, transparent), 0 40px 80px -48px rgba(15, 23, 42, .45); }
+:root[data-theme="dark"] .page-intro:has(.hello) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 20px 50px -26px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .03); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .page-intro:has(.hello) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 20px 50px -26px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .03); } }
+/* Aurora: dos luces amplias (marca y turquesa) en esquinas opuestas; gradientes, sin desenfoque */
+.page-intro:has(.hello) > :first-child::before { content: ""; position: absolute; inset: 0; z-index: -3; border-radius: 26px; pointer-events: none; opacity: var(--pt-amb);
+  background: radial-gradient(60% 90% at 0% 0%, color-mix(in srgb, var(--pt-marca) 16%, transparent), transparent 70%),
+    radial-gradient(50% 80% at 100% 100%, color-mix(in srgb, var(--pt-turquesa) 18%, transparent), transparent 70%),
+    linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, .07) 46%, transparent 54%); }
+/* Filo de luz en el contorno (anillo con máscara): recorre el borde una vez y queda un arco tenue */
+.page-intro:has(.hello) > :first-child::after { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: 26px; padding: 1.5px; pointer-events: none;
+  background: conic-gradient(from var(--pt-ang), transparent 0 58%, color-mix(in srgb, var(--orange) 70%, transparent) 70%, var(--pt-filo) 76%, color-mix(in srgb, var(--pt-turquesa) 80%, transparent) 82%, transparent 92%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: calc(var(--pt-filo-op) * var(--pt-luz)); --pt-luz: .5; --pt-ang: 320deg; animation: ptGiro 2.4s .35s cubic-bezier(.45, .05, .25, 1) both; }
+.page-intro:has(.hello) h1.hello { text-shadow: 0 1px 0 rgba(255, 255, 255, .35); }
+:root[data-theme="dark"] .page-intro:has(.hello) h1.hello { text-shadow: 0 0 28px color-mix(in srgb, var(--pt-marca) 22%, transparent); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .page-intro:has(.hello) h1.hello { text-shadow: 0 0 28px color-mix(in srgb, var(--pt-marca) 22%, transparent); } }
+
+/* — Indicadores: luz ambiental en distinta esquina por tarjeta, filo de luz al aparecer y al pasar el cursor,
+     y cifra con más presencia — */
+:root .kx { --pt-x: 100%; --pt-y: 0%; }
+:root .kx:nth-child(4n+2) { --pt-x: 0%; --pt-y: 0%; } :root .kx:nth-child(4n+3) { --pt-x: 100%; --pt-y: 100%; } :root .kx:nth-child(4n) { --pt-x: 0%; --pt-y: 100%; }
+:root .kx > .kx-top::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 18px; pointer-events: none; opacity: var(--pt-amb);
+  background: radial-gradient(70% 70% at var(--pt-x) var(--pt-y), color-mix(in srgb, var(--ac) 16%, transparent), transparent 70%); transition: opacity .35s; }
+:root .kx > .kx-top::after { content: ""; position: absolute; inset: 0; z-index: 3; border-radius: 18px; padding: 1.2px; pointer-events: none;
+  background: conic-gradient(from var(--pt-ang), transparent 0 64%, color-mix(in srgb, var(--ac) 80%, transparent) 76%, var(--pt-filo) 80%, transparent 90%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: calc(.85 * var(--pt-luz)); --pt-luz: 0; --pt-ang: 320deg; animation: ptGiro 1.6s .45s cubic-bezier(.45, .05, .25, 1) both;
+  transition: --pt-ang 1.1s cubic-bezier(.45, .05, .25, 1), --pt-luz .35s; }
+:root .kx:nth-child(4n+2) > .kx-top::after { animation-delay: .55s; } :root .kx:nth-child(4n+3) > .kx-top::after { animation-delay: .65s; } :root .kx:nth-child(4n) > .kx-top::after { animation-delay: .75s; }
+/* La cifra aparece con un pequeño ascenso y en oscuro gana un halo del tono del indicador */
+:root .kx strong { animation: ptCifra .6s .25s cubic-bezier(.2, .7, .2, 1) both; }
+:root[data-theme="dark"] .kx strong { filter: drop-shadow(0 0 14px color-mix(in srgb, var(--ac) 30%, transparent)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kx strong { filter: drop-shadow(0 0 14px color-mix(in srgb, var(--ac) 30%, transparent)); } }
+@media (hover: hover) and (pointer: fine) {
+  :root .kx:hover > .kx-top::before { opacity: 1; }
+  :root .kx:hover > .kx-top::after { animation: none; --pt-luz: 1; --pt-ang: 680deg; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-intro:has(.hello) > :first-child::after, :root .kx > .kx-top::after, :root .kx strong { animation: none !important; transition: none !important; }
+  .page-intro:has(.hello) > :first-child::after { --pt-luz: .5; }
+  :root .kx > .kx-top::after { --pt-luz: 0; }
+}
+
+@media (max-width: 720px) { .page-intro:has(.hello) > :first-child::before, .page-intro:has(.hello) > :first-child::after { border-radius: 22px; } }
+
 /* ---------- Movimiento ---------- */
 @keyframes ptEntra { from { opacity: 0; transform: translateY(40px); } }
 @media (prefers-reduced-motion: reduce) {
