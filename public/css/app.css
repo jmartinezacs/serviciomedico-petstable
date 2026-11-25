@@ -2387,6 +2387,73 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 
 @media (max-width: 720px) { .page-intro:has(.hello) > :first-child::before, .page-intro:has(.hello) > :first-child::after { border-radius: 22px; } }
 
+/* ---------- 21. Superficie de diseño de indicadores y bienvenida ----------
+   Más diseño en el contenedor, sin tocar tamaño, tipografía ni íconos: fondo con el tono en diagonal,
+   doble borde con brillo interior, esquineros de acento, retícula de puntos que se desvanece y una esfera
+   de luz en la esquina. Todo con gradientes estáticos (se pintan una vez); sin animaciones nuevas. */
+:root { --pt-sup-hl: rgba(255, 255, 255, .75); --pt-sup-dot: .22; --pt-sup-orb: .55; }
+:root[data-theme="dark"] { --pt-sup-hl: rgba(255, 255, 255, .08); --pt-sup-dot: .3; --pt-sup-orb: .75; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --pt-sup-hl: rgba(255, 255, 255, .08); --pt-sup-dot: .3; --pt-sup-orb: .75; } }
+
+/* — Indicadores — */
+:root:root .kx {
+  --pt-esq: color-mix(in srgb, var(--ac) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ac) 28%, var(--line));
+  background:
+    /* esquineros: arriba-izquierda y abajo-derecha */
+    linear-gradient(var(--pt-esq), var(--pt-esq)) left 10px top 10px / 16px 2px no-repeat,
+    linear-gradient(var(--pt-esq), var(--pt-esq)) left 10px top 10px / 2px 16px no-repeat,
+    linear-gradient(var(--pt-esq), var(--pt-esq)) right 10px bottom 10px / 16px 2px no-repeat,
+    linear-gradient(var(--pt-esq), var(--pt-esq)) right 10px bottom 10px / 2px 16px no-repeat,
+    /* brillo diagonal tipo vidrio */
+    linear-gradient(118deg, transparent 30%, color-mix(in srgb, #fff 9%, transparent) 42%, transparent 52%),
+    /* superficie: tono del indicador entrando en diagonal sobre la tarjeta */
+    linear-gradient(145deg, color-mix(in srgb, var(--ac) 17%, var(--card)) 0%, color-mix(in srgb, var(--ac) 5%, var(--card)) 38%, var(--card) 62%, color-mix(in srgb, var(--ac) 10%, var(--card)) 100%);
+  box-shadow: inset 0 1px 0 var(--pt-sup-hl), inset 0 0 0 1px color-mix(in srgb, #fff 6%, transparent),
+    inset 0 -18px 30px -24px color-mix(in srgb, var(--ac) 40%, transparent),
+    0 1px 2px rgba(15, 23, 42, .06), 0 10px 22px -14px color-mix(in srgb, var(--ac) 40%, transparent), 0 28px 56px -38px rgba(15, 23, 42, .55);
+}
+/* Esfera de luz en la esquina (sustituye al anillo plano): volumen con luz arriba a la izquierda */
+:root:root .kx::before { inset: auto -46px -62px auto; width: 170px; height: 170px; border-radius: 50%; opacity: var(--pt-sup-orb);
+  background: radial-gradient(circle at 32% 28%, color-mix(in srgb, #fff 35%, var(--ac)) 0%, color-mix(in srgb, var(--ac) 45%, transparent) 22%, color-mix(in srgb, var(--ac) 14%, transparent) 48%, transparent 70%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac) 22%, transparent); }
+/* Retícula de puntos que se desvanece desde la esquina de luz de cada indicador (sobre la luz ambiental) */
+:root:root .kx > .kx-top::before {
+  background: radial-gradient(color-mix(in srgb, var(--ac) 55%, transparent) 1px, transparent 1.6px) 0 0 / 13px 13px,
+    radial-gradient(70% 70% at var(--pt-x) var(--pt-y), color-mix(in srgb, var(--ac) 18%, transparent), transparent 70%);
+  -webkit-mask: radial-gradient(80% 80% at var(--pt-x) var(--pt-y), #000 0%, rgba(0, 0, 0, .35) 45%, transparent 75%);
+  mask: radial-gradient(80% 80% at var(--pt-x) var(--pt-y), #000 0%, rgba(0, 0, 0, .35) 45%, transparent 75%);
+  opacity: calc(var(--pt-amb) * 1.1); }
+/* Barra superior más definida */
+:root:root .kx::after { left: 22px; right: auto; width: 64px; height: 3px; border-radius: 0 0 4px 4px; background: linear-gradient(90deg, var(--ac), color-mix(in srgb, var(--ac) 30%, transparent)); box-shadow: 0 2px 12px color-mix(in srgb, var(--ac) 70%, transparent); }
+
+/* — Bienvenida — */
+:root .page-intro:has(.hello) {
+  --pt-esq: color-mix(in srgb, var(--orange) 65%, transparent);
+  border: 1px solid color-mix(in srgb, var(--orange) 26%, var(--line, #E5E7EB));
+  background:
+    linear-gradient(var(--pt-esq), var(--pt-esq)) left 14px top 14px / 22px 2px no-repeat,
+    linear-gradient(var(--pt-esq), var(--pt-esq)) left 14px top 14px / 2px 22px no-repeat,
+    linear-gradient(var(--pt-esq), var(--pt-esq)) right 14px bottom 14px / 22px 2px no-repeat,
+    linear-gradient(var(--pt-esq), var(--pt-esq)) right 14px bottom 14px / 2px 22px no-repeat,
+    /* base de luz bajo Petrus */
+    radial-gradient(240px 70px at calc(100% - var(--bv-pr) * .55) 100%, color-mix(in srgb, var(--orange) 38%, transparent), transparent 70%),
+    radial-gradient(320px 220px at calc(100% - var(--bv-pr) * .55) 70%, color-mix(in srgb, var(--pt-turquesa) 20%, transparent), transparent 70%),
+    var(--pt-huellas) 0 0 / 120px 120px,
+    linear-gradient(118deg, color-mix(in srgb, var(--orange) 14%, var(--card, #fff)) 0%, var(--card, #fff) 45%, color-mix(in srgb, var(--pt-turquesa) 12%, var(--card, #fff)) 100%);
+}
+/* Retícula tecnológica de líneas finas que se desvanece desde la izquierda */
+.page-intro:has(.hello) > :first-child::before {
+  background: radial-gradient(60% 90% at 0% 0%, color-mix(in srgb, var(--pt-marca) 18%, transparent), transparent 70%),
+    radial-gradient(50% 80% at 100% 100%, color-mix(in srgb, var(--pt-turquesa) 20%, transparent), transparent 70%),
+    linear-gradient(color-mix(in srgb, var(--orange) 16%, transparent) 1px, transparent 1px) 0 0 / 26px 26px,
+    linear-gradient(90deg, color-mix(in srgb, var(--orange) 16%, transparent) 1px, transparent 1px) 0 0 / 26px 26px;
+  -webkit-mask: linear-gradient(100deg, #000 0%, rgba(0, 0, 0, .55) 35%, transparent 70%);
+  mask: linear-gradient(100deg, #000 0%, rgba(0, 0, 0, .55) 35%, transparent 70%); }
+@media (max-width: 720px) {
+  :root .page-intro:has(.hello) { background-position: left 10px top 10px, left 10px top 10px, right 10px bottom 10px, right 10px bottom 10px, 0 0, 0 0, 0 0, 0 0; }
+}
+
 /* ---------- Movimiento ---------- */
 @keyframes ptEntra { from { opacity: 0; transform: translateY(40px); } }
 @media (prefers-reduced-motion: reduce) {
